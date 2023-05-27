@@ -1,0 +1,511 @@
+% This must be in the first 5 lines to tell arXiv to use pdfLaTeX, which is strongly recommended.
+\pdfoutput=1
+% In particular, the hyperref package requires pdfLaTeX in order to break URLs across lines.
+
+\documentclass[11pt]{article}
+
+% Remove the "review" option to generate the final version.
+\usepackage[final]{ACL2023}
+
+% Standard package includes
+\usepackage{times}
+\usepackage{latexsym}
+
+% For proper rendering and hyphenation of words containing Latin characters (including in bib files)
+\usepackage[T1]{fontenc}
+% For Vietnamese characters
+% \usepackage[T5]{fontenc}
+% See https://www.latex-project.org/help/documentation/encguide.pdf for other character sets
+
+% This assumes your files are encoded as UTF8
+\usepackage[utf8]{inputenc}
+
+% This is not strictly necessary, and may be commented out.
+% However, it will improve the layout of the manuscript,
+% and will typically save some space.
+\usepackage{microtype}
+
+% This is also not strictly necessary, and may be commented out.
+% However, it will improve the aesthetics of text in
+% the typewriter font.
+\usepackage{inconsolata}
+\usepackage{amsmath}
+\usepackage{graphicx}
+
+% If the title and author information does not fit in the area allocated, uncomment the following
+%
+%\setlength\titlebox{<dim>}
+%
+% and set <dim> to something 5cm or larger.
+
+\title{Language Model-Friendly Paraphrase Search \\ for Robust Prompt Optimization}
+
+% Author information can be set in various styles:
+% For several authors from the same institution:
+% \author{Author 1 \and ... \and Author n \\
+%         Address line \\ ... \\ Address line}
+% if the names do not fit well on one line use
+%         Author 1 \\ {\bf Author 2} \\ ... \\ {\bf Author n} \\
+% For authors from different institutions:
+% \author{Author 1 \\ Address line \\  ... \\ Address line
+%         \And  ... \And
+%         Author n \\ Address line \\ ... \\ Address line}
+% To start a seperate ``row'' of authors use \AND, as in
+% \author{Author 1 \\ Address line \\  ... \\ Address line
+%         \AND
+%         Author 2 \\ Address line \\ ... \\ Address line \And
+%         Author 3 \\ Address line \\ ... \\ Address line}
+
+\author{Saeed Najafi \and
+  Alona Fyshe \\
+  Department of Computing Science, University of Alberta, Canada\\
+  \texttt{\{snajafi,alona\}@ualberta.ca} \\}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+Pre-trained Language Models (PLMs) are delivering surprising performance when they are fine-tuned on downstream text processing tasks. Recently, researchers efficiently guide these truly-big models to generate the desired output of a downstream task by optimizing the input prompts. Therefore, the prompt engineering research has solely focused on searching for the prompts that can be fed into the PLMs along with the original input text. Here, we investigate whether small modifications of the original input text would impact the final performance of the downstream task for various discrete and continuous prompt optimization techniques. Interestingly, our experiments in the few-shot Natural Language Understanding (NLU) datasets reveal that augmenting the training datasets with input paraphrases significantly boosts the performance of various prompt optimization techniques.
+\end{abstract}
+
+\section{Introduction}
+
+These instructions are for authors submitting papers to ACL 2023 using \LaTeX. They are not self-contained. All authors must follow the general instructions for *ACL proceedings,\footnote{\url{http://acl-org.github.io/ACLPUB/formatting.html}} as well as guidelines set forth in the ACL 2023 call for papers.\footnote{\url{https://2023.aclweb.org/calls/main_conference/}} This document contains additional instructions for the \LaTeX{} style files.
+The templates include the \LaTeX{} source of this document (\texttt{acl2023.tex}),
+the \LaTeX{} style file used to format it (\texttt{acl2023.sty}),
+an ACL bibliography style (\texttt{acl\_natbib.bst}),
+an example bibliography (\texttt{custom.bib}),
+and the bibliography for the ACL Anthology (\texttt{anthology.bib}).
+
+List of contributions:
+\begin{itemize}
+    \item We empirically show that with different language models and prompt learning techniques, we can further improve the text classification performance by appropriate simplification of the original inputs.
+    \item We propose a learning framework to find these simplified inputs using Maximum Marginal Likelihood (MML) estimation.
+    \item We also compare our MML estimation with following Reinforcement Learning (RL) methods: policy-gradient methods and the recent soft-Q learning algorithm.
+\end{itemize}
+
+\section{Problem Formulation}
+- Are manual prompts robust to Paraphrasing Inputs?
+
+    - What kind of modifications we can make?
+        - Read about behavioural testing of NLP models!
+        - Drop irrelevent phrases such as time phrases!
+        - Change named entities!
+        - Change the input tense!
+        - Generate paraphrases from a supervised model!
+        - Use synonyms of the irrelevant words in the sentence!
+
+Histograms for Positive Vs. Negative is a good diagram on a specific input example and its different variants. Test with 4 different manual prompts and show the averages scores per positive vs. negative performance on the SST-2 dev set sentiment classification using pre-trained T5 large for the verbalizers "positive" vs. "negative" words.
+
+Do a similar experiment for Roberta-large!
+
+- Define the problem!
+We are going to transfer $X$ to $X^{par}$ and then from $X^{par}$ to $Y$.
+
+Once baseline would be data augmentation of the $X$ with greedy samples of $X^{par}$ and then train the prompt method using prompt, $X^{par}$ and $Ys$.
+
+Other approach would be to train a paraphraser on the fly while interacting with the LM. How to make sure the input stays grammatical?, we should generate grammatical samples from the paraphrases. One idea could be top-p sampling or beam-search sampling or do off-policy sampling with MML or do proximal policy optimization or policy gradient with rewards about grammar of the text being generated.
+
+How to generate grammatical $X^{par}$$
+
+\section{Methods}
+
+We focus on Natural Language Understanding (NLU) tasks where we have access to supervised training examples $D_{supp} = \{(x_i, y_i)\}^{i=N}_{i=1}$. We wish to update the parameter set $\theta_{lm}$ by maximizing the probability of the class label $y_i$ given the input $x_i$: $P_{\theta_{lm}} (y_i | x_i)$. To augment $D_{supp}$ with semi-supervised examples, we generate $M$ paraphrases for each $x_i$ using the paraphrase generator $P_{\theta_{par}} (z_{i,j} | x_{i})$ where $z_{i,j}$ is the $j$'s paraphrase for the input $x_{i}$ keeping the same semantic meaning with a different syntactic form. With these generated paraphrases, we are optimizing the following objective:
+\begin{multline}
+    J_{\theta_{lm}} = \sum^{N}_{i=1} \{ \log P_{\theta_{lm}} (y_i | x_i) + \\
+    \sum^{M}_{j=1} P_{\theta_{par}} (z_{i,j} | x_{i}) \times \log P_{\theta_{lm}} (y_i | z_{i,j})\}
+\label{lmfp-augmentation}
+\end{multline}
+
+The paraphrase examples are weighted by the paraphrase model $P_{\theta_{par}}$ which is fixed during optimizing the weights $\theta_{lm}$ of the language model.
+
+\subsection{LM Tuning Techniques}
+- Describe these:
+    - full model tuning.
+    - input tuning.
+    - output tuning.
+    - classifier tuning.
+    - gradient-search based on autoprompt.
+    - grips edit based tuning of the instructions.
+    - soft-prompt tuning.
+    - lora adaptation technique tuning.
+
+- Describe that all are included with instructions except classifier fine-tuning.
+- Describe the relative number of parameters to tune with each of these techniques.
+
+(Need to describe each method in Detail)
+We first assume that our backbone language model is being offered as a third-party API without having access to its gradients or internal activations.
+
+
+
+
+%With this assumption, we consider the recent discrete optimization method RLPrompt \cite{deng-etal-2022-rlprompt} which uses the on-policy version of the soft Q-learning \cite{https://doi.org/10.48550/arxiv.2106.07704} to find the optimal discrete prompt tokens in a gradient-free setting. With the RLPrompt, $\theta_{lm}$ denotes the parameters of the policy network to generate the prompt sequence. 
+
+Similar to the motivating example, as a second gradient-free baseline, we consider manual prompt templates without training any extra parameters for prompt learning in the language model, therefore $\theta_{lm} = \emptyset$ with manual prompts. To further optimize the manual prompts, we apply the gradient-search method similar to AutoPrompt \cite{shin-etal-2020-autoprompt} starting from our manual templates. With this gradient-search method, $\theta_{lm} = \emptyset$ as we are not introducing any new trainable parameters.
+
+With access to gradients, we first consider the full model fine-tuning on the downstream classification task, therefore $\theta_{lm}$ corresponds to all of the parameters in the backbone language model. Moreover, we experiment with soft-prompt tuning approach \cite{lester-etal-2021-power} where a set of continuous vectors are prepended to the fixed input embeddings and these continuous vectors are the only training parameters $\theta_{lm}$ on the downstream task.
+
+\subsection{LM-Friendly Paraphrase Search}
+In this section, we describe our main learning objective for our proposed LM-Friendly Paraphrase Search (LMFPS). We wish to generate paraphrases $z_{i,j}$ of the input $x_i$ such that the downstream language model can predict the correct label $y_i$ with higher confidence. Therefore, our learning objective is to maximize the expected reward for our generated paraphrases $z_{i,j}$ using the downstream language model $P_{\theta_{lm}} (y_i | z_{i,j})$. This goal results in the following expected maximization:
+\begin{multline}
+J_{\theta_{par}} = E_{z_{i,j}} [\log P_{\theta_{lm}} (y_i | z_{i,j})] \\
+z_{i,j} \sim P_{\theta_{par}}(.|x_i)
+\label{lmfp}
+\end{multline}
+
+
+- Describe the motivation for the policy gradient objective.
+
+- Describe the motivation for the normalizing the score of LM per paraphrase.
+
+- Describe the motivation for off-policy learning.
+
+Describe the final objective being used.
+
+We will use various prompt baselines to guide the input sentence.
+Soft-prompt tuning.
++ manual prompts.
+full-model fine-tuning.
+
+- While training the text simplifier, one approach is to fix the LM that has been fine-tuned with respect the prompt method.
+- The second approach we will also update the LM using the prompt method while learning the text simplifier.
+- Two algorithms to train the text simplifier, one would be off-mml, the second would be soft-q-learning.
+- Third simple baseline would be computing an attention over the input x to drop some terms from the input.
+- Last, see the effect on short-vs-long context.
+- Consider the effect of the dataset pre-training for the text simplifier.
+- Two kinds of models, t5-large, roberta-large.
+- Two text classifications (few-shot vs. full-shot)
+- Examples of the text being modified and the change in-accuracy.
+
+- Compare your off-policy method with PPO!
+- I can do top-p sampling with different ratios of length penalty to encourage longer, shorter paraphrases of the same input and make the model or the prompting method robust towards these paraphrases.
+
+To produce a PDF file, pdf\LaTeX{} is strongly recommended (over original \LaTeX{} plus dvips+ps2pdf or dvipdf). Xe\LaTeX{} also produces PDF files, and is especially suitable for text in non-Latin scripts.
+
+
+\section{Experiments}
+
+\subsection{Pre-trained Models}
+As our pre-trained paraphrase model $P_{\theta_{par}} (z_{i,j} | x_{i})$, we use the BART-large \cite{lewis-etal-2020-bart} finetuned on the ParaBank2 dataset over 5 million sentence-paraphrase pairs \cite{hu-etal-2019-large}. These pairs have been constructed by back-translating the Czech portion of an English-Czech parallel corpus \cite{hu-etal-2019-large}. The model has been pre-trained with only token-level cross-entropy loss calculated using the gold paraphrase output given the input sentence.  We download the publically available\footnote{\url{https://huggingface.co/stanford-oval/paraphraser-bart-large}} weights trained as part of the AutoQA system \cite{xu-etal-2020-autoqa}. It is worth noting that our goal is not to train the state-of-the-art paraphrase generator as we study the effect of paraphrasing on prompt optimization techniques. Recent techniques for generating diverse paraphrases \cite{zhou-bhat-2021-paraphrase} could boost the performance in all our experiments. As some of our classification experiments have been conducted on the GLUE benchmark \cite{DBLP:journals/corr/abs-1804-07461}, we choose the BART-based model rather than the alternative T5 pre-trained model. The GLUE dataset has been part of the supervised corpora used for pre-training T5 models \cite{DBLP:journals/corr/abs-1910-10683}. The BART-large model finetuned on the paraphrase corpus has not observed the input sentences and the corresponding class labels of the GLUE datasets as part of its initial pre-training dataset.
+
+We use two types of models\footnote{\url{https://huggingface.co/google/t5-large-lm-adapt}}\footnote{\url{https://huggingface.co/roberta-large}} as our main language model $LM_{\theta_{lm}} (y | p ; x^{s})$: the generative LM T5-large with extra training phase for LM adaptation as explored by the soft-prompt tuning approach \cite{lester-etal-2021-power}, and the RoBERTa-large model pre-trained with Masked Language Modeling (MLM) objective \cite{DBLP:journals/corr/abs-1907-11692}.
+
+\subsection{Sampling Parameters}
+
+\subsection{Alternative Learning Objectives for LMFPS}
+In this section, we describe alternative learning objectives to fine-tune the paraphrase generator using the log likelihood of the downstream language model as the initial reward. Given the $j$'s paraphrase $z_{j}$ of the training example $(x, y)$, we define the $z_{j}$'s reward as $R(z_{j}) = \log P_{\theta_{lm}} (y | z_{j})$. 
+
+We have three dimensions to our decisions regarding the objective functions. Our first option is to use Maximum Marginal Likelihood estimation, or approximate the gradient update for the paraphrase model using the Policy Gradient theorem. The gradient updates using these two approaches are different in how we partition the score of each sample \cite{}. The main objective is to optimize the following expectation:
+\begin{multline}
+J_{\theta_{par}} = \log E_{z_{j}} [e^{R(z_{j})}], 
+z_{j} \sim P_{\theta_{par}}(.|x)
+\label{main-objective}
+\end{multline}
+
+If for each input $x$, we take paraphrase samples from $P_{\theta_{par}}(.|x)$ and then approximate the expectation in $J_{\theta_{par}}$ with numerical summation, we are optimizing the objective using Maximum Marginal Likelihood estimation resulting in the following gradient update:
+\begin{multline}
+\nabla J^{mml}_{\theta_{par}} = \nabla \log \sum^{M}_{j=1} P_{\theta_{par}}(z_{j}|x) \times e^{R(z_{j})} \\
+z_{j} \sim P_{\theta_{par}}(.|x)
+\label{mml-objective}
+\end{multline}
+
+If we push the $\log$ inside the expectation, we can optimize the following lower bound and then apply the policy gradient theorem \cite{10.5555/3009657.3009806} to estimate the gradient update:
+\begin{multline}
+\nabla J^{pg}_{\theta_{par}} = \sum^{M}_{j=1} \nabla \log P_{\theta_{par}}(z_{j}|x) \times R(z_{j}) \\
+z_{j} \sim P_{\theta_{par}}(.|x)
+\label{pg-objective}
+\end{multline}
+
+To promote the generation of paraphrases that are easier for the language model than the original input $x$, we also optimize the policy gradient objective using the following reward function $R^{d}(z_{j}) = R(z_{j}) - R(x)$. As another alternative reward function, we normalize the rewards of the paraphrases for the same input $x$. This helps to avoid training the paraphrase generator with rewards having different magnitudes corresponding to various input examples as some training pairs could be easier for the language model. Similar reward normalization or z-scoring has been reported to boost the performance of text generators across many tasks \cite{guo-etal-2022-efficient}. The normalized reward is defined as follows:
+\begin{multline}
+R^{n}(z_{j}) = \frac{R(z_{j}) - \mu_{j}}{\sigma_{j}}, \mu_{j} = \frac{1}{M} \sum^{M}_{j=1} R(z_{j}) \\
+\sigma^{2}_{j} = \frac{1}{M} \sum^{M}_{j=1} (R(z_{j}) - \mu_{j})^2
+\label{normal-reward}
+\end{multline}
+
+\subsection{Averaging predictions using multiple paraphrases over the test data.}
+
+\subsection{Metrics}
+- Describe the evaluation metrics for each task in superglue.
+- Describe behavioural testing which checks the performance of the models by behavioural testing.
+
+- Summarize the metric for sentiment analysis and sst-5. and Also mention the behavioural testing on SST-2 and SST-5. 
+
+- Describe Behavioural Testing for Sentiment Analysis. Provide a table of example perturbations and tests being applied. We will record the behavioural testing as another metric.
+
+We refer to the paper for a complete list of these tests for question-duplication and machine comprehension.
+
+
+- One main table comparing your paraphrased inputs with previous works on superglue tasks against various baselines on the roberta-large model.
+
+    With only results from SST-2 & SST-5 and paraphrased augmentation and related work comparison in prompt learning, I can do candidacy Exam! I can also compare with my previous off-policy MML! You are doing the experiments in 5 splits of few-shot learning over these datasets, so training is really fast and easy!
+    Report behavioural testing for SST-2 and SST-5 for now for the candidacy exam.
+
+- Multiple ablation tables about simple data augmentation. Or using on-policy samples or the comparison against an RL and PPO objective.
+
+- Ablation study about co-training or just fixing the prompt learning method.
+
+- Ablation study about how to takes samples such as beam or different rates of top-p sampling.
+
+- Ablation study on the corporation of other rewards for the paraphrased inputs.
+
+- Maybe report some metrics about behavioural testing.
+    This is one final table about the the failure rates of different prompting methods and with our paraphrased inputs to suggest that models and prompt techniques are still not robust to small input perterbations!!!!
+
+- Mention your method's difference with self-critical training.
+
+\begin{table*}
+\centering
+\caption{The average accuracy (standard deviation) on the dev set of the SST2 binary sentiment classification task with the Roberta-Large LM trained in the fewshot setting using only 16 train examples per label. The results are averaged after sampling 32 examples for the train and validation splits using five different random seeds.$\dagger$ is the reported performance of the fine-tuned Roberta-Large on all of the training dataset.}
+
+\begin{tabular}{c | c | c | c | c | c | c}
+\hline
+LM Tuning Method & Normal Train Data & +AUG & +AUG$_{avg}$ & +PAR & +PAR$_{avg}$ \\
+\hline
+\cite{DBLP:journals/corr/abs-1907-11692}$\dagger$ & 96.4 & n/a & n/a & n/a & n/a\\
+\hline
+%no instruction - no LM train & 77.2 & 77.2 & 77.2 & \\
+with instruction - no LM train & 86.8 & 86.8 & 83.1 & 86.8 & 83.1\\
+\hline
+all\_finetune & 91.3 \small$\pm$\small1.2 & 91.0 \small$\pm$\small1.6 & 91.1 \small$\pm$\small1.6 & {\color{green}91.7} \small$\pm$\small1.3 & {\color{green}92.0} \small$\pm$\small1.6\\
+input\_finetune & 89.7 \small$\pm$\small0.5 & {\color{green}91.1} \small$\pm$\small0.6 & {\color{green}91.4} \small$\pm$\small0.3 & {\color{green}90.2} \small$\pm$\small0.8 & {\color{green}91.1} \small$\pm$\small1.0\\
+output\_finetune & 87.2 \small$\pm$\small3.3 & 86.5 \small$\pm$\small2.5 & 86.5 \small$\pm$\small2.8 & 86.1 \small$\pm$\small2.6 & 86.4 \small$\pm$\small2.4\\
+classifier\_finetune & 64.5 \small$\pm$\small2.7 &  64.9 \small$\pm$\small4.6 & 64.9 \small$\pm$\small5.6 & {\color{green}66.7} \small$\pm$\small2.3 & {\color{green}66.5} \small$\pm$\small2.5 \\
+\hline
+prompt tune & 79.9 \small$\pm$\small7.5 & {\color{green}88.3} \small$\pm$\small5.0 & {\color{green}88.9} \small$\pm$\small4.8 & {\color{green}88.6} \small$\pm$\small3.3 & {\color{green}88.8} \small$\pm$\small3.1\\
+gradient search & 86.5 \small$\pm$\small2.9 & {\color{green}89.0} \small$\pm$\small1.5 & {\color{green}88.2} \small$\pm$\small1.7 &
+\end{tabular}
+\label{sst2}
+\end{table*}
+
+
+The main Training Step:
+
+\begin{multline}
+P(y|x) = 0.5 \times P_{LM_{\phi}}(y|x) + \\
+0.5 \times \sum_{x^{'} \in P_{sam}} \frac{P_{\theta}(x^{'} | x)}{P_{sam}(x^{'} | x)} \times P_{LM_{\phi}}(y | x^{'})
+\end{multline}
+
+- One table about the number of parameters being updated with each method.
+
+- show the tuned learning rates per model tuning method.
+
+- Depict the picture on the training examples as we plot Dev accuracy for these different methods.
+
+
+- Describe what weights you have been updating.
+
+- Describe the input format for each model and what you are basically updating with these models.
+
+
+\begin{table}
+\centering
+\begin{tabular}{lc}
+\hline
+\textbf{Command} & \textbf{Output}\\
+\hline
+\verb|{\"a}| & {\"a} \\
+\verb|{\^e}| & {\^e} \\
+\verb|{\`i}| & {\`i} \\ 
+\verb|{\.I}| & {\.I} \\ 
+\verb|{\o}| & {\o} \\
+\verb|{\'u}| & {\'u}  \\ 
+\verb|{\aa}| & {\aa}  \\\hline
+\end{tabular}
+\begin{tabular}{lc}
+\hline
+\textbf{Command} & \textbf{Output}\\
+\hline
+\verb|{\c c}| & {\c c} \\ 
+\verb|{\u g}| & {\u g} \\ 
+\verb|{\l}| & {\l} \\ 
+\verb|{\~n}| & {\~n} \\ 
+\verb|{\H o}| & {\H o} \\ 
+\verb|{\v r}| & {\v r} \\ 
+\verb|{\ss}| & {\ss} \\
+\hline
+\end{tabular}
+\caption{Example commands for accented characters, to be used in, \emph{e.g.}, Bib\TeX{} entries.}
+\label{tab:accents}
+\end{table}
+\section{Preamble}
+\begin{table*}
+\centering
+\begin{tabular}{lll}
+\hline
+\textbf{Output} & \textbf{natbib command} & \textbf{Old ACL-style command}\\
+\hline
+\citep{ct1965} & \verb|\citep| & \verb|\cite| \\
+\citealp{ct1965} & \verb|\citealp| & no equivalent \\
+\citet{ct1965} & \verb|\citet| & \verb|\newcite| \\
+\citeyearpar{ct1965} & \verb|\citeyearpar| & \verb|\shortcite| \\
+\citeposs{ct1965} & \verb|\citeposs| & no equivalent \\
+\citep[FFT;][]{ct1965} &  \verb|\citep[FFT;][]| & no equivalent\\
+\hline
+\end{tabular}
+\caption{\label{citation-guide}
+Citation commands supported by the style file.
+The style is based on the natbib package and supports all natbib citation commands.
+It also supports commands defined in previous ACL style files for compatibility.
+}
+\end{table*}
+The first line of the file must be
+\begin{quote}
+\begin{verbatim}
+\documentclass[11pt]{article}
+\end{verbatim}
+\end{quote}
+To load the style file in the review version:
+\begin{quote}
+\begin{verbatim}
+\usepackage[review]{ACL2023}
+\end{verbatim}
+\end{quote}
+For the final version, omit the \verb|review| option:
+\begin{quote}
+\begin{verbatim}
+\usepackage{ACL2023}
+\end{verbatim}
+\end{quote}
+To use Times Roman, put the following in the preamble:
+\begin{quote}
+\begin{verbatim}
+\usepackage{times}
+\end{verbatim}
+\end{quote}
+(Alternatives like txfonts or newtx are also acceptable.)
+Please see the \LaTeX{} source of this document for comments on other packages that may be useful.
+Set the title and author using \verb|\title| and \verb|\author|. Within the author list, format multiple authors using \verb|\and| and \verb|\And| and \verb|\AND|; please see the \LaTeX{} source for examples.
+By default, the box containing the title and author names is set to the minimum of 5 cm. If you need more space, include the following in the preamble:
+\begin{quote}
+\begin{verbatim}
+\setlength\titlebox{<dim>}
+\end{verbatim}
+\end{quote}
+where \verb|<dim>| is replaced with a length. Do not set this length smaller than 5 cm.
+
+\section{Document Body}
+
+\subsection{Footnotes}
+
+Footnotes are inserted with the \verb|\footnote| command.\footnote{This is a footnote.}
+
+\subsection{Tables and figures}
+
+See Table~\ref{tab:accents} for an example of a table and its caption.
+\textbf{Do not override the default caption sizes.}
+
+\subsection{Hyperlinks}
+
+Users of older versions of \LaTeX{} may encounter the following error during compilation: 
+\begin{quote}
+\tt\verb|\pdfendlink| ended up in different nesting level than \verb|\pdfstartlink|.
+\end{quote}
+This happens when pdf\LaTeX{} is used and a citation splits across a page boundary. The best way to fix this is to upgrade \LaTeX{} to 2018-12-01 or later.
+
+\subsection{Citations}
+
+
+
+Table~\ref{citation-guide} shows the syntax supported by the style files.
+We encourage you to use the natbib styles.
+You can use the command \verb|\citet| (cite in text) to get ``author (year)'' citations, like this citation to a paper by \citet{Gusfield:97}.
+You can use the command \verb|\citep| (cite in parentheses) to get ``(author, year)'' citations \citep{Gusfield:97}.
+You can use the command \verb|\citealp| (alternative cite without parentheses) to get ``author, year'' citations, which is useful for using citations within parentheses (e.g. \citealp{Gusfield:97}).
+
+\section{Related Works}
+
+\noindent
+{\bf Prompt Engineering}:
+Describe P-tuning, P-Tuning V2, Prefix-Tuning, Blax-Box Tuning, Levenstian Tuning. Chain of Thought Prompting.
+
+\noindent
+{\bf Paraphrase Generation}:
+Our main goal in this study is not to provide a state-of-the-art system for diverse paraphrase generation. We investigate the effect of input paraphrasing on the prompt optimization techniques for efficiently querying large language models.
+
+\noindent
+{\bf Query \& Question Reformulation}:
+
+
+\section{Limitations}
+
+- We are not doing the best in summarization, more can be done by deploying better summarization models.
+
+- Merging prompts with original inputs.
+\subsection{References}
+
+\nocite{Ando2005,augenstein-etal-2016-stance,andrew2007scalable,rasooli-tetrault-2015,goodman-etal-2016-noise,harper-2014-learning}
+
+The \LaTeX{} and Bib\TeX{} style files provided roughly follow the American Psychological Association format.
+If your own bib file is named \texttt{custom.bib}, then placing the following before any appendices in your \LaTeX{} file will generate the references section for you:
+\begin{quote}
+\begin{verbatim}
+\bibliographystyle{acl_natbib}
+\bibliography{custom}
+\end{verbatim}
+\end{quote}
+You can obtain the complete ACL Anthology as a Bib\TeX{} file from \url{https://aclweb.org/anthology/anthology.bib.gz}.
+To include both the Anthology and your own .bib file, use the following instead of the above.
+\begin{quote}
+\begin{verbatim}
+\bibliographystyle{acl_natbib}
+\bibliography{anthology,custom}
+\end{verbatim}
+\end{quote}
+Please see Section~\ref{sec:bibtex} for information on preparing Bib\TeX{} files.
+
+\subsection{Appendices}
+
+Use \verb|\appendix| before any appendix section to switch the section numbering over to letters. See Appendix~\ref{sec:appendix} for an example.
+
+\section{Bib\TeX{} Files}
+\label{sec:bibtex}
+
+Unicode cannot be used in Bib\TeX{} entries, and some ways of typing special characters can disrupt Bib\TeX's alphabetization. The recommended way of typing special characters is shown in Table~\ref{tab:accents}.
+
+Please ensure that Bib\TeX{} records contain DOIs or URLs when possible, and for all the ACL materials that you reference.
+Use the \verb|doi| field for DOIs and the \verb|url| field for URLs.
+If a Bib\TeX{} entry has a URL or DOI field, the paper title in the references section will appear as a hyperlink to the paper, using the hyperref \LaTeX{} package.
+
+\section*{Limitations}
+ACL 2023 requires all submissions to have a section titled ``Limitations'', for discussing the limitations of the paper as a complement to the discussion of strengths in the main text. This section should occur after the conclusion, but before the references. It will not count towards the page limit.
+The discussion of limitations is mandatory. Papers without a limitation section will be desk-rejected without review.
+
+While we are open to different types of limitations, just mentioning that a set of results have been shown for English only probably does not reflect what we expect. 
+Mentioning that the method works mostly for languages with limited morphology, like English, is a much better alternative.
+In addition, limitations such as low scalability to long text, the requirement of large GPU resources, or other things that inspire crucial further investigation are welcome.
+
+\section*{Ethics Statement}
+Scientific work published at ACL 2023 must comply with the ACL Ethics Policy.\footnote{\url{https://www.aclweb.org/portal/content/acl-code-ethics}} We encourage all authors to include an explicit ethics statement on the broader impact of the work, or other ethical considerations after the conclusion but before the references. The ethics statement will not count toward the page limit (8 pages for long, 4 pages for short papers).
+
+\section*{Acknowledgements}
+This document has been adapted by Jordan Boyd-Graber, Naoaki Okazaki, Anna Rogers from the style files used for earlier ACL, EMNLP and NAACL proceedings, including those for
+EACL 2023 by Isabelle Augenstein and Andreas Vlachos,
+EMNLP 2022 by Yue Zhang, Ryan Cotterell and Lea Frermann,
+ACL 2020 by Steven Bethard, Ryan Cotterell and Rui Yan,
+ACL 2019 by Douwe Kiela and Ivan Vuli\'{c},
+NAACL 2019 by Stephanie Lukin and Alla Roskovskaya, 
+ACL 2018 by Shay Cohen, Kevin Gimpel, and Wei Lu, 
+NAACL 2018 by Margaret Mitchell and Stephanie Lukin,
+Bib\TeX{} suggestions for (NA)ACL 2017/2018 from Jason Eisner,
+ACL 2017 by Dan Gildea and Min-Yen Kan, NAACL 2017 by Margaret Mitchell, 
+ACL 2012 by Maggie Li and Michael White, 
+ACL 2010 by Jing-Shin Chang and Philipp Koehn, 
+ACL 2008 by Johanna D. Moore, Simone Teufel, James Allan, and Sadaoki Furui, 
+ACL 2005 by Hwee Tou Ng and Kemal Oflazer, 
+ACL 2002 by Eugene Charniak and Dekang Lin, 
+and earlier ACL and EACL formats written by several people, including
+John Chen, Henry S. Thompson and Donald Walker.
+Additional elements were taken from the formatting instructions of the \emph{International Joint Conference on Artificial Intelligence} and the \emph{Conference on Computer Vision and Pattern Recognition}.
+
+% Entries for the entire Anthology, followed by custom entries
+\bibliography{anthology,custom}
+\bibliographystyle{acl_natbib}
+
+\appendix
+
+\section{Example Appendix}
+\label{sec:appendix}
+
+This is a section in the appendix.
+
+\end{document}
