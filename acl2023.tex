@@ -138,7 +138,7 @@ We first assume that our backbone language model is being offered as a third-par
 
 
 
-%With this assumption, we consider the recent discrete optimization method RLPrompt \cite{deng-etal-2022-rlprompt} which uses the on-policy version of the soft Q-learning \cite{https://doi.org/10.48550/arxiv.2106.07704} to find the optimal discrete prompt tokens in a gradient-free setting. With the RLPrompt, $\theta_{lm}$ denotes the parameters of the policy network to generate the prompt sequence. 
+%With this assumption, we consider the recent discrete optimization method RLPrompt \cite{deng-etal-2022-rlprompt} which uses the on-policy version of the soft Q-learning \cite{https://doi.org/10.48550/arxiv.2106.07704} to find the optimal discrete prompt tokens in a gradient-free setting. With the RLPrompt, $\theta_{lm}$ denotes the parameters of the policy network to generate the prompt sequence.
 
 Similar to the motivating example, as a second gradient-free baseline, we consider manual prompt templates without training any extra parameters for prompt learning in the language model, therefore $\theta_{lm} = \emptyset$ with manual prompts. To further optimize the manual prompts, we apply the gradient-search method similar to AutoPrompt \cite{shin-etal-2020-autoprompt} starting from our manual templates. With this gradient-search method, $\theta_{lm} = \emptyset$ as we are not introducing any new trainable parameters.
 
@@ -192,11 +192,11 @@ We use two types of models\footnote{\url{https://huggingface.co/google/t5-large-
 \subsection{Sampling Parameters}
 
 \subsection{Alternative Learning Objectives for LMFPS}
-In this section, we describe alternative learning objectives to fine-tune the paraphrase generator using the log likelihood of the downstream language model as the initial reward. Given the $j$'s paraphrase $z_{j}$ of the training example $(x, y)$, we define the $z_{j}$'s reward as $R(z_{j}) = \log P_{\theta_{lm}} (y | z_{j})$. 
+In this section, we describe alternative learning objectives to fine-tune the paraphrase generator using the log likelihood of the downstream language model as the initial reward. Given the $j$'s paraphrase $z_{j}$ of the training example $(x, y)$, we define the $z_{j}$'s reward as $R(z_{j}) = \log P_{\theta_{lm}} (y | z_{j})$.
 
 We have three dimensions to our decisions regarding the objective functions. Our first option is to use Maximum Marginal Likelihood estimation, or approximate the gradient update for the paraphrase model using the Policy Gradient theorem. The gradient updates using these two approaches are different in how we partition the score of each sample \cite{}. The main objective is to optimize the following expectation:
 \begin{multline}
-J_{\theta_{par}} = \log E_{z_{j}} [e^{R(z_{j})}], 
+J_{\theta_{par}} = \log E_{z_{j}} [e^{R(z_{j})}],
 z_{j} \sim P_{\theta_{par}}(.|x)
 \label{main-objective}
 \end{multline}
@@ -228,7 +228,7 @@ R^{n}(z_{j}) = \frac{R(z_{j}) - \mu_{j}}{\sigma_{j}}, \mu_{j} = \frac{1}{M} \sum
 - Describe the evaluation metrics for each task in superglue.
 - Describe behavioural testing which checks the performance of the models by behavioural testing.
 
-- Summarize the metric for sentiment analysis and sst-5. and Also mention the behavioural testing on SST-2 and SST-5. 
+- Summarize the metric for sentiment analysis and sst-5. and Also mention the behavioural testing on SST-2 and SST-5.
 
 - Describe Behavioural Testing for Sentiment Analysis. Provide a table of example perturbations and tests being applied. We will record the behavioural testing as another metric.
 
@@ -305,22 +305,22 @@ P(y|x) = 0.5 \times P_{LM_{\phi}}(y|x) + \\
 \hline
 \verb|{\"a}| & {\"a} \\
 \verb|{\^e}| & {\^e} \\
-\verb|{\`i}| & {\`i} \\ 
-\verb|{\.I}| & {\.I} \\ 
+\verb|{\`i}| & {\`i} \\
+\verb|{\.I}| & {\.I} \\
 \verb|{\o}| & {\o} \\
-\verb|{\'u}| & {\'u}  \\ 
+\verb|{\'u}| & {\'u}  \\
 \verb|{\aa}| & {\aa}  \\\hline
 \end{tabular}
 \begin{tabular}{lc}
 \hline
 \textbf{Command} & \textbf{Output}\\
 \hline
-\verb|{\c c}| & {\c c} \\ 
-\verb|{\u g}| & {\u g} \\ 
-\verb|{\l}| & {\l} \\ 
-\verb|{\~n}| & {\~n} \\ 
-\verb|{\H o}| & {\H o} \\ 
-\verb|{\v r}| & {\v r} \\ 
+\verb|{\c c}| & {\c c} \\
+\verb|{\u g}| & {\u g} \\
+\verb|{\l}| & {\l} \\
+\verb|{\~n}| & {\~n} \\
+\verb|{\H o}| & {\H o} \\
+\verb|{\v r}| & {\v r} \\
 \verb|{\ss}| & {\ss} \\
 \hline
 \end{tabular}
@@ -396,7 +396,7 @@ See Table~\ref{tab:accents} for an example of a table and its caption.
 
 \subsection{Hyperlinks}
 
-Users of older versions of \LaTeX{} may encounter the following error during compilation: 
+Users of older versions of \LaTeX{} may encounter the following error during compilation:
 \begin{quote}
 \tt\verb|\pdfendlink| ended up in different nesting level than \verb|\pdfstartlink|.
 \end{quote}
@@ -470,7 +470,7 @@ If a Bib\TeX{} entry has a URL or DOI field, the paper title in the references s
 ACL 2023 requires all submissions to have a section titled ``Limitations'', for discussing the limitations of the paper as a complement to the discussion of strengths in the main text. This section should occur after the conclusion, but before the references. It will not count towards the page limit.
 The discussion of limitations is mandatory. Papers without a limitation section will be desk-rejected without review.
 
-While we are open to different types of limitations, just mentioning that a set of results have been shown for English only probably does not reflect what we expect. 
+While we are open to different types of limitations, just mentioning that a set of results have been shown for English only probably does not reflect what we expect.
 Mentioning that the method works mostly for languages with limited morphology, like English, is a much better alternative.
 In addition, limitations such as low scalability to long text, the requirement of large GPU resources, or other things that inspire crucial further investigation are welcome.
 
@@ -483,16 +483,16 @@ EACL 2023 by Isabelle Augenstein and Andreas Vlachos,
 EMNLP 2022 by Yue Zhang, Ryan Cotterell and Lea Frermann,
 ACL 2020 by Steven Bethard, Ryan Cotterell and Rui Yan,
 ACL 2019 by Douwe Kiela and Ivan Vuli\'{c},
-NAACL 2019 by Stephanie Lukin and Alla Roskovskaya, 
-ACL 2018 by Shay Cohen, Kevin Gimpel, and Wei Lu, 
+NAACL 2019 by Stephanie Lukin and Alla Roskovskaya,
+ACL 2018 by Shay Cohen, Kevin Gimpel, and Wei Lu,
 NAACL 2018 by Margaret Mitchell and Stephanie Lukin,
 Bib\TeX{} suggestions for (NA)ACL 2017/2018 from Jason Eisner,
-ACL 2017 by Dan Gildea and Min-Yen Kan, NAACL 2017 by Margaret Mitchell, 
-ACL 2012 by Maggie Li and Michael White, 
-ACL 2010 by Jing-Shin Chang and Philipp Koehn, 
-ACL 2008 by Johanna D. Moore, Simone Teufel, James Allan, and Sadaoki Furui, 
-ACL 2005 by Hwee Tou Ng and Kemal Oflazer, 
-ACL 2002 by Eugene Charniak and Dekang Lin, 
+ACL 2017 by Dan Gildea and Min-Yen Kan, NAACL 2017 by Margaret Mitchell,
+ACL 2012 by Maggie Li and Michael White,
+ACL 2010 by Jing-Shin Chang and Philipp Koehn,
+ACL 2008 by Johanna D. Moore, Simone Teufel, James Allan, and Sadaoki Furui,
+ACL 2005 by Hwee Tou Ng and Kemal Oflazer,
+ACL 2002 by Eugene Charniak and Dekang Lin,
 and earlier ACL and EACL formats written by several people, including
 John Chen, Henry S. Thompson and Donald Walker.
 Additional elements were taken from the formatting instructions of the \emph{International Joint Conference on Artificial Intelligence} and the \emph{Conference on Computer Vision and Pattern Recognition}.
