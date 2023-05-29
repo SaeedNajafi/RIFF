@@ -1,7 +1,7 @@
 # Paraphrasing the Inputs
 This repository holds all of the code associated with the research side of my projects considering prompt engineering and paraphrasing the inputs for large language models.
 
-The static code checker runs on python3.9
+The static code checker runs on python3.8
 
 # Installing dependencies
 
