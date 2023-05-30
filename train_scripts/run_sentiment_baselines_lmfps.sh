@@ -34,7 +34,8 @@ do
                         0 \
                         25 \
                         ${loss} \
-                        off_policy
+                        off_policy \
+                        beam_search
                 done
             done
         done

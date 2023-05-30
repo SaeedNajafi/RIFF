@@ -21,8 +21,9 @@ TRAIN_PARAPHRASER=${TRAIN_PARA}
 LOAD_PARAPHRASER=${LOAD_PARA}
 PARA_LOSS=${PARA_LOSS}
 SAMPLING_METHOD=${SAMPLING_METHOD}
+SAMPLING_ALG=${SAMPLING_ALG}
 
-model_path=${MAIN_PATH}/${TASK_NAME}/${EXPERIMENT_TYPE}/${RANDOM_SEED}/${LEARN_RATE}/${DATA_AUG}_${TRAIN_PARAPHRASER}_${LOAD_PARAPHRASER}_${PARA_LOSS}_${SAMPLING_METHOD}
+model_path=${MAIN_PATH}/${TASK_NAME}/${EXPERIMENT_TYPE}/${RANDOM_SEED}/${LEARN_RATE}/${DATA_AUG}_${TRAIN_PARAPHRASER}_${LOAD_PARAPHRASER}_${PARA_LOSS}_${SAMPLING_METHOD}_${SAMPLING_ALG}
 mkdir -p ${MAIN_PATH}
 mkdir -p ${MAIN_PATH}/${TASK_NAME}
 mkdir -p ${MAIN_PATH}/${TASK_NAME}/${EXPERIMENT_TYPE}
@@ -75,7 +76,8 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --train_temperature 2.0 \
     --train_sample_size 8 \
     --paraphrase_loss ${PARA_LOSS} \
-    --sampling_method ${SAMPLING_METHOD}
+    --sampling_method ${SAMPLING_METHOD} \
+    --sampling_algorithm ${SAMPLING_ALG}
 
 
 rm -r -f ${model_path}/roberta_model_best_step

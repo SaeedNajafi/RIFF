@@ -3,7 +3,7 @@ downstream NLP datasets."""
 
 import os
 from abc import abstractmethod
-from typing import Dict, Iterator, List, Optional, Tuple
+from typing import Dict, Iterator, List, Optional
 
 import numpy
 import torch
@@ -60,6 +60,11 @@ flags.DEFINE_string(
     "on_policy",
     "Whether to do on-policy sampling using the paraphrase model \
         or off-policy sampling using a separate paraphrase model.",
+)
+flags.DEFINE_string(
+    "sampling_algorithm",
+    "top_p",
+    "What algorithm to use for sampling? top_p or beam_search?",
 )
 
 
@@ -326,7 +331,7 @@ class Paraphraser(MyBaseLM):
 
     def generate_top_p_paraphrases(
         self, batch: torch.utils.data.Dataset, num_return_seq: int, temperature: float
-    ) -> Tuple[List[str], torch.Tensor]:
+    ) -> List[str]:
         """The main prediction loop to generate paraphrases."""
         # This function is to provide random samples for learning with RL!
         self.predict_mode_on()
@@ -349,7 +354,7 @@ class Paraphraser(MyBaseLM):
         # all special tokens will be removed.
         predictions_str = self.tokenizer.batch_decode(predictions_output.sequences, skip_special_tokens=True)
         predictions_str = [pred.strip() for pred in predictions_str]
-        return predictions_str, None
+        return predictions_str
 
 
 class RobertaPrompted(MyBaseLM):
@@ -414,7 +419,7 @@ class RobertaPrompted(MyBaseLM):
         to_train_lm = True
         if self.enable_data_augmentation == 1:
             potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
-            paraphrases, _ = self.para_model.generate_top_p_paraphrases(
+            paraphrases = self.para_model.generate_top_p_paraphrases(
                 batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
             )
             augment_batch(batch, paraphrases, self.tokenizer, potentials_str, num_return_seq=FLAGS.test_sample_size)
@@ -424,13 +429,18 @@ class RobertaPrompted(MyBaseLM):
             potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
 
             if FLAGS.sampling_method == "on_policy":
-                samples, _ = self.para_model.generate_top_p_paraphrases(
-                    batch, num_return_seq=FLAGS.train_sample_size, temperature=FLAGS.train_temperature
-                )
+                sampling_model = self.para_model
+
             elif FLAGS.sampling_method == "off_policy":
-                samples, _ = self.fixed_para_model.generate_top_p_paraphrases(
+                sampling_model = self.fixed_para_model
+
+            if FLAGS.sampling_algorithm == "top_p":
+                samples = sampling_model.generate_top_p_paraphrases(
                     batch, num_return_seq=FLAGS.train_sample_size, temperature=FLAGS.train_temperature
                 )
+
+            elif FLAGS.sampling_algorithm == "beam_search":
+                samples = sampling_model.generate_beam_paraphrases(batch, num_return_seq=FLAGS.train_sample_size)
 
             batch_size, seq_len = batch["para_input_ids"].size()
             batch["para_input_ids"] = (
@@ -600,7 +610,7 @@ class RobertaPrompted(MyBaseLM):
 
         potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
-        paraphrases, _ = self.para_model.generate_top_p_paraphrases(
+        paraphrases = self.para_model.generate_top_p_paraphrases(
             batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
         )
         augment_batch(batch, paraphrases, self.tokenizer, potentials_str, num_return_seq=FLAGS.test_sample_size)
@@ -634,7 +644,7 @@ class RobertaPrompted(MyBaseLM):
 
         potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
-        paraphrases, _ = self.para_model.generate_top_p_paraphrases(
+        paraphrases = self.para_model.generate_top_p_paraphrases(
             batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
         )
         augment_batch(batch, paraphrases, self.tokenizer, potentials_str, num_return_seq=FLAGS.test_sample_size)
