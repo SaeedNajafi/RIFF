@@ -16,7 +16,7 @@ from absl import app, flags
 from torch.utils.tensorboard import SummaryWriter
 
 from src.reference_implementations.prompt_zoo.classifier import ClassifierLM
-from src.reference_implementations.prompt_zoo.data_utility import create_sentiment_dataset
+from src.reference_implementations.prompt_zoo.data_utility import create_dataset
 from src.reference_implementations.prompt_zoo.gradient_search import SearchRoberta
 from src.reference_implementations.prompt_zoo.metrics import classifier_sentiment_metric, sentiment_metric
 from src.reference_implementations.prompt_zoo.model_utility import set_random_seed
@@ -32,10 +32,6 @@ flags.DEFINE_string("test_file", "/tmp/test.csv", "the path/name of the test fil
 flags.DEFINE_string("task_name", "semeval_3_class_sentiment", "the name of the downstream nlp task.")
 flags.DEFINE_string("train_file", "/tmp/train.csv", "the path/name of the train file.")
 flags.DEFINE_integer("enable_data_augmentation", 0, "To train with data augmentation generated with paraphrasing.")
-flags.DEFINE_integer("enable_paraphrase_training", 0, "To train the paraphraser with some objective.")
-flags.DEFINE_integer(
-    "load_paraphraser", 0, "Whether to load the paraphraser from a specific path while doing data augmentation"
-)
 
 
 def start_predicting(model: MyBaseLM, dataloader: torch.utils.data.DataLoader, prediction_file: str) -> None:
@@ -76,10 +72,8 @@ def train_model(
         epoch = 0
         global_step = 0
         total_loss = []
+        best_score = float("-inf")
         eval_file = os.path.join(FLAGS.model_path, "temp_eval.csv")
-        start_predicting(model, eval_dataloader, eval_file)
-        best_score = metric(eval_file)  # type: ignore
-        writer.add_scalar("Score/dev", best_score, 0)
         while epoch < FLAGS.max_epochs and global_step < FLAGS.training_steps:
             print("\nEpoch:{0}\n".format(epoch))
             epoch_loss = []
@@ -93,7 +87,6 @@ def train_model(
                     f"\rEpoch: {epoch} | Batch: {step} | Mean Loss: {mean_total_loss} | "
                     f"Epoch Loss: {mean_epoch_loss} | Loss: {loss}\n"
                 )
-
                 if global_step % FLAGS.steps_per_checkpoint == 0:
                     start_predicting(model, eval_dataloader, eval_file)
                     score = metric(eval_file)  # type: ignore
@@ -159,11 +152,9 @@ def launch_no_finetune_predict() -> None:
     finetuning any parameters and only relying on the backbone model."""
 
     FLAGS.mode = "no_finetune_test"
-    model = RobertaPrompted(
-        FLAGS.seed, FLAGS.enable_data_augmentation, FLAGS.enable_paraphrase_training, FLAGS.load_paraphraser
-    )
+    model = RobertaPrompted(FLAGS.seed, FLAGS.enable_data_augmentation)
     if FLAGS.enable_data_augmentation == 1:
-        eval_dataloader = create_sentiment_dataset(
+        eval_dataloader = create_dataset(
             tokenizer=model.tokenizer,
             file_name=FLAGS.test_file,
             task_name=FLAGS.task_name,
@@ -172,7 +163,7 @@ def launch_no_finetune_predict() -> None:
             para_tokenizer=model.para_tokenizer,
         )
     else:
-        eval_dataloader = create_sentiment_dataset(
+        eval_dataloader = create_dataset(
             tokenizer=model.tokenizer,
             file_name=FLAGS.test_file,
             task_name=FLAGS.task_name,
@@ -189,38 +180,25 @@ def launch_no_finetune_predict() -> None:
 def launch_test_or_train() -> None:
     """launch the testing or training phase for the prompting experiments
     without having the classifier on top."""
-
+    
+    if FLAGS.exp_type == "gradient_search":
+        model = SearchRoberta(FLAGS.seed, FLAGS.task_name, FLAGS.enable_data_augmentation)
+    else:
+        model = RobertaPrompted(FLAGS.seed, FLAGS.enable_data_augmentation)
+    
     if FLAGS.mode == "train":
-        if FLAGS.exp_type == "gradient_search":
-            model = SearchRoberta(FLAGS.seed, FLAGS.task_name, FLAGS.enable_data_augmentation, FLAGS.load_paraphraser)
-        else:
-            model = RobertaPrompted(
-                FLAGS.seed, FLAGS.enable_data_augmentation, FLAGS.enable_paraphrase_training, FLAGS.load_paraphraser
-            )
-
-        if FLAGS.enable_data_augmentation == 1 or FLAGS.enable_paraphrase_training == 1:
-            train_dataloader = create_sentiment_dataset(
-                tokenizer=model.tokenizer,
-                file_name=FLAGS.train_file,
-                task_name=FLAGS.task_name,
-                shuffle=True,
-                repeat_input=False,
-                para_tokenizer=model.para_tokenizer,
-            )
-        else:
-            train_dataloader = create_sentiment_dataset(
-                tokenizer=model.tokenizer,
-                file_name=FLAGS.train_file,
-                task_name=FLAGS.task_name,
-                shuffle=True,
-                repeat_input=False,
-                para_tokenizer=None,
-            )
-
         # for fewshot experiments, sample the same number of examples as the validation data.
         eval_file = FLAGS.train_file if FLAGS.classification_type == "fewshot" else FLAGS.dev_file
-        if FLAGS.enable_data_augmentation == 1 or FLAGS.enable_paraphrase_training == 1:
-            eval_dataloader = create_sentiment_dataset(
+        if FLAGS.enable_data_augmentation == 1:
+            train_dataloader = create_dataset(
+                tokenizer=model.tokenizer,
+                file_name=FLAGS.train_file,
+                task_name=FLAGS.task_name,
+                shuffle=True,
+                repeat_input=False,
+                para_tokenizer=model.para_tokenizer,
+            )
+            eval_dataloader = create_dataset(
                 tokenizer=model.tokenizer,
                 file_name=eval_file,
                 task_name=FLAGS.task_name,
@@ -229,30 +207,32 @@ def launch_test_or_train() -> None:
                 para_tokenizer=model.para_tokenizer,
             )
         else:
-            eval_dataloader = create_sentiment_dataset(
+            train_dataloader = create_dataset(
+                tokenizer=model.tokenizer,
+                file_name=FLAGS.train_file,
+                task_name=FLAGS.task_name,
+                shuffle=True,
+                repeat_input=False,
+                para_tokenizer=None,
+            )
+            eval_dataloader = create_dataset(
                 tokenizer=model.tokenizer,
                 file_name=eval_file,
                 task_name=FLAGS.task_name,
                 shuffle=False,
                 repeat_input=True,
                 para_tokenizer=None,
-            )
+            )       
         train_model(
             model=model,
             metric=sentiment_metric,
             train_dataloader=train_dataloader,
             eval_dataloader=eval_dataloader,
         )
+        
     elif FLAGS.mode in ["test", "inference"]:
-        if FLAGS.exp_type == "gradient_search":
-            model = SearchRoberta(FLAGS.seed, FLAGS.task_name, FLAGS.enable_data_augmentation, FLAGS.load_paraphraser)
-        else:
-            model = RobertaPrompted(
-                FLAGS.seed, FLAGS.enable_data_augmentation, FLAGS.enable_paraphrase_training, FLAGS.load_paraphraser
-            )
-
-        if FLAGS.enable_data_augmentation == 1 or FLAGS.enable_paraphrase_training == 1:
-            test_dataloader = create_sentiment_dataset(
+        if FLAGS.enable_data_augmentation == 1:
+            test_dataloader = create_dataset(
                 tokenizer=model.tokenizer,
                 file_name=FLAGS.test_file,
                 task_name=FLAGS.task_name,
@@ -261,7 +241,7 @@ def launch_test_or_train() -> None:
                 para_tokenizer=model.para_tokenizer,
             )
         else:
-            test_dataloader = create_sentiment_dataset(
+            test_dataloader = create_dataset(
                 tokenizer=model.tokenizer,
                 file_name=FLAGS.test_file,
                 task_name=FLAGS.task_name,
@@ -276,9 +256,12 @@ def launch_classifier_test_or_train() -> None:
     """launch the testing or training phase for the classifier over the LM."""
 
     if FLAGS.mode == "train":
-        model = ClassifierLM(FLAGS.seed, FLAGS.enable_data_augmentation, FLAGS.load_paraphraser)
+        # for fewshot experiments, sample the same number of examples as the validation data.
+        eval_file = FLAGS.train_file if FLAGS.classification_type == "fewshot" else FLAGS.dev_file
+        
+        model = ClassifierLM(FLAGS.seed, FLAGS.enable_data_augmentation)
         if FLAGS.enable_data_augmentation == 1:
-            train_dataloader = create_sentiment_dataset(
+            train_dataloader = create_dataset(
                 tokenizer=model.tokenizer,
                 file_name=FLAGS.train_file,
                 task_name=FLAGS.task_name,
@@ -286,36 +269,32 @@ def launch_classifier_test_or_train() -> None:
                 repeat_input=False,
                 para_tokenizer=model.para_tokenizer,
             )
+            eval_dataloader = create_dataset(
+                tokenizer=model.tokenizer,
+                file_name=eval_file,
+                task_name=FLAGS.task_name,
+                shuffle=False,
+                repeat_input=False,
+                para_tokenizer=model.para_tokenizer,
+            )
         else:
-            train_dataloader = create_sentiment_dataset(
+            train_dataloader = create_dataset(
                 tokenizer=model.tokenizer,
                 file_name=FLAGS.train_file,
                 task_name=FLAGS.task_name,
                 shuffle=True,
+                repeat_input=False,
+                para_tokenizer=None,
+            )
+            eval_dataloader = create_dataset(
+                tokenizer=model.tokenizer,
+                file_name=eval_file,
+                task_name=FLAGS.task_name,
+                shuffle=False,
                 repeat_input=False,
                 para_tokenizer=None,
             )
 
-        # for fewshot experiments, sample the same number of examples as the validation data.
-        eval_file = FLAGS.train_file if FLAGS.classification_type == "fewshot" else FLAGS.dev_file
-        if FLAGS.enable_data_augmentation == 1:
-            eval_dataloader = create_sentiment_dataset(
-                tokenizer=model.tokenizer,
-                file_name=eval_file,
-                task_name=FLAGS.task_name,
-                shuffle=False,
-                repeat_input=False,
-                para_tokenizer=model.para_tokenizer,
-            )
-        else:
-            eval_dataloader = create_sentiment_dataset(
-                tokenizer=model.tokenizer,
-                file_name=eval_file,
-                task_name=FLAGS.task_name,
-                shuffle=False,
-                repeat_input=False,
-                para_tokenizer=None,
-            )
         train_model(
             model=model,
             metric=classifier_sentiment_metric,
@@ -323,9 +302,9 @@ def launch_classifier_test_or_train() -> None:
             eval_dataloader=eval_dataloader,
         )
     elif FLAGS.mode in ["test", "inference"]:
-        model = ClassifierLM(FLAGS.seed, FLAGS.enable_data_augmentation, FLAGS.load_paraphraser)
+        model = ClassifierLM(FLAGS.seed, FLAGS.enable_data_augmentation)
         if FLAGS.enable_data_augmentation == 1:
-            test_dataloader = create_sentiment_dataset(
+            test_dataloader = create_dataset(
                 tokenizer=model.tokenizer,
                 file_name=FLAGS.test_file,
                 task_name=FLAGS.task_name,
@@ -334,7 +313,7 @@ def launch_classifier_test_or_train() -> None:
                 para_tokenizer=model.para_tokenizer,
             )
         else:
-            test_dataloader = create_sentiment_dataset(
+            test_dataloader = create_dataset(
                 tokenizer=model.tokenizer,
                 file_name=FLAGS.test_file,
                 task_name=FLAGS.task_name,
