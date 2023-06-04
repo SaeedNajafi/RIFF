@@ -30,9 +30,7 @@ def sentiment_metric(prediction_file: str) -> float:
         score_arrays = [[float(s) for s in score.split(",")] for score in scores]
         prediction_scores = np.array(score_arrays).reshape((len(predictions) // num_labels, num_labels, num_workers))
 
-        # average_prediction_scores = np.mean(prediction_scores, axis=2)
-        # only pick the score for
-        average_prediction_scores = prediction_scores[:, :, 0]
+        average_prediction_scores = np.mean(prediction_scores, axis=2)
         max_predictions = np.argmax(average_prediction_scores, axis=1)
 
     else:

@@ -183,3 +183,10 @@ def set_random_seed(seed: int) -> None:
         torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
+
+def z_scoring(rewards: torch.FloatTensor) -> torch.FloatTensor:
+    """Perform normalization of the rewards."""
+    rewards_mean = torch.mean(rewards, dim=1, keepdim=True)
+    rewards_std = torch.std(rewards, dim=1, keepdim=True)
+    return (rewards - rewards_mean) / (rewards_std + 1e-12)

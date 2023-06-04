@@ -22,12 +22,12 @@ do
                 do
                     loss=${losses[$l]}
                     sbatch  src/reference_implementations/run_singlenode_prompt.slrm \
-                        src/reference_implementations/prompt_zoo/sst2_fewshot_lmfps_train.sh \
+                        src/reference_implementations/prompt_zoo/sst2_fewshot_lmfps.sh \
                         ./roberta-exps-logs \
                         ${exp} \
                         ${task} \
                         ${seed} \
-                        /scratch/ssd004/scratch/snajafi/emnlp-2023-roberta-exps/128-shot \
+                        "dummy_main_path" \
                         ${rate} \
                         0 \
                         1 \
@@ -35,7 +35,7 @@ do
                         25 \
                         ${loss} \
                         off_policy \
-                        beam_search
+                        top_p
                 done
             done
         done

@@ -8,6 +8,7 @@ from typing import Dict, Iterator, List, Optional
 import numpy
 import torch
 from absl import flags
+from evaluate import load
 from transformers import AutoTokenizer, BartForConditionalGeneration, BartTokenizer, RobertaForMaskedLM
 
 from src.reference_implementations.prompt_zoo.data_utility import augment_batch, tokenize_samples
@@ -17,6 +18,7 @@ from src.reference_implementations.prompt_zoo.model_utility import (
     mlm_log_of_labels,
     modify_inputs_outputs,
     set_random_seed,
+    z_scoring,
 )
 from src.reference_implementations.prompt_zoo.prompt_optimizers import optimizer_definer
 from src.reference_implementations.prompt_zoo.soft_prompt_modules import create_softprompt_roberta
@@ -389,7 +391,7 @@ class RobertaPrompted(MyBaseLM):
                 self.para_tokenizer = self.para_model.tokenizer
 
         elif self.enable_paraphrase_training == 1:
-            if FLAGS.sampling_method == "off_policy":
+            if FLAGS.sampling_method in ["off_policy", "ppo"]:
                 # two bart models, move to another gpu.
                 self.fixed_para_model = Paraphraser(seed, device=1, mode=FLAGS.mode, fixed=True)
                 self.para_model = Paraphraser(seed, device=1, mode=FLAGS.mode, fixed=False)
@@ -397,12 +399,21 @@ class RobertaPrompted(MyBaseLM):
                 self.para_model = Paraphraser(seed, device=0, mode=FLAGS.mode, fixed=False)
             self.para_tokenizer = self.para_model.tokenizer
 
+            self.bertscore = load("bertscore")
+            self.bleu = load("bleu")
+            self.grammar_model_tokenizer = BartTokenizer.from_pretrained("bart-large")
+            self.grammar_model = BartForConditionalGeneration.from_pretrained("bart-large").to(device=2).eval()
+            self.grammar_model_tokenizer.pad_token = 0
+            self.grammar_loss_func = torch.nn.CrossEntropyLoss(ignore_index=0, reduction="none")
+            self.grammar_cuda = 2
+
         self.setup_models()
 
         if FLAGS.mode == "train" and FLAGS.exp_type not in ["gradient_search", "classifier_finetune"]:
             # create optimizer only for training.
             # based on the experiment type, setup the optimizer.
             self.optimizer = optimizer_definer[FLAGS.exp_type](self.model_pool)
+
         elif FLAGS.mode in ["test", "inference", "eval"]:
             # load from the given checkpoint.
             self.load_from_checkpoint()
@@ -410,7 +421,79 @@ class RobertaPrompted(MyBaseLM):
         if FLAGS.mode == "train" and self.enable_paraphrase_training == 1:
             # for training with the paraphraser, we need average ensembling prediction
             # while evaluating the checkpoints on the dev data.
-            FLAGS.ensemble_type = "average"
+            FLAGS.ensemble_type = "paraphrase_predict"
+
+    def compute_bert_ibleu(self, batch: torch.utils.data.Dataset, samples: List[str]) -> List[float]:
+        """Compute the bert_ibleu score given the input sentences and the generated paraphrases.
+        follow the paper: https://arxiv.org/pdf/2010.12885.pdf
+        """
+
+        def inv(num: float) -> float:
+            """helper function to compute the inverse of a number"""
+            return 1.0 / num
+
+        beta = 0.4  # from the above paper.
+        inputs = [each.strip("<s>").strip("</s>").strip() for each in batch["paraphrase_inputs"]]
+        num_samples = len(samples) // len(inputs)
+        bert_ibleu_scores = []
+        for idx in range(len(inputs)):
+            orig_input = inputs[idx]
+            for sample_idx in range(num_samples):
+                sample = samples[idx * num_samples + sample_idx]
+                bleu_score = self.bleu.compute(predictions=[sample], references=[orig_input])["bleu"]
+                bert_score = self.bertscore.compute(predictions=[sample], references=[orig_input], lang="en")["f1"]
+                bert_ibleu_score = inv((beta * inv(bert_score) + inv(1.0 - bleu_score)) / (beta + 1.0))
+                bert_ibleu_scores.append(bert_ibleu_score)
+
+        return bert_ibleu_scores
+
+    def compute_grammar_score(self, samples: List[str]) -> torch.FloatTensor:
+        """Using the gpt2-large model compute the log likelihood as the score of grammar for the samples."""
+        sample_input_ids = self.grammar_model_tokenizer(
+            samples,
+            truncation=True,
+            padding="max_length",
+            max_length=FLAGS.source_max_length,
+            add_special_tokens=True,
+            return_tensors="pt",
+        )["input_ids"].to(self.grammar_cuda)
+
+        outputs = self.grammar_model(input_ids=sample_input_ids, labels=sample_input_ids)
+        log_p = -self.grammar_loss_func(outputs.logits.view(-1, outputs.logits.size(-1)), sample_input_ids.view(-1))
+        batch_size, sequence_length, vocab_size = outputs.logits.size()
+        log_p = log_p.view(batch_size, sequence_length)
+        good_log_p = log_p.masked_fill_(sample_input_ids == 0, 0.0)
+        grammar_log_p = torch.sum(good_log_p, dim=1).squeeze()
+        return grammar_log_p
+
+    def compute_diversity_score(self, batch: torch.utils.data.Dataset, samples: List[str]) -> List[float]:
+        """Computing pairwise bleu score and use it to define a diversity score
+        for a sample compared to other samples for the same input."""
+        batch_size = len(batch["paraphrase_inputs"])
+        num_samples = len(samples) // batch_size
+        div_scores = []
+        for idx in range(batch_size):
+            memory = [[0.0] * num_samples for i in range(num_samples)]
+            input_samples = samples[idx * num_samples : (idx + 1) * num_samples]
+            total_sums = 0.0
+            for sample_idx in range(num_samples):
+                for sample_jdx in range(num_samples):
+                    if sample_idx == sample_jdx:
+                        continue
+                    bleu = self.bleu.compute(
+                        predictions=[input_samples[sample_idx]], references=[input_samples[sample_jdx]]
+                    )["bleu"]
+                    div_score = 1.0 - bleu
+                    total_sums += div_score
+                    memory[sample_idx][sample_jdx] = div_score
+
+            for sample_idx in range(num_samples):
+                row_sum = 0.0
+                for sample_jdx in range(num_samples):
+                    row_sum += memory[sample_idx][sample_jdx]
+                div_scores.append(row_sum / (total_sums / 2.0))
+
+        return div_scores
 
     def train(self, batch: torch.utils.data.Dataset) -> Dict[str, float]:
         """The main train loop for generating the class sequence in the
@@ -428,7 +511,7 @@ class RobertaPrompted(MyBaseLM):
         elif self.enable_paraphrase_training == 1:
             potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
 
-            if FLAGS.sampling_method == "on_policy":
+            if FLAGS.sampling_method in ["on_policy", "ppo"]:
                 sampling_model = self.para_model
 
             elif FLAGS.sampling_method == "off_policy":
@@ -441,6 +524,23 @@ class RobertaPrompted(MyBaseLM):
 
             elif FLAGS.sampling_algorithm == "beam_search":
                 samples = sampling_model.generate_beam_paraphrases(batch, num_return_seq=FLAGS.train_sample_size)
+
+            elif FLAGS.sampling_algorithm == "mixed":
+                top_p_samples = sampling_model.generate_top_p_paraphrases(
+                    batch, num_return_seq=FLAGS.train_sample_size, temperature=FLAGS.train_temperature
+                )
+                beam_samples = sampling_model.generate_beam_paraphrases(batch, num_return_seq=FLAGS.train_sample_size)
+                batch_size = len(top_p_samples) // FLAGS.train_sample_size
+
+                # the array to hold the mixed samples from beam-search and top-p sampling.
+                samples = []
+                for idx in range(batch_size):
+                    top_p_sample_arr = top_p_samples[
+                        idx * FLAGS.train_sample_size : (idx + 1) * FLAGS.train_sample_size
+                    ]
+                    beam_sample_arr = beam_samples[idx * FLAGS.train_sample_size : (idx + 1) * FLAGS.train_sample_size]
+                    samples.extend(top_p_sample_arr[: FLAGS.train_sample_size // 2])
+                    samples.extend(beam_sample_arr[: FLAGS.train_sample_size // 2])
 
             batch_size, seq_len = batch["para_input_ids"].size()
             batch["para_input_ids"] = (
@@ -472,6 +572,14 @@ class RobertaPrompted(MyBaseLM):
             class_log_ps = self.roberta_forward_pass(batch, train=to_train_lm)
 
         if self.enable_paraphrase_training == 1:
+            sum_rewards = self.compute_other_rewards(batch, samples)["sum_rewards"]
+            class_log_ps = class_log_ps.reshape(batch_size, FLAGS.train_sample_size + 1)
+            normal_class_log_ps = class_log_ps[:, 0].reshape(batch_size, 1).expand(batch_size, FLAGS.train_sample_size)
+            paraphrase_class_log_ps = class_log_ps[:, 1:]
+
+            classification_rewards_z = z_scoring(paraphrase_class_log_ps - normal_class_log_ps)
+            final_rewards_z = classification_rewards_z + sum_rewards
+
             if FLAGS.sampling_method == "off_policy":
                 para_log_ps = para_log_ps.to(self.device)
                 para_log_ps_copy = para_log_ps.detach().clone()
@@ -488,58 +596,17 @@ class RobertaPrompted(MyBaseLM):
                     batch_size, FLAGS.train_sample_size, device=self.device, dtype=para_log_ps.dtype
                 )
 
-            class_log_ps = class_log_ps.reshape(batch_size, FLAGS.train_sample_size + 1)
-            normal_class_log_ps = class_log_ps[:, 0].reshape(batch_size, 1).expand(batch_size, FLAGS.train_sample_size)
-            paraphrase_class_log_ps = class_log_ps[:, 1:]
+            if FLAGS.paraphrase_loss == "pg":
+                pg_loss = -torch.mean(torch.mean(importance_ratio * para_log_ps * final_rewards_z, dim=1), dim=0)
+                loss = pg_loss
 
-            if FLAGS.paraphrase_loss == "pg_z_score":
-                log_reward_difference = paraphrase_class_log_ps - normal_class_log_ps
-                log_reward_difference_mean = torch.mean(log_reward_difference, dim=1, keepdim=True)
-                log_reward_difference_std = torch.std(log_reward_difference, dim=1, keepdim=True)
-                log_reward_z_score = (log_reward_difference - log_reward_difference_mean) / (
-                    log_reward_difference_std + 1e-12
-                )
-                pg_z_score_loss = -torch.mean(
-                    torch.mean(importance_ratio * para_log_ps * log_reward_z_score, dim=1), dim=0
-                )
-                loss = pg_z_score_loss
-
-            if FLAGS.paraphrase_loss == "pg_reward_diff":
-                log_reward_diff = paraphrase_class_log_ps - normal_class_log_ps
-                pg_reward_diff_loss = -torch.mean(
-                    torch.mean(importance_ratio * para_log_ps * log_reward_diff, dim=1), dim=0
-                )
-                loss = pg_reward_diff_loss
-
-            if FLAGS.paraphrase_loss == "pg_basic":
-                pg_basic_loss = -torch.mean(
-                    torch.mean(importance_ratio * para_log_ps * paraphrase_class_log_ps, dim=1), dim=0
-                )
-                loss = pg_basic_loss
-
-            if FLAGS.paraphrase_loss == "mml_basic":
+            if FLAGS.paraphrase_loss == "mml":
                 if FLAGS.sampling_method == "off_policy":
-                    ratio_log = para_log_ps - fixed_para_log_ps + paraphrase_class_log_ps
+                    ratio_log = para_log_ps - fixed_para_log_ps + final_rewards_z
                 elif FLAGS.sampling_method == "on_policy":
-                    ratio_log = para_log_ps + paraphrase_class_log_ps
-                mml_basic_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
-                loss = mml_basic_loss
-
-            if FLAGS.paraphrase_loss == "mml_z_score":
-                log_reward_difference = paraphrase_class_log_ps - normal_class_log_ps
-                log_reward_difference_mean = torch.mean(log_reward_difference, dim=1, keepdim=True)
-                log_reward_difference_std = torch.std(log_reward_difference, dim=1, keepdim=True)
-                log_reward_z_score = (log_reward_difference - log_reward_difference_mean) / (
-                    log_reward_difference_std + 1e-12
-                )
-
-                if FLAGS.sampling_method == "off_policy":
-                    ratio_log = para_log_ps - fixed_para_log_ps + log_reward_z_score
-                elif FLAGS.sampling_method == "on_policy":
-                    ratio_log = para_log_ps + log_reward_z_score
-
-                mml_z_score_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
-                loss = mml_z_score_loss
+                    ratio_log = para_log_ps + final_rewards_z
+                mml_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
+                loss = mml_loss
 
             loss_value = loss.item()
 
@@ -577,10 +644,7 @@ class RobertaPrompted(MyBaseLM):
         """Based on the ensembling type, run the prediction."""
         if FLAGS.ensemble_type == "paraphrase_predict":
             return self.paraphrase_and_predict(batch)
-        elif FLAGS.ensemble_type == "average":
-            return self.average_predict(batch)
-        else:
-            return self.no_ensemble_predict(batch)
+        return self.no_ensemble_predict(batch)
 
     def no_ensemble_predict(self, batch: torch.utils.data.Dataset) -> Iterator[Dict[str, str]]:
         """The main prediction loop for a given potential class verbalizer."""
@@ -603,38 +667,31 @@ class RobertaPrompted(MyBaseLM):
             }
             yield output_row
 
-    def average_predict(self, batch: torch.utils.data.Dataset) -> Iterator[Dict[str, str]]:
-        """The main prediction loop for a given potential class verbalizer
-        Generate multiple paraphrases and average their prediction scores.
-        """
+    def compute_other_rewards(
+        self, batch: torch.utils.data.Dataset, samples: List[str]
+    ) -> Dict[str, torch.floatTensor]:
+        """Compute a normalized score from diversity, grammar and bert_ibleu scores"""
+        # compute the extra rewards.
+        batch_size = len(batch["paraphrase_inputs"])
+        num_samples = len(samples) // batch_size
 
-        potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
-        inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
-        paraphrases = self.para_model.generate_top_p_paraphrases(
-            batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
-        )
-        augment_batch(batch, paraphrases, self.tokenizer, potentials_str, num_return_seq=FLAGS.test_sample_size)
+        bert_ibleu_rewards = self.compute_bert_ibleu(batch, samples)
+        grammar_rewards = self.compute_grammar_score(samples)
+        diversity_rewards = self.compute_diversity_score(batch, samples)
 
-        if FLAGS.exp_type == "soft_prompt_finetune":
-            class_log_ps = self.gradient_search_forward_pass(batch, train=False, prompt_lists=None)
-        else:
-            class_log_ps = self.roberta_forward_pass(batch, train=False)
+        bert_ibleu_rewards_t = torch.FloatTensor(bert_ibleu_rewards).to(device=0).reshape(batch_size, num_samples)
+        grammar_rewards_t = grammar_rewards.to(device=0).reshape(batch_size, num_samples)
+        diversity_rewards_t = torch.FloatTensor(diversity_rewards).to(device=0).reshape(batch_size, num_samples)
 
-        class_log_ps = class_log_ps.cpu().detach().numpy()
-        for index, potential_str in enumerate(potentials_str):
-            scores = class_log_ps[index * (FLAGS.test_sample_size + 1) : (index + 1) * (FLAGS.test_sample_size + 1)]
-            avg_score = numpy.mean(scores[1:])
-            para_index = (index // FLAGS.num_classes) * FLAGS.num_classes
-            output_row = {
-                "potential_class": potential_str.strip(),
-                "prediction_score": avg_score,
-                "gold_class": batch["gold_classes"][index],
-                "paraphrases": paraphrases[
-                    para_index * FLAGS.test_sample_size : (para_index + 1) * FLAGS.test_sample_size
-                ],
-                "original_inputs": inputs_str[index].strip(),
-            }
-            yield output_row
+        bert_ibleu_rewards_z = z_scoring(bert_ibleu_rewards_t)
+        grammar_rewards_z = z_scoring(grammar_rewards_t)
+        diversity_rewards_z = z_scoring(diversity_rewards_t)
+        return {
+            "sum_rewards": bert_ibleu_rewards_z + grammar_rewards_z + diversity_rewards_z,
+            "grammar_rewards": grammar_rewards_z,
+            "diversity_rewards": diversity_rewards_z,
+            "bert_ibleu_rewards": bert_ibleu_rewards_z,
+        }
 
     def paraphrase_and_predict(self, batch: torch.utils.data.Dataset) -> Iterator[Dict[str, str]]:
         """The main prediction loop for a given potential class verbalizer
@@ -647,6 +704,7 @@ class RobertaPrompted(MyBaseLM):
         paraphrases = self.para_model.generate_top_p_paraphrases(
             batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
         )
+        rewards = self.compute_other_rewards(batch, paraphrases)
         augment_batch(batch, paraphrases, self.tokenizer, potentials_str, num_return_seq=FLAGS.test_sample_size)
 
         if FLAGS.exp_type == "soft_prompt_finetune":
@@ -655,13 +713,66 @@ class RobertaPrompted(MyBaseLM):
             class_log_ps = self.roberta_forward_pass(batch, train=False)
 
         class_log_ps = class_log_ps.cpu().detach().numpy()
+        rewards_sum = rewards["sum_rewards"]
+        rewards_sum = (
+            rewards_sum.view(
+                -1,
+            )
+            .cpu()
+            .detach()
+            .numpy()
+        )
+        grammar_rewards = rewards["grammar_rewards"]
+        grammar_rewards = (
+            grammar_rewards.view(
+                -1,
+            )
+            .cpu()
+            .detach()
+            .numpy()
+        )
+        diversity_rewards = rewards["diversity_rewards"]
+        diversity_rewards = (
+            diversity_rewards.view(
+                -1,
+            )
+            .cpu()
+            .detach()
+            .numpy()
+        )
+        bert_ibleu_rewards = rewards["bert_ibleu_rewards"]
+        bert_ibleu_rewards = (
+            bert_ibleu_rewards.view(
+                -1,
+            )
+            .cpu()
+            .detach()
+            .numpy()
+        )
+
         for index, potential_str in enumerate(potentials_str):
             scores = class_log_ps[index * (FLAGS.test_sample_size + 1) : (index + 1) * (FLAGS.test_sample_size + 1)]
             scores_str = ",".join([str(score) for score in scores])
+            avg_score = numpy.mean(scores[1:])
             para_index = (index // FLAGS.num_classes) * FLAGS.num_classes
+            reward_sum = rewards_sum[para_index * FLAGS.test_sample_size : (para_index + 1) * FLAGS.test_sample_size]
+            grammar_reward = grammar_rewards[
+                para_index * FLAGS.test_sample_size : (para_index + 1) * FLAGS.test_sample_size
+            ]
+            diversity_reward = diversity_rewards[
+                para_index * FLAGS.test_sample_size : (para_index + 1) * FLAGS.test_sample_size
+            ]
+            bert_ibleu_reward = bert_ibleu_rewards[
+                para_index * FLAGS.test_sample_size : (para_index + 1) * FLAGS.test_sample_size
+            ]
             output_row = {
                 "potential_class": potential_str.strip(),
-                "prediction_score": scores_str,
+                "total_reward": avg_score + numpy.mean(reward_sum),
+                "prediction_score": avg_score,
+                "all_prediction_scores": scores_str,
+                "grammar_reward": numpy.mean(grammar_reward),
+                "diversity_reward": numpy.mean(diversity_reward),
+                "bert_ibleu_reward": numpy.mean(bert_ibleu_reward),
                 "gold_class": batch["gold_classes"][index],
                 "paraphrases": paraphrases[
                     para_index * FLAGS.test_sample_size : (para_index + 1) * FLAGS.test_sample_size

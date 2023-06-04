@@ -330,6 +330,7 @@ def tokenize_data(
         "input_output_ids": input_output_encodings.input_ids,
         "input_output_attention_mask": input_output_encodings.attention_mask,
         "gold_classes": rawdata.gold_outputs,
+        "paraphrase_inputs": rawdata.paraphrase_inputs,
     }
 
     if para_tokenizer is not None:

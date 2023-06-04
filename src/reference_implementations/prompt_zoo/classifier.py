@@ -138,7 +138,7 @@ class ClassifierLM(MyBaseLM):
 
         if self.enable_data_augmentation == 1:
             potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
-            paraphrases, _ = self.para_model.generate_top_p_paraphrases(
+            paraphrases = self.para_model.generate_top_p_paraphrases(
                 batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
             )
             augment_batch(batch, paraphrases, self.tokenizer, potentials_str, num_return_seq=FLAGS.test_sample_size)
