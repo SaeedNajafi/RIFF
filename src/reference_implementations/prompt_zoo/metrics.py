@@ -1,10 +1,10 @@
 """This module implements different metrics used to evaluate the predictions
 for the downstream tasks."""
+from typing import Dict
+
 import numpy as np
 import pandas as pd
 from absl import flags
-
-from typing import Dict
 
 FLAGS = flags.FLAGS
 
@@ -37,12 +37,11 @@ def sentiment_metric(prediction_file: str) -> Dict[str, float]:
 
         corrects = 0.0
         total = 0.0
-        wrong_rows = []
         for index in range(len(predictions) // num_labels):
             total += 1.0
             if gold_labels[index * num_labels] == max_labels[index]:
                 corrects += 1.0
-        
+
         accuracy = corrects / total
         return_metrics["accuracy"] = accuracy
 
@@ -63,7 +62,6 @@ def sentiment_metric(prediction_file: str) -> Dict[str, float]:
 
         corrects = 0.0
         total = 0.0
-        wrong_rows = []
         for index in range(len(predictions) // num_labels):
             total += 1.0
             if gold_labels[index * num_labels] == max_labels[index]:
@@ -89,8 +87,9 @@ def sentiment_metric(prediction_file: str) -> Dict[str, float]:
         return_metrics["total_score"] = total_score
 
     return return_metrics
-    
-def classifier_sentiment_metric(prediction_file: str) -> float:
+
+
+def classifier_sentiment_metric(prediction_file: str) -> Dict[str, float]:
     """Compute the classification accuracy for sentiment classification where
     we have classifier on top of the LM compared to generation of the classes
     in the decoder."""
@@ -105,4 +104,4 @@ def classifier_sentiment_metric(prediction_file: str) -> float:
         total += 1.0
         if gold == prediction_indices[index]:
             corrects += 1.0
-    return corrects / total
+    return {"accuracy": corrects / total}

@@ -8,7 +8,7 @@ training/inference.
 import csv
 import io
 import os
-from typing import Any, Callable, Iterator, Optional, Tuple
+from typing import Any, Callable, Dict, Iterator, Optional, Tuple
 
 import numpy as np
 import torch
@@ -31,6 +31,9 @@ flags.DEFINE_string("dev_file", "/tmp/dev.csv", "the path/name of the dev file."
 flags.DEFINE_string("test_file", "/tmp/test.csv", "the path/name of the test file.")
 flags.DEFINE_string("task_name", "semeval_3_class_sentiment", "the name of the downstream nlp task.")
 flags.DEFINE_string("train_file", "/tmp/train.csv", "the path/name of the train file.")
+flags.DEFINE_string(
+    "metric_to_save", "total_score", "Which metric to use to save the best model on the internal dev data."
+)
 flags.DEFINE_integer("enable_data_augmentation", 0, "To train with data augmentation generated with paraphrasing.")
 flags.DEFINE_integer("enable_paraphrase_training", 0, "To train the paraphraser with some objective.")
 flags.DEFINE_integer(
@@ -66,7 +69,7 @@ def start_training(model: MyBaseLM, dataloader: torch.utils.data.DataLoader) -> 
 
 def train_model(
     model: MyBaseLM,
-    metric: Callable[[str], float],
+    metric: Callable[[str], Dict[str, float]],
     train_dataloader: torch.utils.data.DataLoader,
     eval_dataloader: torch.utils.data.DataLoader,
 ) -> None:
@@ -78,8 +81,11 @@ def train_model(
         total_loss = []
         eval_file = os.path.join(FLAGS.model_path, "temp_eval.csv")
         start_predicting(model, eval_dataloader, eval_file)
-        best_score = metric(eval_file)  # type: ignore
-        writer.add_scalar("Score/dev", best_score, 0)
+        scores = metric(eval_file)  # type: ignore
+        for score_name, score_val in scores.items():
+            writer.add_scalar(f"{score_name}/dev", score_val, 0)
+            if score_name == FLAGS.metric_to_save:
+                best_score = score_val
         while epoch < FLAGS.max_epochs and global_step < FLAGS.training_steps:
             print("\nEpoch:{0}\n".format(epoch))
             epoch_loss = []
@@ -96,16 +102,18 @@ def train_model(
 
                 if global_step % FLAGS.steps_per_checkpoint == 0:
                     start_predicting(model, eval_dataloader, eval_file)
-                    score = metric(eval_file)  # type: ignore
-                    writer.add_scalar("Score/dev", score, global_step)
-                    if score > best_score:
-                        best_score = score
-                        model.save("best_step")
-                    elif score < best_score and FLAGS.exp_type == "gradient_search":
-                        # re-load the best previous template searched so far!
-                        # the previous templates was not good!
-                        FLAGS.checkpoint = "best_step"
-                        model.load_from_checkpoint()
+                    scores = metric(eval_file)  # type: ignore
+                    for score_name, score_val in scores.items():
+                        writer.add_scalar(f"{score_name}/dev", score_val, global_step)
+                        if score_name == FLAGS.metric_to_save:
+                            if score_val > best_score:
+                                best_score = score_val
+                                model.save("best_step")
+                            elif score_val < best_score and FLAGS.exp_type == "gradient_search":
+                                # re-load the best previous template searched so far!
+                                # the previous templates was not good!
+                                FLAGS.checkpoint = "best_step"
+                                model.load_from_checkpoint()
 
                 writer.add_scalar("Mean_Total_Loss/train", mean_total_loss, global_step)
                 writer.add_scalar("Mean_Epoch_Loss/train", mean_epoch_loss, global_step)
@@ -116,18 +124,18 @@ def train_model(
 
             # do final evaluation on the dev data at the end of epoch.
             start_predicting(model, eval_dataloader, eval_file)
-            score = metric(eval_file)  # type: ignore
-            writer.add_scalar("Score/dev", score, global_step)
-            if score > best_score:
-                best_score = score
-                model.save("best_step")
-
-            elif score < best_score and FLAGS.exp_type == "gradient_search":
-                # re-load the best previous template searched so far!
-                # the previous templates was not good!
-                FLAGS.checkpoint = "best_step"
-                model.load_from_checkpoint()
-
+            scores = metric(eval_file)  # type: ignore
+            for score_name, score_val in scores.items():
+                writer.add_scalar(f"{score_name}/dev", score_val, global_step)
+                if score_name == FLAGS.metric_to_save:
+                    if score_val > best_score:
+                        best_score = score_val
+                        model.save("best_step")
+                    elif score_val < best_score and FLAGS.exp_type == "gradient_search":
+                        # re-load the best previous template searched so far!
+                        # the previous templates was not good!
+                        FLAGS.checkpoint = "best_step"
+                        model.load_from_checkpoint()
             epoch += 1
 
         writer.close()
@@ -141,15 +149,16 @@ def train_model(
 def test_model(
     model: MyBaseLM,
     test_dataloader: torch.utils.data.DataLoader,
-    metric: Optional[Callable[[str], float]] = None,
+    metric: Optional[Callable[[str], Dict[str, float]]] = None,
 ) -> None:
     writer = SummaryWriter(FLAGS.model_path)
     if FLAGS.mode in ["test", "inference", "eval", "no_finetune_test"]:
         print("Predicting...")
         start_predicting(model, test_dataloader, FLAGS.prediction_file)
         if metric is not None:
-            score = metric(FLAGS.prediction_file)
-            writer.add_scalar("Score", score, 0)
+            scores = metric(FLAGS.prediction_file)  # type: ignore
+            for score_name, score_val in scores.items():
+                writer.add_scalar(score_name, score_val, 0)
     else:
         raise Exception(f"the mode {FLAGS.mode} is not for testing.")
 
