@@ -4,10 +4,12 @@ import numpy as np
 import pandas as pd
 from absl import flags
 
+from typing import Dict
+
 FLAGS = flags.FLAGS
 
 
-def sentiment_metric(prediction_file: str) -> float:
+def sentiment_metric(prediction_file: str) -> Dict[str, float]:
     """Compute the classification accuracy for sentiment classification."""
 
     df = pd.read_csv(prediction_file, delimiter=",")
@@ -19,12 +21,33 @@ def sentiment_metric(prediction_file: str) -> float:
 
     # This relies on the assumption that there is a prediction score for every label. (i.e. n label scores per input)
     predictions = [label.strip("<s>").strip("</s>").strip() for label in df["potential_class"].tolist()]
-    scores = df["prediction_score"].tolist()
-
     assert len(predictions) % num_labels == 0
     prediction_labels = np.array(predictions).reshape((len(predictions) // num_labels, num_labels))
 
-    if isinstance(scores[0], str):
+    return_metrics: Dict[str, float] = {}
+
+    if "prediction_score" in df.columns:
+        scores = df["prediction_score"].tolist()
+        prediction_scores = np.array(scores).reshape((len(predictions) // num_labels, num_labels))
+        max_predictions = np.argmax(prediction_scores, axis=1)
+        max_labels = []
+        for index in range(len(predictions) // num_labels):
+            labels_row = prediction_labels[index]
+            max_labels.append(labels_row[max_predictions[index]])
+
+        corrects = 0.0
+        total = 0.0
+        wrong_rows = []
+        for index in range(len(predictions) // num_labels):
+            total += 1.0
+            if gold_labels[index * num_labels] == max_labels[index]:
+                corrects += 1.0
+        
+        accuracy = corrects / total
+        return_metrics["accuracy"] = accuracy
+
+    if "all_prediction_scores" in df.columns:
+        scores = df["all_prediction_scores"].tolist()
         num_workers = len(scores[0].split(","))
 
         score_arrays = [[float(s) for s in score.split(",")] for score in scores]
@@ -33,29 +56,40 @@ def sentiment_metric(prediction_file: str) -> float:
         average_prediction_scores = np.mean(prediction_scores, axis=2)
         max_predictions = np.argmax(average_prediction_scores, axis=1)
 
-    else:
-        prediction_scores = np.array(scores).reshape((len(predictions) // num_labels, num_labels))
-        max_predictions = np.argmax(prediction_scores, axis=1)
+        max_labels = []
+        for index in range(len(predictions) // num_labels):
+            labels_row = prediction_labels[index]
+            max_labels.append(labels_row[max_predictions[index]])
 
-    max_labels = []
-    for index in range(len(predictions) // num_labels):
-        labels_row = prediction_labels[index]
-        max_labels.append(labels_row[max_predictions[index]])
+        corrects = 0.0
+        total = 0.0
+        wrong_rows = []
+        for index in range(len(predictions) // num_labels):
+            total += 1.0
+            if gold_labels[index * num_labels] == max_labels[index]:
+                corrects += 1.0
 
-    corrects = 0.0
-    total = 0.0
-    wrong_rows = []
-    for index in range(len(predictions) // num_labels):
-        total += 1.0
-        if gold_labels[index * num_labels] == max_labels[index]:
-            corrects += 1.0
-        else:
-            wrong_rows.extend(list(range(index * num_labels, (index + 1) * num_labels, 1)))
+        all_accuracy = corrects / total
+        return_metrics["all_accuracy"] = all_accuracy
 
-    df.iloc[wrong_rows,].to_csv("wrong_rows.csv")
-    return corrects / total
+    if "grammar_reward" in df.columns:
+        grammar_score = np.mean(np.array(df["grammar_reward"].tolist()), axis=1)
+        return_metrics["grammar_score"] = grammar_score
 
+    if "diversity_reward" in df.columns:
+        diversity_score = np.mean(np.array(df["diversity_reward"].tolist()), axis=1)
+        return_metrics["diversity_score"] = diversity_score
 
+    if "bert_ibleu_reward" in df.columns:
+        bert_ibleu_score = np.mean(np.array(df["bert_ibleu_reward"].tolist()), axis=1)
+        return_metrics["bert_ibleu_score"] = bert_ibleu_score
+
+    if "grammar_reward" in df.columns and "diversity_reward" in df.columns and "bert_ibleu_reward" in df.columns:
+        total_score = grammar_score + diversity_score + bert_ibleu_score + accuracy
+        return_metrics["total_score"] = total_score
+
+    return return_metrics
+    
 def classifier_sentiment_metric(prediction_file: str) -> float:
     """Compute the classification accuracy for sentiment classification where
     we have classifier on top of the LM compared to generation of the classes
