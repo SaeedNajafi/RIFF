@@ -9,6 +9,11 @@ do
 	export "$KEY"="$VALUE"
 done
 
+PROJECT_DIR=$( dirname -- "$0"; )
+
+# We source to keep the internal env variables defined.
+source ${PROJECT_DIR}/../setup_gpu_worker.sh
+
 LEARN_RATE=${LR}
 EXPERIMENT_TYPE=${EXP_TYPE}
 RANDOM_SEED=${SEED}
@@ -20,10 +25,11 @@ PARA_LOSS=${PARA_LOSS}
 SAMPLING_METHOD=${SAMPLING_METHOD}
 SAMPLING_ALG=${SAMPLING_ALG}
 SLURM_JOB_ID=${SLURM_JOB_ID}
+METRIC_TO_SAVE=${METRIC_TO_SAVE}
 
 checkpoint_path=/checkpoint/$USER/${SLURM_JOB_ID}
 
-experiment_name=${TASK_NAME}_${EXPERIMENT_TYPE}_${RANDOM_SEED}_${LEARN_RATE}_${DATA_AUG}_${TRAIN_PARAPHRASER}_${LOAD_PARAPHRASER}_${PARA_LOSS}_${SAMPLING_METHOD}_${SAMPLING_ALG}
+experiment_name=${TASK_NAME}_${EXPERIMENT_TYPE}_${RANDOM_SEED}_${LEARN_RATE}_${DATA_AUG}_${TRAIN_PARAPHRASER}_${LOAD_PARAPHRASER}_${PARA_LOSS}_${SAMPLING_METHOD}_${SAMPLING_ALG}_${METRIC_TO_SAVE}
 
 model_path=${checkpoint_path}/${experiment_name}
 
@@ -78,7 +84,8 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --train_sample_size 8 \
     --paraphrase_loss ${PARA_LOSS} \
     --sampling_method ${SAMPLING_METHOD} \
-    --sampling_algorithm ${SAMPLING_ALG}
+    --sampling_algorithm ${SAMPLING_ALG} \
+    --metric_to_save ${METRIC_TO_SAVE}
 
 # test phase
 python -m src.reference_implementations.prompt_zoo.trainer \
@@ -103,8 +110,6 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --load_paraphraser ${LOAD_PARAPHRASER} \
     --ensemble_type paraphrase_predict \
     --test_temperature 1.0 \
-    --test_sample_size 8
+    --test_sample_size 8 \
 
 rm -r -f ${model_path}/roberta_model_best_step
-
-gsutil -m cp -r ${model_path} gs://parprompt/emnlp-2023-roberta-exps

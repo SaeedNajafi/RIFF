@@ -70,22 +70,6 @@ def sentiment_metric(prediction_file: str) -> Dict[str, float]:
         all_accuracy = corrects / total
         return_metrics["all_accuracy"] = all_accuracy
 
-    if "grammar_reward" in df.columns:
-        grammar_score = np.mean(np.array(df["grammar_reward"].tolist()), axis=1)
-        return_metrics["grammar_score"] = grammar_score
-
-    if "diversity_reward" in df.columns:
-        diversity_score = np.mean(np.array(df["diversity_reward"].tolist()), axis=1)
-        return_metrics["diversity_score"] = diversity_score
-
-    if "bert_ibleu_reward" in df.columns:
-        bert_ibleu_score = np.mean(np.array(df["bert_ibleu_reward"].tolist()), axis=1)
-        return_metrics["bert_ibleu_score"] = bert_ibleu_score
-
-    if "grammar_reward" in df.columns and "diversity_reward" in df.columns and "bert_ibleu_reward" in df.columns:
-        total_score = grammar_score + diversity_score + bert_ibleu_score + accuracy
-        return_metrics["total_score"] = total_score
-
     return return_metrics
 
 

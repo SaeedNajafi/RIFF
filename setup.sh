@@ -85,7 +85,7 @@ function install_prompt_package () {
 
 function install_reference_methods () {
 	if [ "$ENV_NAME" = "prompt_torch" ]; then
-		python3.9 -m pip install transformers datasets sentencepiece nltk evaluate
+		python3.9 -m pip install transformers datasets sentencepiece nltk evaluate bert-score
 
 	fi
 

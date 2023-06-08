@@ -69,6 +69,8 @@ SAMPLING_METHOD=${13}
 
 SAMPLING_ALG=${14}
 
+METRIC_TO_SAVE=${15}
+
 echo "Placing logs in: ${LOG_DIR}"
 
 echo "World size: ${SLURM_NTASKS}"
@@ -86,4 +88,5 @@ mkdir -p "${LOG_DIR}"
              SEED=${SEED} TASK=${TASK} LEN=${LEN} AUG=${AUG} \
              TRAIN_PARA=${TRAIN_PARA} LOAD_PARA=${LOAD_PARA} \
              PARA_LOSS=${PARA_LOSS} SAMPLING_METHOD=${SAMPLING_METHOD} \
-             SAMPLING_ALG=${SAMPLING_ALG} SLURM_JOB_ID=${SLURM_JOB_ID} >> ${LOG_PATH} 2>&1"
+             SAMPLING_ALG=${SAMPLING_ALG} SLURM_JOB_ID=${SLURM_JOB_ID} \
+             METRIC_TO_SAVE=${METRIC_TO_SAVE} >> ${LOG_PATH} 2>&1"
