@@ -26,10 +26,11 @@ SAMPLING_METHOD=${SAMPLING_METHOD}
 SAMPLING_ALG=${SAMPLING_ALG}
 SLURM_JOB_ID=${SLURM_JOB_ID}
 METRIC_TO_SAVE=${METRIC_TO_SAVE}
+KL_COEFFICIENT=${KL_COEFFICIENT}
 
 checkpoint_path=/checkpoint/$USER/${SLURM_JOB_ID}
 
-experiment_name=${TASK_NAME}_${EXPERIMENT_TYPE}_${RANDOM_SEED}_${LEARN_RATE}_${DATA_AUG}_${TRAIN_PARAPHRASER}_${LOAD_PARAPHRASER}_${PARA_LOSS}_${SAMPLING_METHOD}_${SAMPLING_ALG}_${METRIC_TO_SAVE}
+experiment_name=${TASK_NAME}_${EXPERIMENT_TYPE}_${RANDOM_SEED}_${LEARN_RATE}_${DATA_AUG}_${TRAIN_PARAPHRASER}_${LOAD_PARAPHRASER}_${PARA_LOSS}_${SAMPLING_METHOD}_${SAMPLING_ALG}_${METRIC_TO_SAVE}_${KL_COEFFICIENT}
 
 model_path=${checkpoint_path}/${experiment_name}
 
@@ -85,7 +86,8 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --paraphrase_loss ${PARA_LOSS} \
     --sampling_method ${SAMPLING_METHOD} \
     --sampling_algorithm ${SAMPLING_ALG} \
-    --metric_to_save ${METRIC_TO_SAVE}
+    --metric_to_save ${METRIC_TO_SAVE} \
+    --kl_penalty_coefficient ${KL_COEFFICIENT}
 
 # test phase
 python -m src.reference_implementations.prompt_zoo.trainer \

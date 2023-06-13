@@ -67,6 +67,11 @@ flags.DEFINE_string(
     "top_p",
     "What algorithm to use for sampling? top_p or beam_search?",
 )
+flags.DEFINE_float(
+    "kl_penalty_coefficient",
+    0.1,
+    "What is the coefficient for the KL penalty used in the ppo algorithm?",
+)
 
 
 class MyBaseLM(torch.nn.Module):
@@ -478,7 +483,7 @@ class RobertaPrompted(MyBaseLM):
 
             para_log_ps = self.para_model.bart_forward_pass(batch, train=True)
 
-            if FLAGS.sampling_method == "off_policy":
+            if FLAGS.sampling_method in ["off_policy", "ppo"]:
                 # we also need this for off-policy sampling.
                 fixed_para_log_ps = self.fixed_para_model.bart_forward_pass(batch, train=False)
 
@@ -497,13 +502,14 @@ class RobertaPrompted(MyBaseLM):
 
             final_rewards_z = z_scoring(paraphrase_class_log_ps - normal_class_log_ps)
 
-            if FLAGS.sampling_method == "off_policy":
+            if FLAGS.sampling_method in ["off_policy", "ppo"]:
                 para_log_ps = para_log_ps.to(self.device)
                 para_log_ps_copy = para_log_ps.detach().clone()
                 fixed_para_log_ps = fixed_para_log_ps.to(self.device)
                 importance_ratio_log = para_log_ps_copy - fixed_para_log_ps
+                importance_ratio_log = importance_ratio_log.reshape(batch_size, FLAGS.train_sample_size)
                 fixed_para_log_ps = fixed_para_log_ps.reshape(batch_size, FLAGS.train_sample_size)
-                importance_ratio = torch.exp(importance_ratio_log).reshape(batch_size, FLAGS.train_sample_size)
+                importance_ratio = torch.exp(importance_ratio_log)
                 para_log_ps = para_log_ps.reshape(batch_size, FLAGS.train_sample_size)
 
             elif FLAGS.sampling_method == "on_policy":
@@ -520,10 +526,15 @@ class RobertaPrompted(MyBaseLM):
             if FLAGS.paraphrase_loss == "mml":
                 if FLAGS.sampling_method == "off_policy":
                     ratio_log = para_log_ps - fixed_para_log_ps + final_rewards_z
-                elif FLAGS.sampling_method == "on_policy":
+                elif FLAGS.sampling_method in ["on_policy", "ppo"]:
                     ratio_log = para_log_ps + final_rewards_z
                 mml_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
                 loss = mml_loss
+
+            if FLAGS.sampling_method == "ppo":
+                # now we need to add the kl penalty.
+                kl_penalty = torch.mean(torch.mean((importance_ratio_log + 1) * para_log_ps, dim=1), dim=0)
+                loss = loss + FLAGS.kl_penalty_coefficient * kl_penalty
 
             loss_value = loss.item()
 
