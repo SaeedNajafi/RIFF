@@ -91,6 +91,11 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --g_beam_size 1 \
     --top_k 20
 
+ensembling="paraphrase_predict"
+if [ "${DATA_AUG}" = "0" ]; then
+        ensembling="no_ensemble"
+fi
+
 # test phase
 python -m src.reference_implementations.prompt_zoo.trainer \
     --eval_batch_size 8 \
@@ -112,7 +117,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --enable_data_augmentation ${DATA_AUG} \
     --enable_paraphrase_training ${TRAIN_PARAPHRASER} \
     --load_paraphraser ${LOAD_PARAPHRASER} \
-    --ensemble_type paraphrase_predict \
+    --ensemble_type ${ensembling} \
     --test_temperature 1.0 \
     --test_sample_size 8 \
     --g_beam_size 1 \
