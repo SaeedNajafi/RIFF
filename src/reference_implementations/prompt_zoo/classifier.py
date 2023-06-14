@@ -1,6 +1,7 @@
 """This is a module to train a classifier on top of the LM."""
 from typing import Dict, Iterator, Tuple
 
+import numpy
 import torch
 from absl import flags
 from transformers import AutoTokenizer, RobertaModel
@@ -25,8 +26,6 @@ class FFClassifier(torch.nn.Module):
         """
         super().__init__()
 
-        # we wish to compare to a case where we have a prompt matrix with FLAGS.prompt_length * model_d parameters.
-        # we therefore define a classifier such that we have approximately the same number of extra parameters.
         self.layer = torch.nn.Linear(model_d, FLAGS.classifier_hidden_d, bias=True)
 
         # using gelu activation over relu
@@ -100,6 +99,8 @@ class ClassifierLM(MyBaseLM):
 
     def predict(self, batch: torch.utils.data.Dataset) -> Iterator[Dict[str, str]]:
         """Based on the ensembling type, run the prediction."""
+        if FLAGS.ensemble_type == "paraphrase_predict":
+            return self.paraphrase_and_predict(batch)
         return self.no_ensemble_predict(batch)
 
     def no_ensemble_predict(self, batch: torch.utils.data.Dataset) -> Iterator[Dict[str, str]]:
@@ -120,28 +121,104 @@ class ClassifierLM(MyBaseLM):
 
         _, logits = classifier_model(encoder_hidden_states, loaded_batch["attention_mask"])
 
-        predictions = torch.argmax(logits, dim=1).cpu().detach().numpy()
+        prediction_logits = logits.cpu().detach().numpy()
 
-        # not efficient, but let's pair input along the prediction class.
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
         for index, input_str in enumerate(inputs_str):
-            output_row = {
-                "predicted_class": predictions[index],
-                "original_inputs": input_str.strip(),
-                "class_index": batch["class_indices"][index].item(),
-            }
-            yield output_row
+            for class_idx in range(FLAGS.num_classes):
+                output_row = {
+                    "potential_class": str(class_idx),
+                    "prediction_score": prediction_logits[index][class_idx],
+                    "original_inputs": input_str.strip(),
+                    "gold_class": str(batch["class_indices"][index].item()),
+                }
+                yield output_row
+
+    def paraphrase_and_predict(self, batch: torch.utils.data.Dataset) -> Iterator[Dict[str, str]]:
+        """Generate multiple paraphrases along the original input and return all
+        the results.
+
+        For each example, the first score belongs to the original input.
+        """
+        self.predict_mode_on()
+        # for classifier_finetuning, the dummy labels doesn't have any effect.
+        dummy_labels = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
+        inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
+
+        paraphrases = self.para_model.generate_top_p_paraphrases(
+            batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
+        )
+        augment_batch(
+            batch,
+            paraphrases,
+            self.tokenizer,
+            dummy_labels,
+            num_return_seq=FLAGS.test_sample_size,
+            for_classifier=True,
+        )
+
+        batch_size = batch["class_indices"].size()[0]
+        batch["class_indices"] = (
+            batch.pop("class_indices")
+            .reshape(batch_size, 1)
+            .expand(batch_size, 1 + FLAGS.test_sample_size)
+            .reshape(
+                -1,
+            )
+        )
+
+        loaded_batch = self.move_to_gpu(batch, keys=["input_ids", "attention_mask"])
+
+        encoder = self.model_pool["roberta_model"]
+        classifier_model = self.model_pool["classifier_model"]
+
+        output = encoder(
+            input_ids=loaded_batch["input_ids"],
+            attention_mask=loaded_batch["attention_mask"],
+        )
+
+        encoder_hidden_states = output.last_hidden_state
+
+        _, logits = classifier_model(encoder_hidden_states, loaded_batch["attention_mask"])
+
+        prediction_logits = logits.cpu().detach().numpy()
+
+        for index, input_str in enumerate(inputs_str):
+            scores = prediction_logits[
+                index * (FLAGS.test_sample_size + 1) : (index + 1) * (FLAGS.test_sample_size + 1), :
+            ]
+            for class_idx in range(FLAGS.num_classes):
+                scores_str = ",".join([str(score) for score in scores[:, class_idx]])
+                avg_score = numpy.mean(scores[1:, class_idx])
+                output_row = {
+                    "potential_class": str(class_idx),
+                    "prediction_score": avg_score,
+                    "all_prediction_scores": scores_str,
+                    "original_prediction_score": scores[0, class_idx],
+                    "gold_class": str(batch["class_indices"][index * (FLAGS.test_sample_size + 1)].item()),
+                    "paraphrases": paraphrases[index * FLAGS.test_sample_size : (index + 1) * FLAGS.test_sample_size],
+                    "original_inputs": input_str.strip(),
+                }
+                yield output_row
 
     def train(self, batch: torch.utils.data.Dataset) -> Dict[str, float]:
         """The classifier training step."""
         self.train_mode_on()
 
         if self.enable_data_augmentation == 1:
-            potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
+            # dummy_labels doesn't have any effect for classifier_finetuning.
+            dummy_labels = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
             paraphrases = self.para_model.generate_top_p_paraphrases(
                 batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
             )
-            augment_batch(batch, paraphrases, self.tokenizer, potentials_str, num_return_seq=FLAGS.test_sample_size)
+            augment_batch(
+                batch,
+                paraphrases,
+                self.tokenizer,
+                dummy_labels,
+                num_return_seq=FLAGS.test_sample_size,
+                for_classifier=True,
+            )
 
             batch_size = batch["class_indices"].size()[0]
             batch["class_indices"] = (

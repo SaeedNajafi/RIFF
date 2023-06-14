@@ -93,21 +93,3 @@ def sentiment_metric(prediction_file: str) -> Dict[str, float]:
         return_metrics["all_accuracy"] = all_accuracy
 
     return return_metrics
-
-
-def classifier_sentiment_metric(prediction_file: str) -> Dict[str, float]:
-    """Compute the classification accuracy for sentiment classification where
-    we have classifier on top of the LM compared to generation of the classes
-    in the decoder."""
-
-    df = pd.read_csv(prediction_file, delimiter=",")
-    prediction_indices = df["predicted_class"].tolist()
-    class_indices = df["class_index"].tolist()
-
-    corrects = 0.0
-    total = 0.0
-    for index, gold in enumerate(class_indices):
-        total += 1.0
-        if gold == prediction_indices[index]:
-            corrects += 1.0
-    return {"accuracy": corrects / total}

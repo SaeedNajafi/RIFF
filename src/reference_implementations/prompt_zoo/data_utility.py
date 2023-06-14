@@ -75,6 +75,7 @@ def augment_batch(
     labels: List[str],
     num_return_seq: int,
     for_gradient_search: Optional[bool] = False,
+    for_classifier: Optional[bool] = False,
 ) -> None:
     """Augment the batch with paraphrases."""
     batch_size, seq_len = batch["input_ids"].size()
@@ -89,15 +90,14 @@ def augment_batch(
         for par_index in range(num_return_seq):
             par_base_index = (index // FLAGS.num_classes) * FLAGS.num_classes * num_return_seq
             paraphrase = paraphrases[par_base_index + par_index : par_base_index + par_index + 1][0]
-            if instruction == "":
-                if for_gradient_search:
-                    # for gradient_search.
-                    inputs.append(white_space_fix(f"<s> {paraphrase} It was <mask> . </s>"))
-                    input_outputs.append(white_space_fix(f"<s> {paraphrase} It was {label} . </s>"))
-                else:
-                    # for classifier-finetuning.
-                    inputs.append(white_space_fix(f"<s> {paraphrase} </s>"))
-                    input_outputs.append(white_space_fix(f"<s> {paraphrase} </s>"))
+            if for_gradient_search:
+                # for gradient_search.
+                inputs.append(white_space_fix(f"<s> {paraphrase} It was <mask> . </s>"))
+                input_outputs.append(white_space_fix(f"<s> {paraphrase} It was {label} . </s>"))
+            elif for_classifier:
+                # for classifier_finetuning.
+                inputs.append(white_space_fix(f"<s> {instruction} {paraphrase} </s>"))
+                input_outputs.append(white_space_fix(f"<s> {instruction} {paraphrase} </s>"))
             else:
                 inputs.append(white_space_fix(f"<s> {instruction} {paraphrase} It was <mask> . </s>"))
                 input_outputs.append(white_space_fix(f"<s> {instruction} {paraphrase} It was {label} . </s>"))

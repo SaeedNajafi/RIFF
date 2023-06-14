@@ -39,10 +39,7 @@ mkdir -p ${model_path}
 # delay purge in the checkpoint and job_id
 touch ${checkpoint_path}/DELAYPURGE
 
-if [ "${EXP_TYPE}" = "classifier_finetune" ]; then
-    instruction_type="no_instruction"
-
-elif [ "${TASK_NAME}" = "sst2" ]; then
+if [ "${TASK_NAME}" = "sst2" ]; then
     instruction_type="manual_template_research_sst2_with_instruction"
 
 elif [ "${TASK_NAME}" = "SetFit/sst5" ]; then
