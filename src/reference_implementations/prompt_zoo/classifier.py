@@ -1,12 +1,12 @@
 """This is a module to train a classifier on top of the LM."""
-from typing import Dict, Iterator, Tuple
+from typing import Dict, Iterator, Optional, Tuple
 
 import numpy
 import torch
 from absl import flags
 from transformers import AutoTokenizer, RobertaModel
 
-from src.reference_implementations.prompt_zoo.data_utility import augment_batch
+from src.reference_implementations.prompt_zoo.data_utility import augment_batch, tokenize_samples
 from src.reference_implementations.prompt_zoo.prompt_optimizers import optimizer_definer
 from src.reference_implementations.prompt_zoo.prompted_lm import MyBaseLM, Paraphraser
 
@@ -33,7 +33,7 @@ class FFClassifier(torch.nn.Module):
         self.act = torch.nn.GELU()
         self.classifier = torch.nn.Linear(FLAGS.classifier_hidden_d, FLAGS.num_classes, bias=True)
         self.log_softmax = torch.nn.LogSoftmax(dim=1)
-        self.loss_fun = torch.nn.NLLLoss()
+        self.loss_fun = torch.nn.NLLLoss(reduction="none")
 
     def forward(self, hidden_states: torch.Tensor, input_mask: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """Pass the hidden_vector into the classifier."""
@@ -51,12 +51,31 @@ class FFClassifier(torch.nn.Module):
         return scores, logits
 
     def compute_loss(
-        self, hidden_states: torch.Tensor, input_mask: torch.Tensor, class_indices: torch.Tensor
+        self,
+        hidden_states: torch.Tensor,
+        input_mask: torch.Tensor,
+        class_indices: torch.Tensor,
+        para_log_ps: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         """Compute the cross-entropy loss for the above classifier."""
         _, logits = self.forward(hidden_states, input_mask)
-        loss = self.loss_fun(logits, class_indices)
-        return loss
+        neg_log_likelihoods = self.loss_fun(logits, class_indices)
+        if para_log_ps is None:
+            return neg_log_likelihoods.mean(dim=0)
+        else:
+            neg_log_likelihoods = self.loss_fun(logits, class_indices)
+            batch_size = class_indices.size()[0] // (FLAGS.test_sample_size + 1)
+            loss = 0.0
+            for idx in range(batch_size):
+                idx_neg_log_likelihoods = neg_log_likelihoods[
+                    idx * (FLAGS.test_sample_size + 1) : (idx + 1) * (FLAGS.test_sample_size + 1)
+                ]
+                idx_para_log_ps = para_log_ps[idx * FLAGS.test_sample_size : (idx + 1) * FLAGS.test_sample_size]
+                idx_loss = idx_neg_log_likelihoods[0] + torch.sum(
+                    torch.exp(idx_para_log_ps) * idx_neg_log_likelihoods[1:], dim=0
+                )
+                loss += idx_loss
+            return loss / float(batch_size)
 
 
 class ClassifierLM(MyBaseLM):
@@ -203,7 +222,7 @@ class ClassifierLM(MyBaseLM):
     def train(self, batch: torch.utils.data.Dataset) -> Dict[str, float]:
         """The classifier training step."""
         self.train_mode_on()
-
+        para_log_ps = None
         if self.enable_data_augmentation == 1:
             # dummy_labels doesn't have any effect for classifier_finetuning.
             dummy_labels = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
@@ -222,6 +241,23 @@ class ClassifierLM(MyBaseLM):
                 )
             )
 
+            # compute the log probability of the paraphrases being generated.
+            batch_size, seq_len = batch["para_input_ids"].size()
+            batch["para_input_ids"] = (
+                batch["para_input_ids"]
+                .reshape(batch_size, 1, seq_len)
+                .expand(batch_size, FLAGS.test_sample_size, seq_len)
+                .reshape(-1, seq_len)
+            )
+            batch["para_attention_mask"] = (
+                batch["para_attention_mask"]
+                .reshape(batch_size, 1, seq_len)
+                .expand(batch_size, FLAGS.test_sample_size, seq_len)
+                .reshape(-1, seq_len)
+            )
+            tokenize_samples(batch, paraphrases, self.para_tokenizer)
+            para_log_ps = self.para_model.bart_forward_pass(batch, train=False)
+
         loaded_batch = self.move_to_gpu(batch, keys=["input_ids", "attention_mask", "class_indices"])
 
         encoder = self.model_pool["roberta_model"]
@@ -233,7 +269,10 @@ class ClassifierLM(MyBaseLM):
         )
         encoder_hidden_states = output.last_hidden_state
         loss = classifier_model.compute_loss(
-            encoder_hidden_states, loaded_batch["attention_mask"], loaded_batch["class_indices"]
+            encoder_hidden_states,
+            loaded_batch["attention_mask"],
+            loaded_batch["class_indices"],
+            para_log_ps=para_log_ps,
         )
         loss_value = loss.item()
 

@@ -11,7 +11,7 @@ import torch
 from absl import flags
 from transformers import AutoTokenizer, RobertaForMaskedLM
 
-from src.reference_implementations.prompt_zoo.data_utility import augment_batch, white_space_fix
+from src.reference_implementations.prompt_zoo.data_utility import augment_batch, tokenize_samples, white_space_fix
 from src.reference_implementations.prompt_zoo.prompted_lm import MyBaseLM, Paraphraser
 
 FLAGS = flags.FLAGS
@@ -183,7 +183,11 @@ class SearchRoberta(MyBaseLM):
             pickle.dump(self.search_memory.beam, outp, pickle.HIGHEST_PROTOCOL)
 
     def score_templates(
-        self, batch: torch.utils.data.Dataset, prompt_templates: List[PromptTemplate], train: bool = False
+        self,
+        batch: torch.utils.data.Dataset,
+        prompt_templates: List[PromptTemplate],
+        train: bool = False,
+        para_log_ps: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         """Run a forward computation over the batch for each prompt templates
         and compute the log probability over the batch for that given prompt
@@ -196,10 +200,28 @@ class SearchRoberta(MyBaseLM):
         class_log_ps = self.gradient_search_forward_pass(batch, train, prompt_lists)
 
         template_scores = class_log_ps.view(batch_size, len(prompt_templates))
-        return template_scores
+        if para_log_ps is None:
+            return template_scores
+        else:
+            orig_batch_size = batch_size // (FLAGS.test_sample_size + 1)
+            template_scores_arr = []
+            for idx in range(orig_batch_size):
+                idx_template_scores = template_scores[
+                    idx * (FLAGS.test_sample_size + 1) : (idx + 1) * (FLAGS.test_sample_size + 1), :
+                ]
+                idx_para_log_ps = para_log_ps[idx * FLAGS.test_sample_size : (idx + 1) * FLAGS.test_sample_size]
+                idx_para_log_ps = idx_para_log_ps.reshape(FLAGS.test_sample_size, 1).expand(
+                    FLAGS.test_sample_size, len(prompt_templates)
+                )
+                idx_template_score = idx_template_scores[0, :] + torch.sum(
+                    torch.exp(idx_para_log_ps) * idx_template_scores[1:, :], dim=0
+                )
+                template_scores_arr.append(idx_template_score)
+            return torch.stack(template_scores_arr, dim=0)
 
     def train(self, batch: torch.utils.data.Dataset) -> Dict[str, float]:
         """The train loop for gradient-search method."""
+        para_log_ps = None
         if self.enable_data_augmentation == 1:
             potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
             paraphrases = self.para_model.generate_top_p_paraphrases(
@@ -214,15 +236,34 @@ class SearchRoberta(MyBaseLM):
                 for_gradient_search=True,
             )
 
+            # compute the log probability of the paraphrases being generated.
+            batch_size, seq_len = batch["para_input_ids"].size()
+            batch["para_input_ids"] = (
+                batch["para_input_ids"]
+                .reshape(batch_size, 1, seq_len)
+                .expand(batch_size, FLAGS.test_sample_size, seq_len)
+                .reshape(-1, seq_len)
+            )
+            batch["para_attention_mask"] = (
+                batch["para_attention_mask"]
+                .reshape(batch_size, 1, seq_len)
+                .expand(batch_size, FLAGS.test_sample_size, seq_len)
+                .reshape(-1, seq_len)
+            )
+            tokenize_samples(batch, paraphrases, self.para_tokenizer)
+            para_log_ps = self.para_model.bart_forward_pass(batch, train=False)
+
         prompt_index = random.randint(0, FLAGS.prompt_length - 1)
-        template_log_likelihood = self.score_templates(batch, self.search_memory.beam, train=True)
+        template_log_likelihood = self.score_templates(
+            batch, self.search_memory.beam, train=True, para_log_ps=para_log_ps
+        )
         template_log_likelihood = template_log_likelihood.mean(dim=0)  # mean across batch_size
         beam_candidates = self.search_memory.generate_beam_candidates(
             embedding_weight=self.model_pool["roberta_model"].roberta.embeddings.word_embeddings.weight,
             log_likelihoods=template_log_likelihood,
             prompt_step=prompt_index,
         )
-        beam_candidate_scores = self.score_templates(batch, beam_candidates, train=False)
+        beam_candidate_scores = self.score_templates(batch, beam_candidates, train=False, para_log_ps=para_log_ps)
         beam_candidate_scores = beam_candidate_scores.mean(dim=0)  # mean across batch_size
         for index, score in enumerate(beam_candidate_scores.tolist()):
             beam_candidates[index].score = score

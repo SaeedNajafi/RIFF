@@ -440,6 +440,23 @@ class RobertaPrompted(MyBaseLM):
             augment_batch(batch, paraphrases, self.tokenizer, potentials_str, num_return_seq=FLAGS.test_sample_size)
             to_train_lm = True
 
+            # compute the log probability of the paraphrases being generated.
+            batch_size, seq_len = batch["para_input_ids"].size()
+            batch["para_input_ids"] = (
+                batch["para_input_ids"]
+                .reshape(batch_size, 1, seq_len)
+                .expand(batch_size, FLAGS.test_sample_size, seq_len)
+                .reshape(-1, seq_len)
+            )
+            batch["para_attention_mask"] = (
+                batch["para_attention_mask"]
+                .reshape(batch_size, 1, seq_len)
+                .expand(batch_size, FLAGS.test_sample_size, seq_len)
+                .reshape(-1, seq_len)
+            )
+            tokenize_samples(batch, paraphrases, self.para_tokenizer)
+            para_log_ps = self.para_model.bart_forward_pass(batch, train=False)
+
         elif self.enable_paraphrase_training == 1:
             potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
 
@@ -553,8 +570,13 @@ class RobertaPrompted(MyBaseLM):
             self.para_model.optimizer.step()
 
         elif self.enable_data_augmentation == 1:
-            # equal weight for all data points including the paraphrases.
-            loss = -class_log_ps.mean(dim=0)
+            # re-weight each paraphrase log likelihood using the probability of the paraphrase model.
+            para_log_ps = para_log_ps.reshape(batch_size, FLAGS.test_sample_size)
+            class_log_ps = class_log_ps.reshape(batch_size, FLAGS.test_sample_size + 1)
+            normal_class_log_ps = class_log_ps[:, 0]
+            paraphrase_class_log_ps = class_log_ps[:, 1:]
+            objective = torch.sum(torch.exp(para_log_ps) * paraphrase_class_log_ps, dim=1) + normal_class_log_ps
+            loss = -objective.mean(dim=0)
             loss_value = loss.item()
 
             # backProp
