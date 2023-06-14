@@ -3,9 +3,7 @@
 rates=(0.00001)
 exps=(all_finetune)
 seeds=(11 42 1993 2023 12321)
-#seeds=(11)
 tasks=(sst2)
-#losses=(mml_basic mml_z_score pg_basic pg_z_score pg_reward_diff)
 losses=(pg mml)
 
 for i in ${!rates[@]};
@@ -36,9 +34,10 @@ do
                         0 \
                         25 \
                         ${loss} \
-                        off_policy \
-                        mixed \
-                        accuracy
+                        ppo \
+                        top_p \
+                        accuracy \
+                        0.6
                 done
             done
         done

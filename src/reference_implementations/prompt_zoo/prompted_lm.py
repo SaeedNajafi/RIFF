@@ -397,8 +397,8 @@ class RobertaPrompted(MyBaseLM):
         elif self.enable_paraphrase_training == 1:
             if FLAGS.sampling_method in ["off_policy", "ppo"]:
                 # two bart models, move to another gpu.
-                self.fixed_para_model = Paraphraser(seed, device=1, mode=FLAGS.mode, fixed=True)
-                self.para_model = Paraphraser(seed, device=1, mode=FLAGS.mode, fixed=False)
+                self.fixed_para_model = Paraphraser(seed, device=0, mode=FLAGS.mode, fixed=True)
+                self.para_model = Paraphraser(seed, device=0, mode=FLAGS.mode, fixed=False)
             elif FLAGS.sampling_method == "on_policy":
                 self.para_model = Paraphraser(seed, device=0, mode=FLAGS.mode, fixed=False)
             self.para_tokenizer = self.para_model.tokenizer
