@@ -57,8 +57,9 @@ class PromptSearchMemory:
         """For the next training step, select the top beam_size prompt
         templates.
 
-        out of beam_size * top_k template candidates
-        inside the beam_candidates. The sorting is based on the score attribute of the PromptTemplate.
+        out of beam_size * top_k template candidates inside the
+        beam_candidates. The sorting is based on the score attribute of
+        the PromptTemplate.
         """
         # sort the prompt templates by their score in descending order.
         sorted_pool = sorted(beam_candidates, key=operator.attrgetter("score"), reverse=True)
@@ -201,13 +202,15 @@ class SearchRoberta(MyBaseLM):
         """The train loop for gradient-search method."""
         if self.enable_data_augmentation == 1:
             potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
-            paraphrases = self.para_model.generate_beam_paraphrases(batch, num_return_seq=FLAGS.beam_size)
+            paraphrases = self.para_model.generate_top_p_paraphrases(
+                batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
+            )
             augment_batch(
                 batch,
                 paraphrases,
                 self.tokenizer,
                 potentials_str,
-                num_return_seq=FLAGS.beam_size,
+                num_return_seq=FLAGS.test_sample_size,
                 for_gradient_search=True,
             )
 
@@ -229,9 +232,7 @@ class SearchRoberta(MyBaseLM):
 
     def predict(self, batch: torch.utils.data.Dataset) -> Iterator[Dict[str, str]]:
         """Based on the ensembling type, run the prediction."""
-        if FLAGS.ensemble_type == "average":
-            return self.average_predict(batch)
-        elif FLAGS.ensemble_type == "paraphrase_predict":
+        if FLAGS.ensemble_type == "paraphrase_predict":
             return self.paraphrase_and_predict(batch)
         else:
             return self.no_ensemble_predict(batch)
@@ -256,24 +257,25 @@ class SearchRoberta(MyBaseLM):
                 "potential_class": potential_class.strip(),
                 "prediction_score": class_log_ps[index],
                 "prompt_str": prompt_str,
-                "gold_class": batch["gold_classes"][index],
                 "original_inputs": inputs_str[index].strip(),
+                "gold_class": batch["gold_classes"][index],
             }
             yield output_row
 
-    def average_predict(self, batch: torch.utils.data.Dataset) -> Iterator[Dict[str, str]]:
+    def paraphrase_and_predict(self, batch: torch.utils.data.Dataset) -> Iterator[Dict[str, str]]:
         """The main prediction loop for a given potential class label using a
-        beam of templates."""
-
+        beam of templates and the paraphraser."""
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
         potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
-        paraphrases = self.para_model.generate_beam_paraphrases(batch, num_return_seq=FLAGS.beam_size)
+        paraphrases = self.para_model.generate_top_p_paraphrases(
+            batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
+        )
         augment_batch(
             batch,
             paraphrases,
             self.tokenizer,
             potentials_str,
-            num_return_seq=FLAGS.beam_size,
+            num_return_seq=FLAGS.test_sample_size,
             for_gradient_search=True,
         )
 
@@ -284,49 +286,20 @@ class SearchRoberta(MyBaseLM):
 
         prompt_str = self.tokenizer.batch_decode(top_template.tokens, skip_special_tokens=True)
         print("evaluating batch with prompt template:", prompt_str)
-        for index, potential_class in enumerate(potentials_str):
-            scores = class_log_ps[index * (FLAGS.beam_size + 1) : (index + 1) * (FLAGS.beam_size + 1)]
-            avg_score = numpy.mean(scores[1:])
-            output_row = {
-                "potential_class": potential_class.strip(),
-                "prediction_score": avg_score,
-                "prompt_str": prompt_str,
-                "gold_class": batch["gold_classes"][index],
-                "original_inputs": inputs_str[index].strip(),
-            }
-            yield output_row
-
-    def paraphrase_predict(self, batch: torch.utils.data.Dataset) -> Iterator[Dict[str, str]]:
-        """The main prediction loop for a given potential class label using a
-        beam of templates."""
-
-        inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
-        potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
-        paraphrases = self.para_model.generate_beam_paraphrases(batch, num_return_seq=FLAGS.beam_size)
-        augment_batch(
-            batch,
-            paraphrases,
-            self.tokenizer,
-            potentials_str,
-            num_return_seq=FLAGS.beam_size,
-            for_gradient_search=True,
-        )
-
-        top_template = self.search_memory.beam[0]
-        class_log_ps = self.score_templates(batch, [top_template], train=False)
-        class_log_ps = class_log_ps.mean(dim=1)  # mean across the beam size.
-        class_log_ps = class_log_ps.cpu().detach().numpy()
-
-        prompt_str = self.tokenizer.batch_decode(top_template.tokens, skip_special_tokens=True)
-        print("evaluating batch with prompt template:", prompt_str)
-        for index, potential_class in enumerate(potentials_str):
-            scores = class_log_ps[index * (FLAGS.beam_size + 1) : (index + 1) * (FLAGS.beam_size + 1)]
+        for index, potential_str in enumerate(potentials_str):
+            scores = class_log_ps[index * (FLAGS.test_sample_size + 1) : (index + 1) * (FLAGS.test_sample_size + 1)]
             scores_str = ",".join([str(score) for score in scores])
+            avg_score = numpy.mean(scores[1:])
+            para_index = (index // FLAGS.num_classes) * FLAGS.num_classes
             output_row = {
-                "potential_class": potential_class.strip(),
-                "prediction_score": scores_str,
-                "prompt_str": prompt_str,
+                "potential_class": potential_str.strip(),
+                "prediction_score": avg_score,
+                "all_prediction_scores": scores_str,
+                "original_prediction_score": scores[0],
                 "gold_class": batch["gold_classes"][index],
+                "paraphrases": paraphrases[
+                    para_index * FLAGS.test_sample_size : (para_index + 1) * FLAGS.test_sample_size
+                ],
                 "original_inputs": inputs_str[index].strip(),
             }
             yield output_row

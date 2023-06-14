@@ -33,12 +33,14 @@ flags.DEFINE_integer("top_k", 20, "Number of candidate tokens to replace the pro
 flags.DEFINE_integer(
     "test_sample_size",
     8,
-    "Number of paraphrases to generate top-p sampling used for testing or data augmentation using the paraphraser.",
+    "Number of paraphrases to generate top-p sampling or beam search used \
+        for testing or data augmentation using the paraphraser.",
 )
 flags.DEFINE_integer(
-    "train_sample_size", 128, "Number of paraphrases to generate top-p sampling used for training the paraphraser"
+    "train_sample_size",
+    128,
+    "Number of paraphrases to generate using top-p sampling or beam search used for training the paraphraser",
 )
-flags.DEFINE_integer("beam_size", 20, "Number of paraphrases to generate using the beam search decoding.")
 flags.DEFINE_integer("g_beam_size", 20, "Number of prompt templates to consider for gradient-search beam search.")
 flags.DEFINE_integer("no_repeat_ngram_size", 2, "related to generation with beam size.")
 flags.DEFINE_float(
@@ -182,9 +184,12 @@ class MyBaseLM(torch.nn.Module):
         pass
 
     def bart_forward_pass(self, batch: torch.utils.data.Dataset, train: bool = False) -> torch.Tensor:
-        """Run a forward computation over the batch, compute the log probability
-        over the batch. This function can be called multiple times for training
-        or inference. This function is to train the paraphraser."""
+        """Run a forward computation over the batch, compute the log
+        probability over the batch.
+
+        This function can be called multiple times for training or
+        inference. This function is to train the paraphraser.
+        """
         if train:
             self.train_mode_on()
         else:
@@ -216,9 +221,12 @@ class MyBaseLM(torch.nn.Module):
         return class_log_p
 
     def roberta_forward_pass(self, batch: torch.utils.data.Dataset, train: bool = False) -> torch.Tensor:
-        """Using the Roberta Model, run a forward computation over the batch, compute the log probability
-        over the batch. This function can be called multiple times for training
-        or inference."""
+        """Using the Roberta Model, run a forward computation over the batch,
+        compute the log probability over the batch.
+
+        This function can be called multiple times for training or
+        inference.
+        """
 
         if train:
             self.train_mode_on()
@@ -320,7 +328,7 @@ class Paraphraser(MyBaseLM):
             input_ids=loaded_batch["para_input_ids"],
             attention_mask=loaded_batch["para_attention_mask"],
             no_repeat_ngram_size=FLAGS.no_repeat_ngram_size,
-            num_beams=FLAGS.beam_size,
+            num_beams=num_return_seq,
             early_stopping=True,
             max_length=128,
             num_return_sequences=num_return_seq,
@@ -597,7 +605,9 @@ class RobertaPrompted(MyBaseLM):
 
     def paraphrase_and_predict(self, batch: torch.utils.data.Dataset) -> Iterator[Dict[str, str]]:
         """The main prediction loop for a given potential class verbalizer
-        Generate multiple paraphrases along the original input and return all the results.
+        Generate multiple paraphrases along the original input and return all
+        the results.
+
         For each example, the first score belongs to the original input.
         """
 
@@ -624,6 +634,7 @@ class RobertaPrompted(MyBaseLM):
                 "potential_class": potential_str.strip(),
                 "prediction_score": avg_score,
                 "all_prediction_scores": scores_str,
+                "original_prediction_score": scores[0],
                 "gold_class": batch["gold_classes"][index],
                 "paraphrases": paraphrases[
                     para_index * FLAGS.test_sample_size : (para_index + 1) * FLAGS.test_sample_size

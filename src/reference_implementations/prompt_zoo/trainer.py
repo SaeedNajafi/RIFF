@@ -32,7 +32,7 @@ flags.DEFINE_string("test_file", "/tmp/test.csv", "the path/name of the test fil
 flags.DEFINE_string("task_name", "semeval_3_class_sentiment", "the name of the downstream nlp task.")
 flags.DEFINE_string("train_file", "/tmp/train.csv", "the path/name of the train file.")
 flags.DEFINE_string(
-    "metric_to_save", "total_score", "Which metric to use to save the best model on the internal dev data."
+    "metric_to_save", "accuracy", "Which metric to use to save the best model on the internal dev data."
 )
 flags.DEFINE_integer("enable_data_augmentation", 0, "To train with data augmentation generated with paraphrasing.")
 flags.DEFINE_integer("enable_paraphrase_training", 0, "To train the paraphraser with some objective.")
@@ -164,7 +164,7 @@ def test_model(
 
 
 def launch_no_finetune_predict() -> None:
-    """launch the predict phase for the no prompting experiments without
+    """Launch the predict phase for the no prompting experiments without
     finetuning any parameters and only relying on the backbone model."""
 
     FLAGS.mode = "no_finetune_test"
@@ -196,7 +196,7 @@ def launch_no_finetune_predict() -> None:
 
 
 def launch_test_or_train() -> None:
-    """launch the testing or training phase for the prompting experiments
+    """Launch the testing or training phase for the prompting experiments
     without having the classifier on top."""
 
     if FLAGS.mode == "train":
@@ -282,7 +282,7 @@ def launch_test_or_train() -> None:
 
 
 def launch_classifier_test_or_train() -> None:
-    """launch the testing or training phase for the classifier over the LM."""
+    """Launch the testing or training phase for the classifier over the LM."""
 
     if FLAGS.mode == "train":
         model = ClassifierLM(FLAGS.seed, FLAGS.enable_data_augmentation, FLAGS.load_paraphraser)

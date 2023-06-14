@@ -88,7 +88,8 @@ def no_weights_opt(opt_args: OPTIMIZER_ARGS_TYPE) -> Optimizer:
 
 
 def lora_opt(opt_args: OPTIMIZER_ARGS_TYPE) -> Optimizer:
-    """Define the optimizer that does not change the parameters defined by lora."""
+    """Define the optimizer that does not change the parameters defined by
+    lora."""
     model: torch.nn.Module = opt_args["roberta_model"]
     return construct_optimizer(model=model)
 

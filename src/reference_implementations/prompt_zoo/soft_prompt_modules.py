@@ -41,7 +41,7 @@ class PromptEmbedding(torch.nn.Module):
         self.prompt_embedder.weight.data = self.normal_embedder.weight.data[sampled_indices, :]
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
-        """prompt tokens are always at the first prompt_length steps of the
+        """Prompt tokens are always at the first prompt_length steps of the
         input after the BOS token. split the input sequences into three parts:
 
             1 - the first BOS token to be embedded by the normal embedding.

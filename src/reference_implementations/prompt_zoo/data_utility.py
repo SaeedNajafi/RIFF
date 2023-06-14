@@ -76,7 +76,7 @@ def augment_batch(
     num_return_seq: int,
     for_gradient_search: Optional[bool] = False,
 ) -> None:
-    """augment the batch with paraphrases."""
+    """Augment the batch with paraphrases."""
     batch_size, seq_len = batch["input_ids"].size()
     input_ids = batch.pop("input_ids").reshape(batch_size, 1, seq_len)
     attention_mask = batch.pop("attention_mask").reshape(batch_size, 1, seq_len)
@@ -134,12 +134,15 @@ def template_data(
 ) -> SentimentRawData:
     """Helper function to format the data for the models.
 
-    if with_instructions is True, we will add an instruction to the input sentence
-    and make the input a template with special keywords "instructions:", "sentence:", and "sentiment:".
+    if with_instructions is True, we will add an instruction to the
+    input sentence and make the input a template with special keywords
+    "instructions:", "sentence:", and "sentiment:".
 
-    if the repeat_input is True, we will repeat the input multiple times for every possible output class.
+    if the repeat_input is True, we will repeat the input multiple times
+    for every possible output class.
 
-    Finally, the end of sentence token </s> used with T5 models are added to both input and output.
+    Finally, the end of sentence token </s> used with T5 models are
+    added to both input and output.
     """
     paraphrase_sentences = [f"{sent}" for sent in sentences]
     if FLAGS.instruction_type == "qa":
@@ -276,7 +279,7 @@ class SentimentDataset(Dataset):
     analysis task."""
 
     def __init__(self, data: Dict[str, Union[List[int], List[List[int]]]]) -> None:
-        """store the reference to the tokenized data."""
+        """Store the reference to the tokenized data."""
         self.data = data
 
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:

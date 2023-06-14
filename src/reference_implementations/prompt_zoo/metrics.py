@@ -27,6 +27,7 @@ def sentiment_metric(prediction_file: str) -> Dict[str, float]:
     return_metrics: Dict[str, float] = {}
 
     if "prediction_score" in df.columns:
+        # accuracy based on the scores of the paraphrases
         scores = df["prediction_score"].tolist()
         prediction_scores = np.array(scores).reshape((len(predictions) // num_labels, num_labels))
         max_predictions = np.argmax(prediction_scores, axis=1)
@@ -45,7 +46,28 @@ def sentiment_metric(prediction_file: str) -> Dict[str, float]:
         accuracy = corrects / total
         return_metrics["accuracy"] = accuracy
 
+    if "original_prediction_score" in df.columns:
+        # accuracy based on the original input sentence.
+        scores = df["original_prediction_score"].tolist()
+        prediction_scores = np.array(scores).reshape((len(predictions) // num_labels, num_labels))
+        max_predictions = np.argmax(prediction_scores, axis=1)
+        max_labels = []
+        for index in range(len(predictions) // num_labels):
+            labels_row = prediction_labels[index]
+            max_labels.append(labels_row[max_predictions[index]])
+
+        corrects = 0.0
+        total = 0.0
+        for index in range(len(predictions) // num_labels):
+            total += 1.0
+            if gold_labels[index * num_labels] == max_labels[index]:
+                corrects += 1.0
+
+        accuracy = corrects / total
+        return_metrics["original_accuracy"] = accuracy
+
     if "all_prediction_scores" in df.columns:
+        # accuracy based on all the scores from the original sentence and its paraphrases.
         scores = df["all_prediction_scores"].tolist()
         num_workers = len(scores[0].split(","))
 
