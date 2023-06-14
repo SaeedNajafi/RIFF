@@ -154,7 +154,6 @@ class ClassifierLM(MyBaseLM):
             self.tokenizer,
             dummy_labels,
             num_return_seq=FLAGS.test_sample_size,
-            for_classifier=True,
         )
 
         batch_size = batch["class_indices"].size()[0]
@@ -211,14 +210,7 @@ class ClassifierLM(MyBaseLM):
             paraphrases = self.para_model.generate_top_p_paraphrases(
                 batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
             )
-            augment_batch(
-                batch,
-                paraphrases,
-                self.tokenizer,
-                dummy_labels,
-                num_return_seq=FLAGS.test_sample_size,
-                for_classifier=True,
-            )
+            augment_batch(batch, paraphrases, self.tokenizer, dummy_labels, num_return_seq=FLAGS.test_sample_size)
 
             batch_size = batch["class_indices"].size()[0]
             batch["class_indices"] = (
