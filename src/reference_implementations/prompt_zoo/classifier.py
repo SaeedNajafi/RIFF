@@ -147,7 +147,7 @@ class ClassifierLM(MyBaseLM):
             for class_idx in range(FLAGS.num_classes):
                 output_row = {
                     "potential_class": str(class_idx),
-                    "prediction_score": prediction_logits[index][class_idx],
+                    "original_prediction_score": prediction_logits[index][class_idx],
                     "original_inputs": input_str.strip(),
                     "gold_class": str(batch["class_indices"][index].item()),
                 }

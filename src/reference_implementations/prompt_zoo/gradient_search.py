@@ -298,7 +298,7 @@ class SearchRoberta(MyBaseLM):
                 "potential_class": potential_class.strip(),
                 "prediction_score": class_log_ps[index],
                 "prompt_str": prompt_str,
-                "original_inputs": inputs_str[index].strip(),
+                "original_prediction_score": inputs_str[index].strip(),
                 "gold_class": batch["gold_classes"][index],
             }
             yield output_row

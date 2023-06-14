@@ -619,7 +619,7 @@ class RobertaPrompted(MyBaseLM):
         for index, potential_str in enumerate(potentials_str):
             output_row = {
                 "potential_class": potential_str.strip(),
-                "prediction_score": class_log_ps[index],
+                "original_prediction_score": class_log_ps[index],
                 "original_inputs": inputs_str[index].strip(),
                 "gold_class": batch["gold_classes"][index],
             }

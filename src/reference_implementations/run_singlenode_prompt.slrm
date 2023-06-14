@@ -50,28 +50,30 @@ TASK=$4
 
 SEED=$5
 
-MODEL_PATH=$6
+NUM_CLASSES=$6
+
+FEWSHOT_SIZE=$7
 
 # learning rate.
-LR=$7
+LR=$8
 
-AUG=$8
+AUG=$9
 
-TRAIN_PARA=$9
+TRAIN_PARA=${10}
 
-LOAD_PARA=${10}
+LOAD_PARA=${11}
 
-LEN=${11}
+LEN=${12}
 
-PARA_LOSS=${12}
+PARA_LOSS=${13}
 
-SAMPLING_METHOD=${13}
+SAMPLING_METHOD=${14}
 
-SAMPLING_ALG=${14}
+SAMPLING_ALG=${15}
 
-METRIC_TO_SAVE=${15}
+METRIC_TO_SAVE=${16}
 
-KL_COEFFICIENT=${16}
+KL_COEFFICIENT=${17}
 
 echo "Placing logs in: ${LOG_DIR}"
 
@@ -85,11 +87,13 @@ mkdir -p "${LOG_DIR}"
 
 # Run on all nodes
 /opt/slurm/bin/srun -N"${SLURM_NNODES}" -l \
-    bash -c "bash ${SCRIPT} MAIN_PATH=${MODEL_PATH} \
+    bash -c "bash ${SCRIPT} \
              EXP_TYPE=${EXP_TYPE} LR=${LR} \
              SEED=${SEED} TASK=${TASK} LEN=${LEN} AUG=${AUG} \
              TRAIN_PARA=${TRAIN_PARA} LOAD_PARA=${LOAD_PARA} \
              PARA_LOSS=${PARA_LOSS} SAMPLING_METHOD=${SAMPLING_METHOD} \
              SAMPLING_ALG=${SAMPLING_ALG} SLURM_JOB_ID=${SLURM_JOB_ID} \
              METRIC_TO_SAVE=${METRIC_TO_SAVE} \
-             KL_COEFFICIENT=${KL_COEFFICIENT} >> ${LOG_PATH} 2>&1"
+             KL_COEFFICIENT=${KL_COEFFICIENT} \
+             FEWSHOT_SIZE=${FEWSHOT_SIZE} \
+             NUM_CLASSES=${NUM_CLASSES} >> ${LOG_PATH} 2>&1"

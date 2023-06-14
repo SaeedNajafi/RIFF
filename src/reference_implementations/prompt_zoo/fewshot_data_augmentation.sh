@@ -84,7 +84,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --enable_data_augmentation ${DATA_AUG} \
     --enable_paraphrase_training ${TRAIN_PARAPHRASER} \
     --load_paraphraser ${LOAD_PARAPHRASER} \
-    --ensemble_type paraphrase_predict \
+    --ensemble_type no_ensemble \
     --test_temperature 1.0 \
     --test_sample_size 8 \
     --metric_to_save ${METRIC_TO_SAVE} \
