@@ -45,7 +45,7 @@ if [ "${TASK_NAME}" = "sst2" ]; then
     train_batch_size=8
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
         instruction_type="manual_template_research_sst2_no_instruction"
-        train_batch_size=2
+        train_batch_size=4
     fi
 
 elif [ "${TASK_NAME}" = "SetFit/sst5" ]; then
@@ -53,7 +53,7 @@ elif [ "${TASK_NAME}" = "SetFit/sst5" ]; then
     train_batch_size=8
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
         instruction_type="manual_template_research_sst5_no_instruction"
-        train_batch_size=2
+        train_batch_size=4
     fi
 fi
 
@@ -89,7 +89,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --test_sample_size 8 \
     --metric_to_save ${METRIC_TO_SAVE} \
     --g_beam_size 1 \
-    --top_k 20
+    --top_k 10
 
 ensembling="paraphrase_predict"
 if [ "${DATA_AUG}" = "0" ]; then
@@ -121,4 +121,4 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --test_temperature 1.0 \
     --test_sample_size 8 \
     --g_beam_size 1 \
-    --top_k 20
+    --top_k 10
