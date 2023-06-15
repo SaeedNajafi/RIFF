@@ -106,7 +106,7 @@ def train_model(
                     for score_name, score_val in scores.items():
                         writer.add_scalar(f"{score_name}/dev", score_val, global_step)
                         if score_name == FLAGS.metric_to_save:
-                            if score_val > best_score:
+                            if score_val >= best_score:
                                 best_score = score_val
                                 model.save("best_step")
                             elif score_val < best_score and FLAGS.exp_type == "gradient_search":
@@ -128,7 +128,7 @@ def train_model(
             for score_name, score_val in scores.items():
                 writer.add_scalar(f"{score_name}/dev", score_val, global_step)
                 if score_name == FLAGS.metric_to_save:
-                    if score_val > best_score:
+                    if score_val >= best_score:
                         best_score = score_val
                         model.save("best_step")
                     elif score_val < best_score and FLAGS.exp_type == "gradient_search":

@@ -296,9 +296,9 @@ class SearchRoberta(MyBaseLM):
         for index, potential_class in enumerate(potentials_str):
             output_row = {
                 "potential_class": potential_class.strip(),
-                "prediction_score": class_log_ps[index],
+                "original_prediction_score": class_log_ps[index],
                 "prompt_str": prompt_str,
-                "original_prediction_score": inputs_str[index].strip(),
+                "original_inputs": inputs_str[index].strip(),
                 "gold_class": batch["gold_classes"][index],
             }
             yield output_row

@@ -16,13 +16,13 @@ def sentiment_metric(prediction_file: str) -> Dict[str, float]:
 
     df = pd.read_csv(prediction_file, delimiter=",")
 
-    gold_labels = df["gold_class"].tolist()
+    gold_labels = [str(label) for label in df["gold_class"].tolist()]
 
     # pick the class with the highest score among the possible class labels!
     num_labels = len(set(gold_labels))
 
     # This relies on the assumption that there is a prediction score for every label. (i.e. n label scores per input)
-    predictions = [label.strip("<s>").strip("</s>").strip() for label in df["potential_class"].tolist()]
+    predictions = [str(label).strip("<s>").strip("</s>").strip() for label in df["potential_class"].tolist()]
     assert len(predictions) % num_labels == 0
     prediction_labels = np.array(predictions).reshape((len(predictions) // num_labels, num_labels))
 
