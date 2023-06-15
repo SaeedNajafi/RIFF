@@ -31,6 +31,7 @@
 \usepackage{inconsolata}
 \usepackage{amsmath}
 \usepackage{graphicx}
+\usepackage{comment}
 
 % If the title and author information does not fit in the area allocated, uncomment the following
 %
@@ -64,195 +65,142 @@
 \begin{document}
 \maketitle
 \begin{abstract}
-Pre-trained Language Models (PLMs) are delivering surprising performance when they are fine-tuned on downstream text processing tasks. Recently, researchers efficiently guide these truly-big models to generate the desired output of a downstream task by optimizing the input prompts. Therefore, the prompt engineering research has solely focused on searching for the prompts that can be fed into the PLMs along with the original input text. Here, we investigate whether small modifications of the original input text would impact the final performance of the downstream task for various discrete and continuous prompt optimization techniques. Interestingly, our experiments in the few-shot Natural Language Understanding (NLU) datasets reveal that augmenting the training datasets with input paraphrases significantly boosts the performance of various prompt optimization techniques.
+Pre-trained Language Models (PLMs) are delivering surprising performance when they are fine-tuned on downstream text processing tasks. Recently, researchers efficiently guide these truly-big models to generate the desired output of a downstream task by optimizing the input prompts. Therefore, the prompt engineering research has solely focused on searching for the prompts that can be fed into the PLMs along with the original input text. Here, we investigate whether small modifications of the original input text would impact the final performance of the downstream task for various discrete and continuous prompt optimization techniques. Interestingly, our experiments in the few-shot Natural Language Understanding (NLU) datasets reveal that augmenting the training datasets with input paraphrases significantly boosts the performance of various prompt optimization techniques. To search these paraphrases which are helpful for the downstream language model, we propose a new learning objective based on maximum-marginal likelihood estimation and off-policy sampling. We also compare various perspectives in our objective design comparing with recent proximal policy optimization using different text decoding strategies. [talk about results for NLU in summary]
 \end{abstract}
 
+
 \section{Introduction}
+Motivating points for introduction?
 
-These instructions are for authors submitting papers to ACL 2023 using \LaTeX. They are not self-contained. All authors must follow the general instructions for *ACL proceedings,\footnote{\url{http://acl-org.github.io/ACLPUB/formatting.html}} as well as guidelines set forth in the ACL 2023 call for papers.\footnote{\url{https://2023.aclweb.org/calls/main_conference/}} This document contains additional instructions for the \LaTeX{} style files.
-The templates include the \LaTeX{} source of this document (\texttt{acl2023.tex}),
-the \LaTeX{} style file used to format it (\texttt{acl2023.sty}),
-an ACL bibliography style (\texttt{acl\_natbib.bst}),
-an example bibliography (\texttt{custom.bib}),
-and the bibliography for the ACL Anthology (\texttt{anthology.bib}).
+- Are LMs and the prompts or the adaptation matrices robust to paraphrasing inputs?
 
-List of contributions:
-\begin{itemize}
-    \item We empirically show that with different language models and prompt learning techniques, we can further improve the text classification performance by appropriate simplification of the original inputs.
-    \item We propose a learning framework to find these simplified inputs using Maximum Marginal Likelihood (MML) estimation.
-    \item We also compare our MML estimation with following Reinforcement Learning (RL) methods: policy-gradient methods and the recent soft-Q learning algorithm.
-\end{itemize}
+- What kind of modifications we can make?
 
-\section{Problem Formulation}
-- Are manual prompts robust to Paraphrasing Inputs?
+- Read about behavioural testing of NLP models!
 
-    - What kind of modifications we can make?
-        - Read about behavioural testing of NLP models!
-        - Drop irrelevent phrases such as time phrases!
-        - Change named entities!
-        - Change the input tense!
-        - Generate paraphrases from a supervised model!
-        - Use synonyms of the irrelevant words in the sentence!
+- Drop irrelevent phrases such as time phrases!
 
-Histograms for Positive Vs. Negative is a good diagram on a specific input example and its different variants. Test with 4 different manual prompts and show the averages scores per positive vs. negative performance on the SST-2 dev set sentiment classification using pre-trained T5 large for the verbalizers "positive" vs. "negative" words.
+- Change named entities!
 
-Do a similar experiment for Roberta-large!
+- Change the input tense!
 
-- Define the problem!
-We are going to transfer $X$ to $X^{par}$ and then from $X^{par}$ to $Y$.
-
-Once baseline would be data augmentation of the $X$ with greedy samples of $X^{par}$ and then train the prompt method using prompt, $X^{par}$ and $Ys$.
-
-Other approach would be to train a paraphraser on the fly while interacting with the LM. How to make sure the input stays grammatical?, we should generate grammatical samples from the paraphrases. One idea could be top-p sampling or beam-search sampling or do off-policy sampling with MML or do proximal policy optimization or policy gradient with rewards about grammar of the text being generated.
-
-How to generate grammatical $X^{par}$$
+- Generate paraphrases from a supervised model!
 
 \section{Methods}
 
 We focus on Natural Language Understanding (NLU) tasks where we have access to supervised training examples $D_{supp} = \{(x_i, y_i)\}^{i=N}_{i=1}$. We wish to update the parameter set $\theta_{lm}$ by maximizing the probability of the class label $y_i$ given the input $x_i$: $P_{\theta_{lm}} (y_i | x_i)$. To augment $D_{supp}$ with semi-supervised examples, we generate $M$ paraphrases for each $x_i$ using the paraphrase generator $P_{\theta_{par}} (z_{i,j} | x_{i})$ where $z_{i,j}$ is the $j$'s paraphrase for the input $x_{i}$ keeping the same semantic meaning with a different syntactic form. With these generated paraphrases, we are optimizing the following objective:
 \begin{multline}
-    J_{\theta_{lm}} = \sum^{N}_{i=1} \{ \log P_{\theta_{lm}} (y_i | x_i) + \\
+    J_{\theta_{lm}} := \sum^{N}_{i=1} \{ \log P_{\theta_{lm}} (y_i | x_i) + \\
     \sum^{M}_{j=1} P_{\theta_{par}} (z_{i,j} | x_{i}) \times \log P_{\theta_{lm}} (y_i | z_{i,j})\}
-\label{lmfp-augmentation}
-\end{multline}
+\label{lmfp-augmentation-objective}
+\end{multline}  
 
 The paraphrase examples are weighted by the paraphrase model $P_{\theta_{par}}$ which is fixed during optimizing the weights $\theta_{lm}$ of the language model.
 
 \subsection{LM Tuning Techniques}
-- Describe these:
-    - full model tuning.
-    - input tuning.
-    - output tuning.
-    - classifier tuning.
-    - gradient-search based on autoprompt.
-    - grips edit based tuning of the instructions.
-    - soft-prompt tuning.
-    - lora adaptation technique tuning.
+To train the language model optimizing the objective \ref{lmfp-augmentation-objective}, we need to adjust the set of parameters $\theta_{lm}$. Naively, we can update every parameter defined in the language model to optimize the training objective, but this ``All-Finetuning'' (AlTune) approach is not efficient if we do not have enough compute resource, especially with truly large language models. Therefore, we will study the effect of paraphrase augmentation along seven other efficient tuning~\cite{pmlr-v97-houlsby19a} or prompt engineering techniques~\cite{liu2021pretrain}. 
 
-- Describe that all are included with instructions except classifier fine-tuning.
-- Describe the relative number of parameters to tune with each of these techniques.
-
-(Need to describe each method in Detail)
-We first assume that our backbone language model is being offered as a third-party API without having access to its gradients or internal activations.
-
-
-
-
-%With this assumption, we consider the recent discrete optimization method RLPrompt \cite{deng-etal-2022-rlprompt} which uses the on-policy version of the soft Q-learning \cite{https://doi.org/10.48550/arxiv.2106.07704} to find the optimal discrete prompt tokens in a gradient-free setting. With the RLPrompt, $\theta_{lm}$ denotes the parameters of the policy network to generate the prompt sequence.
-
-Similar to the motivating example, as a second gradient-free baseline, we consider manual prompt templates without training any extra parameters for prompt learning in the language model, therefore $\theta_{lm} = \emptyset$ with manual prompts. To further optimize the manual prompts, we apply the gradient-search method similar to AutoPrompt \cite{shin-etal-2020-autoprompt} starting from our manual templates. With this gradient-search method, $\theta_{lm} = \emptyset$ as we are not introducing any new trainable parameters.
-
-With access to gradients, we first consider the full model fine-tuning on the downstream classification task, therefore $\theta_{lm}$ corresponds to all of the parameters in the backbone language model. Moreover, we experiment with soft-prompt tuning approach \cite{lester-etal-2021-power} where a set of continuous vectors are prepended to the fixed input embeddings and these continuous vectors are the only training parameters $\theta_{lm}$ on the downstream task.
+We assume that every input $x$ or its paraphrase $z_j$ has been prepended with a task instruction $p$. We represent task instruction with the symbol $p$ to be consistent with the prompt engineering literature. Adding the task instruction to the input can be interpreted as a parameter-free, gradient-free prompt engineering technique which uses the manually designed instruction to boost the performance of the pre-trained language model on various downstream tasks~\cite{DBLP:journals/corr/abs-2005-14165, petroni-etal-2019-language, deng-etal-2022-rlprompt}. With only the task instructions, we don't update any parameter of the language model $\theta_{lm}=\emptyset$ and we only make a zero-shot prediction on the development data. By augmenting the input or paraphrases with these task instructions, we further study the following LM tuning techniques:
+\begin{itemize}
+    \item Gradient-Search (GS): The GS technique is based on the recent AUTOPROMPT~\cite{shin-etal-2020-autoprompt} method which can optimize our task instructions without introducing any new parameters. The search starts in the vocabulary space by approximating the change in the label log-likelihood if we had replaced the token $p_{i}$ in the task instruction with another token $v$ from the vocabulary set. The search iteration in our implementation randomly picks a mini-batch of the training examples and then randomly picks one of tokens of the task instruction to update. It then finds the top $k$ new candidate tokens based on the change in the label log-likelihood approximated by the label directional gradient in the embedding direction $w_v$ of the candidate token $v$: $Top_v \; \{w^{T}_{v} \nabla_{w_{p_i}} \log P(y|p,x)$\}. The resulting new $k$ task instructions are compared again on the same training examples based on the label log-likelihood and the top new instruction is kept for the next search iteration. The search continues to the next iteration over another training mini-batch. We also monitor the task performance on the validation set and re-load the best saved task instruction if the current searched task instruction is not boosting the validation performance. This technique searches for an optimized task instruction in the discrete space and the resulting instructions are usually ungrammatical strings~\cite{shin-etal-2020-autoprompt}. The previous research applying this technique for prompt engineering always use the original input $x$ to search for the new task prompts~\cite{shin-etal-2020-autoprompt, deng-etal-2022-rlprompt}. We wish to investigate the effect of introducing paraphrases of $x$ during the search iterations.
+    
+    \item GrIPS: The Gradient-free Edit-based Instruction Search (GrIPS)~\cite{prasad-etal-2023-grips} is our second parameter-free search method for discrete prompt optimization. Similar to our previous GradientSearch implementation, within each search iteration over a training mini-batch, we try to perform a chain of four edit operations: deleting one token at random from the instruction, adding one of the previously deleted tokens back to the instruction at random, swapping two tokens in the instruction at random, and finally paraphrasing one of the tokens in the instruction using a pre-trained Pegasus paraphrase model. To evaluate the candidate instructions, GrIPS considers a score function based on the balanced accuracy augmented with the entropy of the predictions over the training mini-batch instead of the change in the label log-likelihood~\cite{prasad-etal-2023-grips}. We also monitor the task performance on the development set to save the best instruction out of the new candidate instructions similar to the GradientSearch method. The optimized instructions with GrIPS also tend to be ungrammatical strings. The paraphrase model used in GrIPS has only been used over the instructions and not the original text $x$. We investigate if further paraphrasing $x$ would improve the performance of GrIPS to find instructions that can generalize better.
+    \item Input-Finetuning (InTune): As our simple efficient tuning technique, we only update the input embedding table in the transformer architecture. This method requires gradient computation similar to All-Finetuning (AlTune) (i.e. updating every parameter) and the GS method. The InTune method requires $\Theta(V \times D)$ parameters to update where $D$ is the dimension of the embedding vectors and $V$ is the vocabulary size~\footnote{we also update the bias and weight of the normalization layer associated with the input embedding table.}.
+    \item LM-Head-Finetuning (HTune): The pre-trained language models based on the transformer architecture include a language modelling table (head) that maps the hidden vectors to the token logit (i.e. score before softmax function) per token of the vocabulary. We only update this language modelling head which requires $\Theta(D \times V)$ parameters where $D$ is the dimension of the hidden vectors of the final layer of the transformer architecture and $V$ is the vocabulary size.
+    \item Classifier-Finetuning (ClsTune): We can use the averaged hidden vector $h(x)$ pooled from the final hidden vectors of the last layer in the language model as the feature representation for a given input $x$. In the Classifier-Finetuning (ClsTune), we assume our language model (feature extractor) is fixed and we only build a two-layer feedforward layer with the $gelu$ activation function~\cite{DBLP:journals/corr/HendrycksG16} as our classification module on top of the language model: $y = softmax(W \times gleu(U \times h(x) + f) + b)$. With ClsTune, we only update the weight matrices $W$ and $U$ as well as the bias vectors $f$ and $b$. We need to update $\Theta(D^{'} \times D + D^{'} + C \times D^{'} + C)$ parameters where $D$ is the dimension of the hidden vectors in the language model, $D^{'}$ is the corresponding dimension of the bias vector $f$, and $C$ is the number of labels. Despite HTune which generates the tokens corresponding to a class label, ClsTune classifies the input $x$ into all possible class ids. On the test data, ClsTune chooses the class with  highest logit, whereas HTune computes the probability for each possible class label and chooses the class with the most probable output.
+    \item Softprompt-Tuning (SpTune): 
+    \item LoRA-Adapting (LoAdapt):
+\end{itemize}
 
 \subsection{LM-Friendly Paraphrase Search}
-In this section, we describe our main learning objective for our proposed LM-Friendly Paraphrase Search (LMFPS). We wish to generate paraphrases $z_{i,j}$ of the input $x_i$ such that the downstream language model can predict the correct label $y_i$ with higher confidence. Therefore, our learning objective is to maximize the expected reward for our generated paraphrases $z_{i,j}$ using the downstream language model $P_{\theta_{lm}} (y_i | z_{i,j})$. This goal results in the following expected maximization:
+In this section, we describe the learning objectives for training our paraphrase generator. Given a training example $(x, y)$, our goal is to classify the input $x$ into the gold label $y$ by maximizing the log likelihood $\log P(y|x)$. Our assumption is that there are some paraphrases of the input $x$ that could be easier for predicting the correct class. These paraphrases should maintain the semantic meaning of $x$ while being syntactically different from $x$. We wish to generate these paraphrases $z_{j}$ given the input $x$ such that the downstream language model can predict the correct label $y$ with higher confidence. Therefore, our data log likelihood is factorized into the following marginalization over paraphrases where $\theta_{par}$ and $\theta_{lm}$ are respectively the parameters of the paraphrase generator and the downstream language model:
 \begin{multline}
-J_{\theta_{par}} = E_{z_{i,j}} [\log P_{\theta_{lm}} (y_i | z_{i,j})] \\
-z_{i,j} \sim P_{\theta_{par}}(.|x_i)
-\label{lmfp}
+J_{\theta_{par}} := \log E_{z_{j}} [P(y | z_{j})] = \\ \log \sum_{z_{j}} P_{\theta_{par}}(z_{j} | x) \times P_{\theta_{lm}}(y | z_{j})
+\label{lmfp-main-objective}
 \end{multline}
 
 
-- Describe the motivation for the policy gradient objective.
+To train the paraphrase generator optimizing the objective \ref{lmfp-main-objective}, we consider four different learning perspectives: a) two techniques for gradient approximation, b) one reward scaling technique, c) three decoding techniques to sample paraphrases, and d) two techniques for maintaining grammar while generating paraphrases. These combinations result in different learning methods to fine-tune the paraphrase generator using the downstream language model. We describe our options for each perspective in the following paragraphs.
 
-- Describe the motivation for the normalizing the score of LM per paraphrase.
-
-- Describe the motivation for off-policy learning.
-
-Describe the final objective being used.
-
-We will use various prompt baselines to guide the input sentence.
-Soft-prompt tuning.
-+ manual prompts.
-full-model fine-tuning.
-
-- While training the text simplifier, one approach is to fix the LM that has been fine-tuned with respect the prompt method.
-- The second approach we will also update the LM using the prompt method while learning the text simplifier.
-- Two algorithms to train the text simplifier, one would be off-mml, the second would be soft-q-learning.
-- Third simple baseline would be computing an attention over the input x to drop some terms from the input.
-- Last, see the effect on short-vs-long context.
-- Consider the effect of the dataset pre-training for the text simplifier.
-- Two kinds of models, t5-large, roberta-large.
-- Two text classifications (few-shot vs. full-shot)
-- Examples of the text being modified and the change in-accuracy.
-
-- Compare your off-policy method with PPO!
-- I can do top-p sampling with different ratios of length penalty to encourage longer, shorter paraphrases of the same input and make the model or the prompting method robust towards these paraphrases.
-
-To produce a PDF file, pdf\LaTeX{} is strongly recommended (over original \LaTeX{} plus dvips+ps2pdf or dvipdf). Xe\LaTeX{} also produces PDF files, and is especially suitable for text in non-Latin scripts.
-
-
-\section{Experiments}
-
-\subsection{Pre-trained Models}
-As our pre-trained paraphrase model $P_{\theta_{par}} (z_{i,j} | x_{i})$, we use the BART-large \cite{lewis-etal-2020-bart} finetuned on the ParaBank2 dataset over 5 million sentence-paraphrase pairs \cite{hu-etal-2019-large}. These pairs have been constructed by back-translating the Czech portion of an English-Czech parallel corpus \cite{hu-etal-2019-large}. The model has been pre-trained with only token-level cross-entropy loss calculated using the gold paraphrase output given the input sentence.  We download the publically available\footnote{\url{https://huggingface.co/stanford-oval/paraphraser-bart-large}} weights trained as part of the AutoQA system \cite{xu-etal-2020-autoqa}. It is worth noting that our goal is not to train the state-of-the-art paraphrase generator as we study the effect of paraphrasing on prompt optimization techniques. Recent techniques for generating diverse paraphrases \cite{zhou-bhat-2021-paraphrase} could boost the performance in all our experiments. As some of our classification experiments have been conducted on the GLUE benchmark \cite{DBLP:journals/corr/abs-1804-07461}, we choose the BART-based model rather than the alternative T5 pre-trained model. The GLUE dataset has been part of the supervised corpora used for pre-training T5 models \cite{DBLP:journals/corr/abs-1910-10683}. The BART-large model finetuned on the paraphrase corpus has not observed the input sentences and the corresponding class labels of the GLUE datasets as part of its initial pre-training dataset.
-
-We use two types of models\footnote{\url{https://huggingface.co/google/t5-large-lm-adapt}}\footnote{\url{https://huggingface.co/roberta-large}} as our main language model $LM_{\theta_{lm}} (y | p ; x^{s})$: the generative LM T5-large with extra training phase for LM adaptation as explored by the soft-prompt tuning approach \cite{lester-etal-2021-power}, and the RoBERTa-large model pre-trained with Masked Language Modeling (MLM) objective \cite{DBLP:journals/corr/abs-1907-11692}.
-
-\subsection{Sampling Parameters}
-
-\subsection{Alternative Learning Objectives for LMFPS}
-In this section, we describe alternative learning objectives to fine-tune the paraphrase generator using the log likelihood of the downstream language model as the initial reward. Given the $j$'s paraphrase $z_{j}$ of the training example $(x, y)$, we define the $z_{j}$'s reward as $R(z_{j}) = \log P_{\theta_{lm}} (y | z_{j})$.
-
-We have three dimensions to our decisions regarding the objective functions. Our first option is to use Maximum Marginal Likelihood estimation, or approximate the gradient update for the paraphrase model using the Policy Gradient theorem. The gradient updates using these two approaches are different in how we partition the score of each sample \cite{}. The main objective is to optimize the following expectation:
+Given the $j$'s paraphrase $z_{j}$ for the training example $(x, y)$, we define the $z_{j}$'s reward as $R(z_{j}) = \log P_{\theta_{lm}} (y | z_{j})$.
+To approximate the gradient vector of the objective \ref{lmfp-main-objective} with respect to $\theta_{par}$, we consider two options. We can use Maximum Marginal Likelihood (MML) estimation, or approximate the gradient vector for the paraphrase model using the Policy Gradient (PG) theorem. The gradient updates using these two approaches are closely related and they are only different in the posterior coefficient we use to score each sample \cite{guu-etal-2017-language}. We can re-formulate the main objective \ref{lmfp-main-objective} into the following expected reward:
 \begin{multline}
-J_{\theta_{par}} = \log E_{z_{j}} [e^{R(z_{j})}],
+J_{\theta_{par}} 
+:= \log E_{z_{j}} [e^{R(z_{j})}],
 z_{j} \sim P_{\theta_{par}}(.|x)
-\label{main-objective}
+\label{lmfp-expect-objective}
 \end{multline}
 
 If for each input $x$, we take paraphrase samples from $P_{\theta_{par}}(.|x)$ and then approximate the expectation in $J_{\theta_{par}}$ with numerical summation, we are optimizing the objective using Maximum Marginal Likelihood estimation resulting in the following gradient update:
 \begin{multline}
-\nabla J^{mml}_{\theta_{par}} = \nabla \log \sum^{M}_{j=1} P_{\theta_{par}}(z_{j}|x) \times e^{R(z_{j})} \\
-z_{j} \sim P_{\theta_{par}}(.|x)
+\nabla J^{mml}_{\theta_{par}} :=  \nabla_{\theta_{par}} \log E_{z_{j}} [e^{R(z_{j})}] = \\
+\sum^{M}_{j=1} \phi^{mml}(z_{j}) \times \nabla_{\theta_{par}} \log P_{\theta_{par}}(z_{j}|x) \\
+\phi^{mml}(z_{j}) = \frac{P_{\theta_{par}}(z_{j}|x) \times e^{R(z_{j})}}{\sum^{M}_{j^{'}=1} P_{\theta_{par}}(z_{j^{'}}|x) \times e^{R(z_{j^{'}})}}
 \label{mml-objective}
 \end{multline}
 
-If we push the $\log$ inside the expectation, we can optimize the following lower bound and then apply the policy gradient theorem \cite{10.5555/3009657.3009806} to estimate the gradient update:
+If we push the $\log$ inside the expectation (using Jensen's inequality), we can optimize a surrogate lower bound for the objective \ref{lmfp-expect-objective} resulting in the following policy gradient approximation \cite{10.5555/3009657.3009806}:
 \begin{multline}
-\nabla J^{pg}_{\theta_{par}} = \sum^{M}_{j=1} \nabla \log P_{\theta_{par}}(z_{j}|x) \times R(z_{j}) \\
-z_{j} \sim P_{\theta_{par}}(.|x)
+\nabla J^{pg}_{\theta_{par}} := \nabla_{\theta_{par}} E_{z_{j}} [R(z_{j})] = \\
+\sum^{M}_{j=1} \phi^{pg}(z_{j}) \times \nabla_{\theta_{par}} \log P_{\theta_{par}}(z_{j}|x) \\
+\phi^{pg}(z_{j}) = P_{\theta_{par}}(z_{j}|x) \times R(z_{j})
 \label{pg-objective}
 \end{multline}
 
-To promote the generation of paraphrases that are easier for the language model than the original input $x$, we also optimize the policy gradient objective using the following reward function $R^{d}(z_{j}) = R(z_{j}) - R(x)$. As another alternative reward function, we normalize the rewards of the paraphrases for the same input $x$. This helps to avoid training the paraphrase generator with rewards having different magnitudes corresponding to various input examples as some training pairs could be easier for the language model. Similar reward normalization or z-scoring has been reported to boost the performance of text generators across many tasks \cite{guo-etal-2022-efficient}. The normalized reward is defined as follows:
+For our second learning perspective, we can use the basic reward $R(z_{j})$ or normalize the rewards of the paraphrases for the same input $x$. This normalization helps to avoid training the paraphrase generator with rewards having different magnitudes corresponding to various input examples as some training pairs could be easier for the language model. Similar reward normalization has been reported to boost the performance of text generators across many tasks \cite{guo-etal-2022-efficient}. The normalized reward is defined as follows:
 \begin{multline}
 R^{n}(z_{j}) = \frac{R(z_{j}) - \mu_{j}}{\sigma_{j}}, \mu_{j} = \frac{1}{M} \sum^{M}_{j=1} R(z_{j}) \\
 \sigma^{2}_{j} = \frac{1}{M} \sum^{M}_{j=1} (R(z_{j}) - \mu_{j})^2
 \label{normal-reward}
 \end{multline}
 
-\subsection{Averaging predictions using multiple paraphrases over the test data.}
+To train the paraphrase generator using the both the MML and PG objectives outlined in the equations \ref{mml-objective} and \ref{pg-objective}, we need to take $M$ samples from the paraphrase generator. We consider three decoding techniques to collect these samples. We first use beam search decoding to collect these $M$ paraphrases. To properly explore the paraphrase space, we can also take the $M$ paraphrases using nucleus (top-p) sampling~\cite{holtzman2020curious}. With the top-p sampling, we use the sampling threshold of $p=0.99$ where we collect the minimum set of tokens from the vocabulary set with the cumulative probability of at least $0.99$ and then re-sample tokens from this set. We also smooth the softmax logits for the tokens using the temperature value $t=2$ before applying the top-p sampling: $\frac{e^{score(v_i)/t}}{\sum_{v} e^{score(v)/t}}$. This smoothing helps to include more tokens in the sampling set~\footnote{Further smoothing $t>2$ results in degenerate paraphrases using the pre-trained paraphrase generator!}. As our third option for sampling during the training phase, we mix beam search and top-p sampling where we first sample $M$ paraphrases using the beam search and top-p samplings, and then mix the top $M/2$ samples from each of these outputs to form our final $M$ samples. To take samples for data augmentation (i.e. test phase) in the objective \ref{lmfp-augmentation-objective}, we only use top-p sampling without smoothing the softmax logits (i.e. $t=1$). As suggested by the previous work, top-p sampling can generate more diverse paraphrases using our pre-trained paraphrase generator~\cite{xu-etal-2020-autoqa}.
+
+As our final learning perspective, we investigate whether the paraphrase generator starts to generate ungrammatical paraphrases or not. As we are sampling paraphrases from $P_{\theta_{par}}(z_{j}|x)$ and update the same set of parameters using these samples, the paraphrase generator can start generating ungrammatical text during this on-policy learning. Similar degenerate generation has been reported for question generation~\cite{najafi-fyshe-2023-weakly} or program synthesis~\cite{NEURIPS2018_f4e369c0}.
+
+We experiment with two remedies for this degenerate generation. Similar to previous work on question generation~\cite{najafi-fyshe-2023-weakly}, we consider off-policy learning of the paraphrase generator where there is a fixed sampling module $P_{fixed}(z_{j}|x)$ to pick the samples and then we update the main paraphrase generator $P_{\theta_{par}}(z_{j}|x)$ within the objectives \ref{mml-objective} and \ref{pg-objective}. Therefore with these off-policy samples, the posterior coefficients include the importance sampling ratio $s(z_{j}) = \frac{P_{\theta_{par}}(z_{j}|x)}{P_{fixed}(z_{j}|x)}$:
+\begin{multline}
+\phi^{pg}_{off}(z_{j}) = s(z_{j}) \times R(z_{j})\\
+\phi^{mml}_{off}(z_{j}) = \frac{s(z_{j}) \times e^{R(z_{j})}}{\sum^{M}_{j^{'}=1} s(z_{j^{'}}) \times e^{R(z_{j^{'}})}}
+\label{off-pg-mml-objective}
+\end{multline}
+
+Our second solution for avoiding these degenerate paraphrases is to put a penalty in the training objective if the samples drawn from the current paraphrase generator $P_{\theta_{par}}(z_{j}|x)$ deviates a lot from the pre-trained paraphrase generator. This penalty could be implemented as a $KL$ penalty between the distributions of the paraphrases given by the current model and the pre-trained one. This penalty resembles the Proximal Policy Optimization (PPO) with the $KL$ penalty~\cite{DBLP:journals/corr/SchulmanWDRK17} and has also been used for fine-tuning of InstructGPT with the reward model trained over huma n feedback~\cite{ouyang2022training}. In the InstructGPT, the reward fine-tuned model cannot diverge from the language model pre-trained on the supervised data~\cite{ouyang2022training}. With this penalty, we define the following new objective for $\theta_{par}$:
+\begin{multline}
+J^{ppo}_{\theta_{par}} 
+:= \log E_{z_{j}} [e^{R(z_{j})}] - \beta E_{z_{j}} [\log s(z_j)] \\
+s(z_{j}) = \frac{P_{\theta_{par}}(z_{j}|x)}{P_{fixed}
+(z_{j}|x)}, z_{j} \sim P_{\theta_{par}}(.|x)
+\label{lmfp-expect-ppo-objective}
+\end{multline}
+
+Using the previous MML and PG gradient approximations, we have the following regularized gradient vectors with respect to $\theta_{par}$ ($\beta$ is a hyper-parameter):
+\begin{multline}
+\nabla J^{mml}_{\theta_{par}} - \beta E_{z_{j}} [(\log s(z_{j}) + 1) \nabla \log P_{\theta_{par}} (z_{j} | x)] \\
+\nabla J^{pg}_{\theta_{par}} - \beta E_{z_{j}} [(\log s(z_{j}) + 1) \nabla \log P_{\theta_{par}} (z_{j} | x)] \\
+z_{j} \sim P_{\theta_{par}}(.|x)
+\label{lmfp-expect-ppo-gradient}
+\end{multline}
+
+It is worth noting that the KL penalty could be interpreted as a grammar reward given by $P_{fixed}(z_{j}|x)$ and an entropy regularization for $P_{\theta_{par}} (z_{j} | x)$. The entropy regularization helps with diverse exploration of the search space~\cite{DBLP:journals/corr/MnihBMGLHSK16} and the grammar reward hinders learning of the ungrammatical samples.
+
+\subsection{Ensemble Inference}
+
+\section{Experiments}
+
+\subsection{Pre-trained Models}
+As our pre-trained paraphrase model $P_{\theta_{par}} (z_{i,j} | x_{i})$, we use the BART-large \cite{lewis-etal-2020-bart} finetuned on the ParaBank2 dataset over 5 million sentence-paraphrase pairs \cite{hu-etal-2019-large}. These pairs have been constructed by back-translating the Czech portion of an English-Czech parallel corpus \cite{hu-etal-2019-large}. The model has been pre-trained with only token-level cross-entropy loss calculated using the gold paraphrase output given the input sentence.  We download the publically available\footnote{\url{https://huggingface.co/stanford-oval/paraphraser-bart-large}} weights trained as part of the AutoQA system \cite{xu-etal-2020-autoqa}. It is worth noting that our goal is not to train the state-of-the-art paraphrase generator as we study the effect of paraphrasing on prompt optimization techniques. Recent techniques for generating diverse paraphrases \cite{zhou-bhat-2021-paraphrase} could boost the performance in all our experiments. As some of our classification experiments have been conducted on the GLUE benchmark \cite{DBLP:journals/corr/abs-1804-07461}, we choose the BART-based model rather than the alternative T5 pre-trained model. The GLUE dataset has been part of the supervised corpora used for pre-training T5 models \cite{DBLP:journals/corr/abs-1910-10683}. The BART-large model finetuned on the paraphrase corpus has not observed the input sentences and the corresponding class labels of the GLUE datasets as part of its initial pre-training dataset.
+
+As our main language model, we use the RoBERTa-large model pre-trained with Masked Language Modeling (MLM) objective \cite{DBLP:journals/corr/abs-1907-11692} which has been shown to perform well on Natural Language Understanding (NLU) tasks.
+
+\subsection{Hyper-Parameters}
 
 \subsection{Metrics}
 - Describe the evaluation metrics for each task in superglue.
-- Describe behavioural testing which checks the performance of the models by behavioural testing.
 
-- Summarize the metric for sentiment analysis and sst-5. and Also mention the behavioural testing on SST-2 and SST-5.
+- Summarize the metric for sentiment analysis and sst-5.
 
-- Describe Behavioural Testing for Sentiment Analysis. Provide a table of example perturbations and tests being applied. We will record the behavioural testing as another metric.
-
-We refer to the paper for a complete list of these tests for question-duplication and machine comprehension.
-
-
-- One main table comparing your paraphrased inputs with previous works on superglue tasks against various baselines on the roberta-large model.
-
-    With only results from SST-2 & SST-5 and paraphrased augmentation and related work comparison in prompt learning, I can do candidacy Exam! I can also compare with my previous off-policy MML! You are doing the experiments in 5 splits of few-shot learning over these datasets, so training is really fast and easy!
-    Report behavioural testing for SST-2 and SST-5 for now for the candidacy exam.
-
-- Multiple ablation tables about simple data augmentation. Or using on-policy samples or the comparison against an RL and PPO objective.
-
-- Ablation study about co-training or just fixing the prompt learning method.
-
-- Ablation study about how to takes samples such as beam or different rates of top-p sampling.
-
-- Ablation study on the corporation of other rewards for the paraphrased inputs.
-
-- Maybe report some metrics about behavioural testing.
-    This is one final table about the the failure rates of different prompting methods and with our paraphrased inputs to suggest that models and prompt techniques are still not robust to small input perterbations!!!!
-
-- Mention your method's difference with self-critical training.
-
+\begin{comment}
 \begin{table*}
 \centering
 \caption{The average accuracy (standard deviation) on the dev set of the SST2 binary sentiment classification task with the Roberta-Large LM trained in the fewshot setting using only 16 train examples per label. The results are averaged after sampling 32 examples for the train and validation splits using five different random seeds.$\dagger$ is the reported performance of the fine-tuned Roberta-Large on all of the training dataset.}
@@ -290,7 +238,6 @@ P(y|x) = 0.5 \times P_{LM_{\phi}}(y|x) + \\
 - show the tuned learning rates per model tuning method.
 
 - Depict the picture on the training examples as we plot Dev accuracy for these different methods.
-
 
 - Describe what weights you have been updating.
 
@@ -412,25 +359,32 @@ You can use the command \verb|\citet| (cite in text) to get ``author (year)'' ci
 You can use the command \verb|\citep| (cite in parentheses) to get ``(author, year)'' citations \citep{Gusfield:97}.
 You can use the command \verb|\citealp| (alternative cite without parentheses) to get ``author, year'' citations, which is useful for using citations within parentheses (e.g. \citealp{Gusfield:97}).
 
+\end{comment}
+
 \section{Related Works}
 
 \noindent
 {\bf Prompt Engineering}:
 Describe P-tuning, P-Tuning V2, Prefix-Tuning, Blax-Box Tuning, Levenstian Tuning. Chain of Thought Prompting.
 
+The recent discrete optimization method RLPrompt \cite{deng-etal-2022-rlprompt} which uses the on-policy version of the soft Q-learning \cite{https://doi.org/10.48550/arxiv.2106.07704} to find the optimal discrete prompt tokens in a gradient-free setting.
+
 \noindent
 {\bf Paraphrase Generation}:
 Our main goal in this study is not to provide a state-of-the-art system for diverse paraphrase generation. We investigate the effect of input paraphrasing on the prompt optimization techniques for efficiently querying large language models.
 
-\noindent
-{\bf Query \& Question Reformulation}:
-
-
 \section{Limitations}
-
-- We are not doing the best in summarization, more can be done by deploying better summarization models.
+- We are not doing the best in paraphrasing, more can be done by deploying better paraphraser models.
 
 - Merging prompts with original inputs.
+
+- Tested on large models only, not test on truly large models.
+
+- Pre-trained paraphrase generator requires a supervised corpus for that particular language. More research on unsupervised paraphrase generation maybe helpful.
+
+\section*{Ethics Statement}
+Scientific work published at ACL 2023 must comply with the ACL Ethics Policy.\footnote{\url{https://www.aclweb.org/portal/content/acl-code-ethics}} We encourage all authors to include an explicit ethics statement on the broader impact of the work, or other ethical considerations after the conclusion but before the references. The ethics statement will not count toward the page limit (8 pages for long, 4 pages for short papers).
+
 \subsection{References}
 
 \nocite{Ando2005,augenstein-etal-2016-stance,andrew2007scalable,rasooli-tetrault-2015,goodman-etal-2016-noise,harper-2014-learning}
@@ -465,17 +419,6 @@ Unicode cannot be used in Bib\TeX{} entries, and some ways of typing special cha
 Please ensure that Bib\TeX{} records contain DOIs or URLs when possible, and for all the ACL materials that you reference.
 Use the \verb|doi| field for DOIs and the \verb|url| field for URLs.
 If a Bib\TeX{} entry has a URL or DOI field, the paper title in the references section will appear as a hyperlink to the paper, using the hyperref \LaTeX{} package.
-
-\section*{Limitations}
-ACL 2023 requires all submissions to have a section titled ``Limitations'', for discussing the limitations of the paper as a complement to the discussion of strengths in the main text. This section should occur after the conclusion, but before the references. It will not count towards the page limit.
-The discussion of limitations is mandatory. Papers without a limitation section will be desk-rejected without review.
-
-While we are open to different types of limitations, just mentioning that a set of results have been shown for English only probably does not reflect what we expect.
-Mentioning that the method works mostly for languages with limited morphology, like English, is a much better alternative.
-In addition, limitations such as low scalability to long text, the requirement of large GPU resources, or other things that inspire crucial further investigation are welcome.
-
-\section*{Ethics Statement}
-Scientific work published at ACL 2023 must comply with the ACL Ethics Policy.\footnote{\url{https://www.aclweb.org/portal/content/acl-code-ethics}} We encourage all authors to include an explicit ethics statement on the broader impact of the work, or other ethical considerations after the conclusion but before the references. The ethics statement will not count toward the page limit (8 pages for long, 4 pages for short papers).
 
 \section*{Acknowledgements}
 This document has been adapted by Jordan Boyd-Graber, Naoaki Okazaki, Anna Rogers from the style files used for earlier ACL, EMNLP and NAACL proceedings, including those for
