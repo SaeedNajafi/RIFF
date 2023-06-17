@@ -45,15 +45,15 @@ if [ "${TASK_NAME}" = "sst2" ]; then
     train_batch_size=8
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
         instruction_type="manual_template_research_sst2_no_instruction"
-        train_batch_size=4
+        train_batch_size=2
     fi
 
-elif [ "${TASK_NAME}" = "SetFit/sst5" ]; then
+elif [ "${TASK_NAME}" = "SetFit_sst5" ]; then
     instruction_type="manual_template_research_sst5_with_instruction"
     train_batch_size=8
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
         instruction_type="manual_template_research_sst5_no_instruction"
-        train_batch_size=4
+        train_batch_size=2
     fi
 fi
 
@@ -89,7 +89,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --test_sample_size 8 \
     --metric_to_save ${METRIC_TO_SAVE} \
     --g_beam_size 1 \
-    --top_k 10
+    --top_k 20
 
 ensembling="paraphrase_predict"
 if [ "${DATA_AUG}" = "0" ]; then
@@ -111,7 +111,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --source_max_length 128 \
     --decoder_max_length 128 \
     --checkpoint best_step \
-    --prediction_file ${model_path}/${TASK_NAME}.validation.with_instruction.${EXPERIMENT_TYPE}.all_predictions.predictions.csv \
+    --prediction_file ${model_path}/${TASK_NAME}.validation.with_instruction.${EXPERIMENT_TYPE}.all_predictions.csv \
     --instruction_type ${instruction_type} \
     --pretrained_model roberta-large \
     --enable_data_augmentation ${DATA_AUG} \
@@ -121,4 +121,4 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --test_temperature 1.0 \
     --test_sample_size 8 \
     --g_beam_size 1 \
-    --top_k 10
+    --top_k 20

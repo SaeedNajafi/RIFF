@@ -51,7 +51,8 @@ def return_instruction() -> str:
             sentence is positive or as 'terrible' if the sentiment of the sentence is negative."
     elif FLAGS.instruction_type == "manual_template_research_sst5_with_instruction":
         instruction = "In this task, you are given sentences from movie reviews. \
-            Based on the given review, classify it to one of the five classes: terrible, bad, okay, good, and great."
+            Based on the given review, classify it to one of the five classes: \
+                (1) terrible, (2) bad, (3) okay, (4) good, and (5) great."
     return instruction
 
 
@@ -158,7 +159,8 @@ def template_data(
         sentences = [f"{instruction} {sent} It was <mask> ." for sent in sentences]
     elif FLAGS.instruction_type == "manual_template_research_sst5_with_instruction":
         instruction = "In this task, you are given sentences from movie reviews. \
-            Based on the given review, classify it to one of the five classes: terrible, bad, okay, good, and great."
+            Based on the given review, classify it to one of the five classes: \
+                (1) terrible, (2) bad, (3) okay, (4) good, and (5) great."
         sentences = [f"{instruction} {sent} It was <mask> ." for sent in sentences]
     elif FLAGS.instruction_type in [
         "manual_template_research_sst2_no_instruction",
@@ -213,14 +215,17 @@ def template_data(
 def read_sst_sentiment_file(split_name: str, task_name: str, repeat_input: bool = False) -> SentimentRawData:
     """Load the sst sentiment analysis split for train, validation or test."""
     assert split_name in {"train", "validation", "test"}
-    dataset = load_dataset(task_name, split=split_name)
+    if task_name == "SetFit_sst5":
+        dataset = load_dataset("SetFit/sst5", split=split_name)
+    else:
+        dataset = load_dataset(task_name, split=split_name)
     sst5_mapping = {"0": "terrible", "1": "bad", "2": "okay", "3": "good", "4": "great"}
     sst2_mapping = {"0": "terrible", "1": "great"}
     sst5_class_to_id_mapping = {val: int(key) for key, val in sst5_mapping.items()}
     sst2_class_to_id_mapping = {val: int(key) for key, val in sst2_mapping.items()}
     if task_name == "sst2":
         class_to_id = sst2_class_to_id_mapping
-    elif task_name == "SetFit/sst5":
+    elif task_name == "SetFit_sst5":
         class_to_id = sst5_class_to_id_mapping
 
     def process_row(row: Dict[str, str]) -> Dict[str, str]:
@@ -230,7 +235,7 @@ def read_sst_sentiment_file(split_name: str, task_name: str, repeat_input: bool 
         if task_name == "sst2":
             label = sst2_mapping[str(row["label"])]
             return {"sentence": white_space_fix(row["sentence"]), "sentiment": label}
-        elif task_name == "SetFit/sst5":
+        elif task_name == "SetFit_sst5":
             label = sst5_mapping[str(row["label"])]
             return {"sentence": white_space_fix(row["text"]), "sentiment": label}
         return {"sentence": "none"}
@@ -240,7 +245,7 @@ def read_sst_sentiment_file(split_name: str, task_name: str, repeat_input: bool 
             process_row,
             remove_columns=["idx", "label"],
         )
-    elif task_name == "SetFit/sst5":
+    elif task_name == "SetFit_sst5":
         new_dataset = dataset.map(
             process_row,
             remove_columns=["text", "label", "label_text"],
@@ -251,7 +256,7 @@ def read_sst_sentiment_file(split_name: str, task_name: str, repeat_input: bool 
 
     if task_name == "sst2":
         label_counter = {val: 0 for val in sst2_mapping.values()}
-    elif task_name == "SetFit/sst5":
+    elif task_name == "SetFit_sst5":
         label_counter = {val: 0 for val in sst5_mapping.values()}
 
     sentences = []
@@ -356,7 +361,7 @@ def create_sentiment_dataset(
     """Function to create the required huggingface dataset to train the T5
     models on the sentiment analysis task."""
 
-    if task_name in ["sst2", "SetFit/sst5"]:
+    if task_name in ["sst2", "SetFit_sst5"]:
         rawdata = read_sst_sentiment_file(file_name, task_name, repeat_input)
     else:
         raise Exception(f"this {task_name} is not supported!")

@@ -86,6 +86,7 @@ def train_model(
             writer.add_scalar(f"{score_name}/dev", score_val, 0)
             if score_name == FLAGS.metric_to_save:
                 best_score = score_val
+                model.save("best_step")
         while epoch < FLAGS.max_epochs and global_step < FLAGS.training_steps:
             print("\nEpoch:{0}\n".format(epoch))
             epoch_loss = []

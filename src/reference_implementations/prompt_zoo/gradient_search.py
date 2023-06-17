@@ -139,8 +139,8 @@ class SearchRoberta(MyBaseLM):
                     sentence is positive or as 'terrible' if the sentiment of the sentence is negative."
         elif task_name == "SetFit/sst5":
             initial_template = "In this task, you are given sentences from movie reviews. \
-                Based on the given review, classify it to one of the five classes: \
-                    terrible, bad, okay, good, and great."
+            Based on the given review, classify it to one of the five classes: \
+                (1) terrible, (2) bad, (3) okay, (4) good, and (5) great."
         instruct_ids = self.tokenizer(white_space_fix(initial_template), add_special_tokens=False)["input_ids"]
         self.search_memory = PromptSearchMemory(instruct_ids)
 

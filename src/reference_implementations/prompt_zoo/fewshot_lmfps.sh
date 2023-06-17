@@ -18,6 +18,8 @@ LEARN_RATE=${LR}
 EXPERIMENT_TYPE=${EXP_TYPE}
 RANDOM_SEED=${SEED}
 TASK_NAME=${TASK}
+NUM_CLASSES=${NUM_CLASSES}
+FEWSHOT_SIZE=${FEWSHOT_SIZE}
 DATA_AUG=${AUG}
 TRAIN_PARAPHRASER=${TRAIN_PARA}
 LOAD_PARAPHRASER=${LOAD_PARA}
@@ -30,7 +32,8 @@ KL_COEFFICIENT=${KL_COEFFICIENT}
 
 checkpoint_path=/checkpoint/$USER/${SLURM_JOB_ID}
 
-experiment_name=${TASK_NAME}_${EXPERIMENT_TYPE}_${RANDOM_SEED}_${LEARN_RATE}_${DATA_AUG}_${TRAIN_PARAPHRASER}_${LOAD_PARAPHRASER}_${PARA_LOSS}_${SAMPLING_METHOD}_${SAMPLING_ALG}_${METRIC_TO_SAVE}_${KL_COEFFICIENT}
+experiment_name=${TASK_NAME}_${NUM_CLASSES}_${FEWSHOT_SIZE}_${EXPERIMENT_TYPE}_${RANDOM_SEED}
+experiment_name=${experiment_name}_${LEARN_RATE}_${DATA_AUG}_${TRAIN_PARAPHRASER}_${LOAD_PARAPHRASER}_${PARA_LOSS}_${SAMPLING_METHOD}_${SAMPLING_ALG}_${METRIC_TO_SAVE}_${KL_COEFFICIENT}
 
 model_path=${checkpoint_path}/${experiment_name}
 
@@ -42,7 +45,7 @@ touch ${checkpoint_path}/DELAYPURGE
 if [ "${TASK_NAME}" = "sst2" ]; then
     instruction_type="manual_template_research_sst2_with_instruction"
 
-elif [ "${TASK_NAME}" = "SetFit/sst5" ]; then
+elif [ "${TASK_NAME}" = "SetFit_sst5" ]; then
     instruction_type="manual_template_research_sst5_with_instruction"
 
 fi
@@ -53,17 +56,17 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --eval_batch_size 8 \
     --mode train \
     --seed ${RANDOM_SEED} \
-    --task_name sst2 \
+    --task_name ${TASK_NAME} \
     --train_file train \
     --dev_file validation \
     --classification_type fewshot \
-    --num_classes 2 \
-    --fewshot_sample_size 128 \
-    --exp_type ${EXP_TYPE} \
+    --num_classes ${NUM_CLASSES} \
+    --fewshot_sample_size ${FEWSHOT_SIZE} \
+    --exp_type ${EXPERIMENT_TYPE} \
     --model_path ${model_path} \
     --para_model_path ${model_path} \
     --checkpoint best_step \
-    --max_epochs 20 \
+    --max_epochs 50 \
     --learning_rate ${LEARN_RATE} \
     --training_steps 1000000 \
     --steps_per_checkpoint 8 \
@@ -91,17 +94,17 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --eval_batch_size 8 \
     --mode test \
     --seed ${RANDOM_SEED} \
-    --task_name sst2 \
+    --task_name ${TASK_NAME} \
     --test_file validation \
-    --num_classes 2 \
-    --fewshot_sample_size 128 \
-    --exp_type ${EXP_TYPE} \
+    --num_classes ${NUM_CLASSES} \
+    --fewshot_sample_size ${FEWSHOT_SIZE} \
+    --exp_type ${EXPERIMENT_TYPE} \
     --model_path ${model_path} \
     --para_model_path ${model_path} \
     --source_max_length 128 \
     --decoder_max_length 128 \
     --checkpoint best_step \
-    --prediction_file ${model_path}/sst2.validation.with_instruction.${EXP_TYPE}.all_predictions.csv \
+    --prediction_file ${model_path}/${TASK_NAME}.validation.with_instruction.${EXPERIMENT_TYPE}.all_predictions.csv \
     --instruction_type ${instruction_type} \
     --pretrained_model roberta-large \
     --enable_data_augmentation ${DATA_AUG} \
@@ -109,6 +112,6 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --load_paraphraser ${LOAD_PARAPHRASER} \
     --ensemble_type paraphrase_predict \
     --test_temperature 1.0 \
-    --test_sample_size 8 \
+    --test_sample_size 8
 
 rm -r -f ${model_path}/roberta_model_best_step

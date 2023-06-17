@@ -1,10 +1,9 @@
 #!/bin/bash
 
-:'
 rates=(0.00001)
 exps=(all_finetune)
 seeds=(11 42 1993 2023 12321)
-tasks=(sst2)
+tasks=(SetFit_sst5)
 augs=(0 1)
 fewshot_sizes=(16 128)
 
@@ -32,7 +31,7 @@ do
                             ${exp} \
                             ${task} \
                             ${seed} \
-                            2 \
+                            5 \
                             ${fewshot_size} \
                             ${rate} \
                             ${aug} \
@@ -54,7 +53,7 @@ done
 rates=(0.001)
 exps=(input_finetune output_finetune)
 seeds=(11 42 1993 2023 12321)
-tasks=(sst2)
+tasks=(SetFit_sst5)
 augs=(0 1)
 fewshot_sizes=(16 128)
 
@@ -82,7 +81,7 @@ do
                             ${exp} \
                             ${task} \
                             ${seed} \
-                            2 \
+                            5 \
                             ${fewshot_size} \
                             ${rate} \
                             ${aug} \
@@ -104,7 +103,7 @@ done
 rates=(0.001)
 exps=(soft_prompt_finetune)
 seeds=(11 42 1993 2023 12321)
-tasks=(sst2)
+tasks=(SetFit_sst5)
 augs=(0 1)
 fewshot_sizes=(16 128)
 
@@ -132,7 +131,7 @@ do
                             ${exp} \
                             ${task} \
                             ${seed} \
-                            2 \
+                            5 \
                             ${fewshot_size} \
                             ${rate} \
                             ${aug} \
@@ -154,7 +153,7 @@ done
 rates=(0.01)
 exps=(classifier_finetune)
 seeds=(11 42 1993 2023 12321)
-tasks=(sst2)
+tasks=(SetFit_sst5)
 augs=(0 1)
 fewshot_sizes=(16 128)
 
@@ -182,7 +181,7 @@ do
                             ${exp} \
                             ${task} \
                             ${seed} \
-                            2 \
+                            5 \
                             ${fewshot_size} \
                             ${rate} \
                             ${aug} \
@@ -200,12 +199,11 @@ do
         done
     done
 done
-'
 
 rates=(0.001)
 exps=(gradient_search)
 seeds=(11 42 1993 2023 12321)
-tasks=(sst2)
+tasks=(SetFit_sst5)
 augs=(0 1)
 fewshot_sizes=(16 128)
 
@@ -233,7 +231,7 @@ do
                             ${exp} \
                             ${task} \
                             ${seed} \
-                            2 \
+                            5 \
                             ${fewshot_size} \
                             ${rate} \
                             ${aug} \
