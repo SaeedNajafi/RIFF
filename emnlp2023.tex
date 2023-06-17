@@ -5,7 +5,7 @@
 \documentclass[11pt]{article}
 
 % Remove the "review" option to generate the final version.
-\usepackage[final]{EMNLP2023}
+\usepackage[review]{EMNLP2023}
 
 % Standard package includes
 \usepackage{times}
@@ -32,6 +32,7 @@
 \usepackage{amsmath}
 \usepackage{graphicx}
 \usepackage{comment}
+\usepackage[inkscapeformat=png]{svg}
 
 % If the title and author information does not fit in the area allocated, uncomment the following
 %
@@ -125,7 +126,9 @@ We assume that each input $x$ or its paraphrase $z_j$ is preceded by a task inst
 
 All the Language Model (LM) tuning techniques we have discussed will use the same input format. For example in the sentiment classification task, we use the following format:
 \textbf{``<s> \{instruction\} \{text\} . It was <mask> </s>''}. Except for ClsTune, all of our LM tuning techniques aim to maximize the probability of the correct label token replacing the <mask> token. In contrast, ClsTune takes the formatted input and classifies it into one of the predefined class IDs.
+
 \subsection{LM-Friendly Paraphrase Search}
+\label{paraphrase-objectives}
 In this section, we present the learning objectives for training our paraphrase generator. Given a training example $(x, y)$, our objective is to classify the input $x$ into the gold label $y$ by maximizing the log likelihood $\log P(y|x)$. We assume that there exist paraphrases of the input $x$ that could facilitate the prediction of the correct class. These paraphrases should retain the semantic meaning of $x$ while exhibiting syntactic differences. Our aim is to generate paraphrases $z_{j}$ based on the input $x$, enabling the downstream language model to predict the correct label $y$ with greater confidence. Consequently, our data log likelihood is factorized into the following marginalization over the space of paraphrases, where $\theta_{\text{par}}$ and $\theta_{\text{lm}}$ represent the parameters of the paraphrase generator and the downstream language model, respectively:
 \begin{multline}
 J_{\theta_{\text{par}}} := \log E_{z_{j}} [P(y | z_{j})] = \\ \log \sum_{z_{j}} P_{\theta_{\text{par}}}(z_{j} | x) \times P_{\theta_{\text{lm}}}(y | z_{j})
@@ -203,6 +206,7 @@ z_{j} \sim P_{\theta_{\text{par}}}(.|x)
 It's important to note that the KL penalty can be interpreted as the sum of a grammar reward, denoted by $\log P_{\text{fixed}}(z_{j}|x)$, and an entropy regularization term over $P_{\theta_{\text{par}}} (z_{j} | x)$. The entropy regularization aids in the diverse exploration of the search space~\cite{DBLP:journals/corr/MnihBMGLHSK16}, while the grammar reward discourages the learning of ungrammatical samples.
 
 \subsection{Ensemble Inference}
+\label{ensemble-inference}
 After optimizing the objective \ref{lmfp-main-objective} and fine-tuning our paraphrase generator, we generate weakly-supervised examples for inclusion in the objective \ref{lmfp-augmentation-objective} to train our downstream language model.
 
 To predict the label of a test example, we could either use our fine-tuned language model to predict the class based on the original input $x$, or adopt an ensembling approach. For the latter, for a given $x$, we generate $M$ paraphrases using our fine-tuned paraphrase generator. We then average the prediction scores for a potential class across the $M+1$ values to predict the class for that input example $x$. This aligns with our earlier assumption that some paraphrases could be easier for the language model to predict the correct label.
@@ -222,10 +226,35 @@ Inspired by prior work~\cite{gao-etal-2021-making, deng-etal-2022-rlprompt}, we 
 We conducted few-shot experiments using the seeds \{11, 42, 1993, 12321, 2023\}. The learning rate for each LM tuning technique was separately fine-tuned from the set \{0.5, 0.3, 0.1, 0.01, 0.001, 0.0001, 0.00001\} using the seed 11 from the 16-shot experiments on the SST2 dataset, and was then applied globally across other datasets and experiments. For paraphrase fine-tuning, we use the learning rate of 0.00001. Detailed information about the specific learning rates used for each LM technique, along with other hyperparameters we employed across all experiments and datasets, can be found in Appendix~\ref{training-details-extra:appendix}. For optimization, we utilized the AdamW~\cite{DBLP:journals/corr/abs-1711-05101}\footnote{\url{https://pytorch.org/docs/stable/generated/torch.optim.AdamW.html}} optimizer with the AMSGrad variant set to True~\cite{DBLP:journals/corr/abs-1904-09237}. We implemented the methods using the HuggingFace\footnote{\url{https://huggingface.co/}} library and the PyTorch\footnote{\url{https://pytorch.org/}} machine learning framework. The experiments were conducted using multiple NVIDIA's A40 and RTX6000 GPU cards (upto 60 GPU cards). This was facilitated by the GPU cluster provided by the Vector Institute\footnote{\url{https://vectorinstitute.ai/}}. We report the accuracy metric on the classification datasets.
 
 \subsection{Paraphrase Training}
+As discussed in Section~\ref{paraphrase-objectives}, there are four learning aspects to be considered when fine-tuning our paraphrase generator for the downstream language model. We conduct an extensive set of experiments in the 128-shot setting using the SST2 binary sentiment classification task. Our main focus is to examine the mean accuracy, which is averaged over the five validation splits. For predicting the class label for a given validation input sentence $x$, we sample $M$ paraphrases from the paraphrase generator and average the prediction scores to calculate our classification accuracy. Despite the ensembling approach described in Section~\ref{ensemble-inference}, we exclude the original input $x$ when computing the accuracy on the validation splits. This particular setting accurately captures the quality of the paraphrases for the downstream classification task. When generating paraphrases over the validation splits, we employ top-p sampling without applying any smoothing to the logits. However, for the training phase, we experiment with three distinct decoding techniques to generate paraphrase samples.
 
-\subsection{Data Augmentation}
-- some generated paraphrases before tuning.
-- some generated paraphrases after tuning.
+\begin{figure}[h]
+
+\begin{center}
+\includesvg[width=0.5\textwidth]{images/mml_vs_pg_off_policy.svg}
+\end{center}
+\caption{Average accuracy over five internal validation splits for the 128-shot classification on the SST2 dataset using off-policy sampling with MML and PG gradient approximations.}
+\label{pg-vs-mml-off-policy}
+\end{figure}
+
+Our first comparison is between the MML and PG gradient approximations. As illustrated in Figure~\ref{pg-vs-mml-off-policy}, the MML gradient approximation outperforms the PG gradients in both off-policy and on-policy samplings (for on-policy result, please refer to Figure~\ref{pg-vs-mml-on-policy} in Appendix~\ref{training-paraphrase-extra:appendix}). One potential reason for this behavior could be the appropriate posterior coefficient assigned to the samples within the MML gradients (refer to Objective~\ref{mml-objective}).
+
+\begin{figure}[h]
+\begin{center}
+\includesvg[width=0.5\textwidth]{images/mml_vs_ppo.svg}
+\end{center}
+\caption{Average accuracy over five internal validation splits for the 128-shot classification on the SST2 dataset using MML gradient approximations. PPO helps with the degenerate paraphrases compared to on-policy sampling.}
+\label{mml-vs-ppo}
+\end{figure}
+
+Additionally, Figure~\ref{mml-vs-ppo} compares off-policy sampling with the KL penalty introduced by the PPO regularization. We initially observe that on-policy learning, after a few training steps, tends to generate degenerate paraphrases which lead to random guessing when using the binary classifier. In contrast, the KL penalty incorporated with PPO shows a higher resistance to these degenerate paraphrases. Furthermore, the MML approximation with off-policy sampling outperforms the PPO penalty as well. Off-policy sampling outperforms on-policy sampling when averaged over three decoding techniques used for drawing training samples. This holds true for both MML and PG gradient approximations (See Figure~\ref{off-policy-vs-on-policy} in Appendix~\ref{training-paraphrase-extra:appendix}).
+
+Lastly, we evaluated and compared different decoding methods, including beam search, top-p sampling, and mixed sampling, during the training phase to generate samples. We also examined the impact of reward normalization in contrast to using the standard reward, i.e., the log-likelihood of the classifier. The corresponding validation curves for these experiments can be found in Appendix~\ref{training-paraphrase-extra:appendix}.
+
+Upon investigating various elements of our learning objectives for fine-tuning the paraphrase generator, we find that the combination that delivers the best average performance across the validation splits includes: using MML gradient approximation, off-policy sampling, beam search for sample generation during training, and reward normalization. We name this combined approach our novel Language Model-Friendly Paraphrase Search (LMFPS) algorithm. In the subsequent experiments, we utilize LMFPS to generate paraphrases that augment the training splits while tuning the downstream language model.
+
+\subsection{Data Augmentation with LMFPS}
+some generated paraphrases before tuning, some generated paraphrases after tuning.
 
 \begin{comment}
 \begin{table*}
@@ -380,4 +409,58 @@ LoRA & ?
 \label{learning-rates}
 \end{table}
 
+\section{Paraphrase Training (Further Results)}
+\label{training-paraphrase-extra:appendix}
+
+This section provides additional results that compare our training objectives for the fine-tuning of the paraphrase generator using the downstream language model. The supplementary experiment shown in Figure~\ref{pg-vs-mml-on-policy} confirms that the MML gradient approximation surpasses the PG estimation within the on-policy samplings.
+
+\begin{figure}[h]
+\begin{center}
+\includesvg[width=0.5\textwidth]{images/mml_vs_pg_on_policy.svg}
+\end{center}
+\caption{Average accuracy over five internal validation splits for the 128-shot classification on the SST2 dataset using on-policy sampling with MML and PG gradient approximations.}
+\label{pg-vs-mml-on-policy}
+\end{figure}
+
+Additionally, Figure~\ref{off-policy-vs-on-policy} demonstrates that off-policy sampling outperforms on-policy sampling when averaged over three decoding techniques used during training phase: beam search, top-p, and mixed sampling. This trend holds true for both MML and PG gradient approximations. In the case of on-policy sampling, it tends to generate degenerate, ungrammatical paraphrases after a few training steps.
+
+\begin{figure}[h]
+\begin{center}
+\includesvg[width=0.5\textwidth]{images/on_policy_vs_off_policy.svg}
+\end{center}
+\caption{Average accuracy over five internal validation splits for the 128-shot classification on the SST2 dataset. Performance is further averaged across three text decoding techniques used during training phase for both MML and PG gradient approximations.}
+\label{off-policy-vs-on-policy}
+\end{figure}
+
+Our training phase utilizes three decoding techniques for generating paraphrase samples: beam-search, top-p sampling, and mixed sampling. The average accuracy across the validation splits for each of these decoding techniques is plotted in Figure~\ref{beam-search-top-mixed}. These curves represent further averages across four combinations from both MML and PG gradient approximations, as well as on-policy and off-policy sampling. Our results indicate that mixed sampling tends to exhibit greater robustness to degenerate paraphrases than beam-search decoding during the later stages of training.
+
+\begin{figure}[h]
+\begin{center}
+\includesvg[width=0.5\textwidth]{images/topp_vs_beam_mixed.svg}
+\end{center}
+\caption{Average accuracy over five internal validation splits for the 128-shot classification on the SST2 dataset. Performance is further averaged across MML and PG gradient approximations as well as on-policy and off-policy sampling.}
+\label{beam-search-top-mixed}
+\end{figure}
+
+In a final attempt to gauge the influence of reward normalization, we deploy this technique for both MML and PG gradient approximations, utilizing beam-search decoding during the generation of samples. The resultant average accuracy on the SST2 validation splits is then plotted.
+
+In the case of on-policy learning, as illustrated in Figure~\ref{zscore-on-policy}, reward normalization leads to enhanced robustness against degenerate paraphrase generation, irrespective of whether MML or PG gradient estimation is employed.
+
+Interestingly, when employing off-policy sampling, we don't observe a significant disparity between the usage of basic rewards or reward normalization. This observation is visually represented in Figure~\ref{zscore-off-policy}.
+
+\begin{figure}[h]
+\begin{center}
+\includesvg[width=0.5\textwidth]{images/zscore_on_policy.svg}
+\end{center}
+\caption{The average accuracy over five internal validation splits for the 128-shot classification on the SST2 dataset is plotted. Reward normalization (z\_score) assists in mitigating the generation of degenerate paraphrases in both MML and PG gradient estimations.}
+\label{zscore-on-policy}
+\end{figure}
+
+\begin{figure}[h]
+\begin{center}
+\includesvg[width=0.5\textwidth]{images/zscore_off_policy.svg}
+\end{center}
+\caption{The average accuracy over five internal validation splits for the 128-shot classification on the SST2 dataset is plotted. Reward normalization (z\_score) does not result in significant variations with both MML and PG gradient estimations.}
+\label{zscore-off-policy}
+\end{figure}
 \end{document}
