@@ -626,3 +626,100 @@ series = {NIPS'99}
   biburl       = {https://dblp.org/rec/journals/corr/MnihBMGLHSK16.bib},
   bibsource    = {dblp computer science bibliography, https://dblp.org}
 }
+
+
+@InProceedings{pmlr-v119-zhang20ae,
+  title = 	 {{PEGASUS}: Pre-training with Extracted Gap-sentences for Abstractive Summarization},
+  author =       {Zhang, Jingqing and Zhao, Yao and Saleh, Mohammad and Liu, Peter},
+  booktitle = 	 {Proceedings of the 37th International Conference on Machine Learning},
+  pages = 	 {11328--11339},
+  year = 	 {2020},
+  editor = 	 {III, Hal Daumé and Singh, Aarti},
+  volume = 	 {119},
+  series = 	 {Proceedings of Machine Learning Research},
+  month = 	 {13--18 Jul},
+  publisher =    {PMLR},
+  pdf = 	 {http://proceedings.mlr.press/v119/zhang20ae/zhang20ae.pdf},
+  url = 	 {https://proceedings.mlr.press/v119/zhang20ae.html},
+  abstract = 	 {Recent work pre-training Transformers with self-supervised objectives on large text corpora has shown great success when fine-tuned on downstream NLP tasks including text summarization. However, pre-training objectives tailored for abstractive text summarization have not been explored. Furthermore there is a lack of systematic evaluation across diverse domains. In this work, we propose pre-training large Transformer-based encoder-decoder models on massive text corpora with a new self-supervised objective. In PEGASUS, important sentences are removed/masked from an input document and are generated together as one output sequence from the remaining sentences, similar to an extractive summary. We evaluated our best PEGASUS model on 12 downstream summarization tasks spanning news, science, stories, instructions, emails, patents, and legislative bills. Experiments demonstrate it achieves state-of-the-art performance on all 12 downstream datasets measured by ROUGE scores. Our model also shows surprising performance on low-resource summarization, surpassing previous state-of-the-art results on 6 datasets with only 1000 examples. Finally we validated our results using human evaluation and show that our model summaries achieve human performance on multiple datasets.}
+}
+
+@inproceedings{lester-etal-2021-power,
+    title = "The Power of Scale for Parameter-Efficient Prompt Tuning",
+    author = "Lester, Brian  and
+      Al-Rfou, Rami  and
+      Constant, Noah",
+    booktitle = "Proceedings of the 2021 Conference on Empirical Methods in Natural Language Processing",
+    month = nov,
+    year = "2021",
+    address = "Online and Punta Cana, Dominican Republic",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2021.emnlp-main.243",
+    doi = "10.18653/v1/2021.emnlp-main.243",
+    pages = "3045--3059",
+    abstract = "In this work, we explore {``}prompt tuning,{''} a simple yet effective mechanism for learning {``}soft prompts{''} to condition frozen language models to perform specific downstream tasks. Unlike the discrete text prompts used by GPT-3, soft prompts are learned through backpropagation and can be tuned to incorporate signals from any number of labeled examples. Our end-to-end learned approach outperforms GPT-3{'}s few-shot learning by a large margin. More remarkably, through ablations on model size using T5, we show that prompt tuning becomes more competitive with scale: as models exceed billions of parameters, our method {``}closes the gap{''} and matches the strong performance of model tuning (where all model weights are tuned). This finding is especially relevant because large models are costly to share and serve and the ability to reuse one frozen model for multiple downstream tasks can ease this burden. Our method can be seen as a simplification of the recently proposed {``}prefix tuning{''} of Li and Liang (2021) and we provide a comparison to this and other similar approaches. Finally, we show that conditioning a frozen model with soft prompts confers benefits in robustness to domain transfer and enables efficient {``}prompt ensembling.{''} We release code and model checkpoints to reproduce our experiments.",
+}
+@article{DBLP:journals/corr/abs-2106-09685,
+  author       = {Edward J. Hu and
+                  Yelong Shen and
+                  Phillip Wallis and
+                  Zeyuan Allen{-}Zhu and
+                  Yuanzhi Li and
+                  Shean Wang and
+                  Weizhu Chen},
+  title        = {LoRA: Low-Rank Adaptation of Large Language Models},
+  journal      = {CoRR},
+  volume       = {abs/2106.09685},
+  year         = {2021},
+  url          = {https://arxiv.org/abs/2106.09685},
+  eprinttype    = {arXiv},
+  eprint       = {2106.09685},
+  timestamp    = {Tue, 29 Jun 2021 16:55:04 +0200},
+  biburl       = {https://dblp.org/rec/journals/corr/abs-2106-09685.bib},
+  bibsource    = {dblp computer science bibliography, https://dblp.org}
+}
+
+@inproceedings
+
+@inproceedings{NIPS2015_250cf8b5,
+ author = {Zhang, Xiang and Zhao, Junbo and LeCun, Yann},
+ booktitle = {Advances in Neural Information Processing Systems},
+ editor = {C. Cortes and N. Lawrence and D. Lee and M. Sugiyama and R. Garnett},
+ pages = {},
+ publisher = {Curran Associates, Inc.},
+ title = {Character-level Convolutional Networks for Text Classification},
+ url = {https://proceedings.neurips.cc/paper_files/paper/2015/file/250cf8b51c773f3f8dc8b4be867a9a02-Paper.pdf},
+ volume = {28},
+ year = {2015}
+}
+
+@article{DBLP:journals/corr/abs-1711-05101,
+  author       = {Ilya Loshchilov and
+                  Frank Hutter},
+  title        = {Fixing Weight Decay Regularization in Adam},
+  journal      = {CoRR},
+  volume       = {abs/1711.05101},
+  year         = {2017},
+  url          = {http://arxiv.org/abs/1711.05101},
+  eprinttype    = {arXiv},
+  eprint       = {1711.05101},
+  timestamp    = {Mon, 13 Aug 2018 16:48:18 +0200},
+  biburl       = {https://dblp.org/rec/journals/corr/abs-1711-05101.bib},
+  bibsource    = {dblp computer science bibliography, https://dblp.org}
+}
+
+@article{DBLP:journals/corr/abs-1904-09237,
+  author       = {Sashank J. Reddi and
+                  Satyen Kale and
+                  Sanjiv Kumar},
+  title        = {On the Convergence of Adam and Beyond},
+  journal      = {CoRR},
+  volume       = {abs/1904.09237},
+  year         = {2019},
+  url          = {http://arxiv.org/abs/1904.09237},
+  eprinttype    = {arXiv},
+  eprint       = {1904.09237},
+  timestamp    = {Fri, 26 Apr 2019 13:18:53 +0200},
+  biburl       = {https://dblp.org/rec/journals/corr/abs-1904-09237.bib},
+  bibsource    = {dblp computer science bibliography, https://dblp.org}
+}
