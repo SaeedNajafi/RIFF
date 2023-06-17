@@ -127,7 +127,7 @@ We assume that each input $x$ or its paraphrase $z_j$ is preceded by a task inst
 All the Language Model (LM) tuning techniques we have discussed will use the same input format. For example in the sentiment classification task, we use the following format:
 \textbf{``<s> \{instruction\} \{text\} . It was <mask> </s>''}. Except for ClsTune, all of our LM tuning techniques aim to maximize the probability of the correct label token replacing the <mask> token. In contrast, ClsTune takes the formatted input and classifies it into one of the predefined class IDs.
 
-\subsection{LM-Friendly Paraphrase Search}
+\subsection{LM-Friendly Paraphrase Search (LMFPS)}
 \label{paraphrase-objectives}
 In this section, we present the learning objectives for training our paraphrase generator. Given a training example $(x, y)$, our objective is to classify the input $x$ into the gold label $y$ by maximizing the log likelihood $\log P(y|x)$. We assume that there exist paraphrases of the input $x$ that could facilitate the prediction of the correct class. These paraphrases should retain the semantic meaning of $x$ while exhibiting syntactic differences. Our aim is to generate paraphrases $z_{j}$ based on the input $x$, enabling the downstream language model to predict the correct label $y$ with greater confidence. Consequently, our data log likelihood is factorized into the following marginalization over the space of paraphrases, where $\theta_{\text{par}}$ and $\theta_{\text{lm}}$ represent the parameters of the paraphrase generator and the downstream language model, respectively:
 \begin{multline}
@@ -392,10 +392,10 @@ Prompt len in SpTune & $L$=25
 
 \begin{table}[t]
 \centering
-\caption{Learning rates used per Language Model (LM) technique.}
+\caption{Learning rates used per Language Model (LM) tuning technique.}
 \begin{tabular}{ c | c }
 \hline
-LM Technique & Learning Rate\\
+LM Tuning Technique & Learning Rate\\
 \hline
 GS & No rate \\
 GrIPS & No rate \\
