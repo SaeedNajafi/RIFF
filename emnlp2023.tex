@@ -226,6 +226,7 @@ Inspired by prior work~\cite{gao-etal-2021-making, deng-etal-2022-rlprompt}, we 
 We conducted few-shot experiments using the seeds \{11, 42, 1993, 12321, 2023\}. The learning rate for each LM tuning technique was separately fine-tuned from the set \{0.5, 0.3, 0.1, 0.01, 0.001, 0.0001, 0.00001\} using the seed 11 from the 16-shot experiments on the SST2 dataset, and was then applied globally across other datasets and experiments. For paraphrase fine-tuning, we use the learning rate of 0.00001. Detailed information about the specific learning rates used for each LM technique, along with other hyperparameters we employed across all experiments and datasets, can be found in Appendix~\ref{training-details-extra:appendix}. For optimization, we utilized the AdamW~\cite{DBLP:journals/corr/abs-1711-05101}\footnote{\url{https://pytorch.org/docs/stable/generated/torch.optim.AdamW.html}} optimizer with the AMSGrad variant set to True~\cite{DBLP:journals/corr/abs-1904-09237}. We implemented the methods using the HuggingFace\footnote{\url{https://huggingface.co/}} library and the PyTorch\footnote{\url{https://pytorch.org/}} machine learning framework. The experiments were conducted using multiple NVIDIA's A40 and RTX6000 GPU cards (upto 60 GPU cards). This was facilitated by the GPU cluster provided by the Vector Institute\footnote{\url{https://vectorinstitute.ai/}}. We report the accuracy metric on the classification datasets.
 
 \subsection{Paraphrase Training}
+\label{final-lmfps-result}
 As discussed in Section~\ref{paraphrase-objectives}, there are four learning aspects to be considered when fine-tuning our paraphrase generator for the downstream language model. We conduct an extensive set of experiments in the 128-shot setting using the SST2 binary sentiment classification task. Our main focus is to examine the mean accuracy, which is averaged over the five validation splits. For predicting the class label for a given validation input sentence $x$, we sample $M$ paraphrases from the paraphrase generator and average the prediction scores to calculate our classification accuracy. Despite the ensembling approach described in Section~\ref{ensemble-inference}, we exclude the original input $x$ when computing the accuracy on the validation splits. This particular setting accurately captures the quality of the paraphrases for the downstream classification task. When generating paraphrases over the validation splits, we employ top-p sampling without applying any smoothing to the logits. However, for the training phase, we experiment with three distinct decoding techniques to generate paraphrase samples.
 
 \begin{figure}[h]
@@ -256,32 +257,35 @@ Upon investigating various elements of our learning objectives for fine-tuning t
 \subsection{Data Augmentation with LMFPS}
 some generated paraphrases before tuning, some generated paraphrases after tuning.
 
-\begin{comment}
 \begin{table*}
 \centering
-\caption{The average accuracy (standard deviation) on the dev set of the SST2 binary sentiment classification task with the Roberta-Large LM trained in the fewshot setting using only 16 train examples per label. The results are averaged after sampling 32 examples for the train and validation splits using five different random seeds.$\dagger$ is the reported performance of the fine-tuned Roberta-Large on all of the training dataset.}
-
-\begin{tabular}{c | c | c | c | c | c | c}
+\caption{Average accuracy scores on the standard development sets for the SST2, SST5, and AG's News datasets for the 128-shot classification. The scores are reported for eight different language model (LM) tuning techniques, namely, AlTune, InTune, HTune, ClsTune, GS, GrIPS, SpTune, and LoRA. We conducted a comparison between two methods of generating paraphrases for data augmentation: DAug and LMFPS. DAug utilizes a simple pre-trained paraphrase model, while LMFPS, our proposed algorithm, fine-tunes the paraphrase generator using the downstream classification model. The final three rows are the average performance across the datasets.}
+%`+Es' denotes the ensemble inference method, as discussed in section \ref{ensemble-inference}. 
+\begin{tabular}{c | c | c | c | c | c | c | c | c}
 \hline
-LM Tuning Method & Normal Train Data & +AUG & +AUG$_{avg}$ & +PAR & +PAR$_{avg}$ \\
+(Dataset) & AlTune & InTune & HTune & ClsTune & GS & GrIPS & SpTune & LoRA \\
+\small+Method &  &  &  &  &  &  &  &  \\
 \hline
-\cite{DBLP:journals/corr/abs-1907-11692}$\dagger$ & 96.4 & n/a & n/a & n/a & n/a\\
+(SST2) & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
+\small+DAug & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
+\small+LMFPS & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
 \hline
-%no instruction - no LM train & 77.2 & 77.2 & 77.2 & \\
-with instruction - no LM train & 86.8 & 86.8 & 83.1 & 86.8 & 83.1\\
+(SST5) & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
+\small+DAug & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
+\small+LMFPS & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
 \hline
-all\_finetune & 91.3 \small$\pm$\small1.2 & 91.0 \small$\pm$\small1.6 & 91.1 \small$\pm$\small1.6 & {\color{green}91.7} \small$\pm$\small1.3 & {\color{green}92.0} \small$\pm$\small1.6\\
-input\_finetune & 89.7 \small$\pm$\small0.5 & {\color{green}91.1} \small$\pm$\small0.6 & {\color{green}91.4} \small$\pm$\small0.3 & {\color{green}90.2} \small$\pm$\small0.8 & {\color{green}91.1} \small$\pm$\small1.0\\
-output\_finetune & 87.2 \small$\pm$\small3.3 & 86.5 \small$\pm$\small2.5 & 86.5 \small$\pm$\small2.8 & 86.1 \small$\pm$\small2.6 & 86.4 \small$\pm$\small2.4\\
-classifier\_finetune & 64.5 \small$\pm$\small2.7 &  64.9 \small$\pm$\small4.6 & 64.9 \small$\pm$\small5.6 & {\color{green}66.7} \small$\pm$\small2.3 & {\color{green}66.5} \small$\pm$\small2.5 \\
+(AG News) & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
+\small+DAug & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
+\small+LMFPS & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
 \hline
-prompt tune & 79.9 \small$\pm$\small7.5 & {\color{green}88.3} \small$\pm$\small5.0 & {\color{green}88.9} \small$\pm$\small4.8 & {\color{green}88.6} \small$\pm$\small3.3 & {\color{green}88.8} \small$\pm$\small3.1\\
-gradient search & 86.5 \small$\pm$\small2.9 & {\color{green}89.0} \small$\pm$\small1.5 & {\color{green}88.2} \small$\pm$\small1.7 &
+\hline
+(Average) & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
+\small+DAug & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
+\small+LMFPS & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
+\hline
 \end{tabular}
-\label{sst2}
+\label{lmfps-vs-dataaug-vs-main-128-shot}
 \end{table*}
-
-\end{comment}
 
 \section{Related Works}
 
@@ -463,4 +467,40 @@ Interestingly, when employing off-policy sampling, we don't observe a significan
 \caption{The average accuracy over five internal validation splits for the 128-shot classification on the SST2 dataset is plotted. Reward normalization (z\_score) does not result in significant variations with both MML and PG gradient estimations.}
 \label{zscore-off-policy}
 \end{figure}
+
+\section{LMFPS vs. Simple Augmentation}
+\label{lmfps-simple-augmentation:appendix}
+The proposed LMFPS objective in Section~\ref{final-lmfps-result} fine-tunes the paraphrase generator using the downstream classification model. In this section, we aim to juxtapose our LMFPS algorithm with a basic data augmentation method that leverages the pre-trained paraphrase generator without any fine-tuning based on the objective~\ref{lmfp-main-objective}. The settings used to predict classes on the final development sets are identical for both LMFPS and the simple data augmentation method, which we refer to as DAug. These settings include ensemble inference and the application of top-p sampling without logit smoothing for generating the paraphrases. Both LMPFS and DAug use the same objective to train the language model, as detailed in Objective~\ref{lmfp-augmentation-objective}.
+
+
+\begin{table*}
+\centering
+\caption{Average accuracy scores on the standard development sets for the SST2, SST5, and AG's News datasets for the 16-shot classification. The scores are reported for eight different language model (LM) tuning techniques, namely, AlTune, InTune, HTune, ClsTune, GS, GrIPS, SpTune, and LoRA. We conducted a comparison between two methods of generating paraphrases for data augmentation: DAug and LMFPS. DAug utilizes a simple pre-trained paraphrase model, while LMFPS, our proposed algorithm, fine-tunes the paraphrase generator using the downstream classification model. The final three rows are the average performance across the datasets.}
+%`+Es' denotes the ensemble inference method, as discussed in section \ref{ensemble-inference}. 
+\begin{tabular}{c | c | c | c | c | c | c | c | c}
+\hline
+(Dataset) & AlTune & InTune & HTune & ClsTune & GS & GrIPS & SpTune & LoRA \\
+\small+Method &  &  &  &  &  &  &  &  \\
+\hline
+(SST2) & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
+\small+DAug & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
+\small+LMFPS & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
+\hline
+(SST5) & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
+\small+DAug & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
+\small+LMFPS & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
+\hline
+(AG News) & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
+\small+DAug & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
+\small+LMFPS & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
+\hline
+\hline
+(Average) & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
+\small+DAug & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
+\small+LMFPS & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
+\hline
+\end{tabular}
+\label{lmfps-vs-dataaug-vs-main-16-shot}
+\end{table*}
+
 \end{document}
