@@ -66,7 +66,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --model_path ${model_path} \
     --para_model_path ${model_path} \
     --checkpoint best_step \
-    --max_epochs 50 \
+    --max_epochs 25 \
     --learning_rate ${LEARN_RATE} \
     --training_steps 1000000 \
     --steps_per_checkpoint 8 \
@@ -81,7 +81,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --ensemble_type no_ensemble \
     --test_temperature 1.0 \
     --test_sample_size 8 \
-    --train_temperature 2.0 \
+    --train_temperature 1.0 \
     --train_sample_size 8 \
     --paraphrase_loss ${PARA_LOSS} \
     --sampling_method ${SAMPLING_METHOD} \

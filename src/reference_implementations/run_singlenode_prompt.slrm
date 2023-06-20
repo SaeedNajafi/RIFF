@@ -75,6 +75,8 @@ METRIC_TO_SAVE=${16}
 
 KL_COEFFICIENT=${17}
 
+PARA_MODEL_PATH=${18}
+
 echo "Placing logs in: ${LOG_DIR}"
 
 echo "World size: ${SLURM_NTASKS}"
@@ -96,4 +98,4 @@ mkdir -p "${LOG_DIR}"
              METRIC_TO_SAVE=${METRIC_TO_SAVE} \
              KL_COEFFICIENT=${KL_COEFFICIENT} \
              FEWSHOT_SIZE=${FEWSHOT_SIZE} \
-             NUM_CLASSES=${NUM_CLASSES} >> ${LOG_PATH} 2>&1"
+             NUM_CLASSES=${NUM_CLASSES} PARA_MODEL_PATH=${PARA_MODEL_PATH} >> ${LOG_PATH} 2>&1"

@@ -224,9 +224,7 @@ class SearchRoberta(MyBaseLM):
         para_log_ps = None
         if self.enable_data_augmentation == 1:
             potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
-            paraphrases = self.para_model.generate_top_p_paraphrases(
-                batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
-            )
+            paraphrases = self.para_model.generate_beam_paraphrases(batch, num_return_seq=FLAGS.test_sample_size)
             augment_batch(
                 batch,
                 paraphrases,
@@ -308,9 +306,7 @@ class SearchRoberta(MyBaseLM):
         beam of templates and the paraphraser."""
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
         potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
-        paraphrases = self.para_model.generate_top_p_paraphrases(
-            batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
-        )
+        paraphrases = self.para_model.generate_beam_paraphrases(batch, num_return_seq=FLAGS.test_sample_size)
         augment_batch(
             batch,
             paraphrases,

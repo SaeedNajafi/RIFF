@@ -357,7 +357,7 @@ class Paraphraser(MyBaseLM):
             attention_mask=loaded_batch["para_attention_mask"],
             no_repeat_ngram_size=FLAGS.no_repeat_ngram_size,
             do_sample=True,
-            top_p=0.99,
+            top_p=0.95,
             temperature=temperature,
             max_length=128,
             num_return_sequences=num_return_seq,
@@ -434,9 +434,7 @@ class RobertaPrompted(MyBaseLM):
         to_train_lm = True
         if self.enable_data_augmentation == 1:
             potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
-            paraphrases = self.para_model.generate_top_p_paraphrases(
-                batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
-            )
+            paraphrases = self.para_model.generate_beam_paraphrases(batch, num_return_seq=FLAGS.test_sample_size)
             augment_batch(batch, paraphrases, self.tokenizer, potentials_str, num_return_seq=FLAGS.test_sample_size)
             to_train_lm = True
 
@@ -635,9 +633,7 @@ class RobertaPrompted(MyBaseLM):
 
         potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
-        paraphrases = self.para_model.generate_top_p_paraphrases(
-            batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
-        )
+        paraphrases = self.para_model.generate_beam_paraphrases(batch, num_return_seq=FLAGS.test_sample_size)
         augment_batch(batch, paraphrases, self.tokenizer, potentials_str, num_return_seq=FLAGS.test_sample_size)
 
         if FLAGS.exp_type == "soft_prompt_finetune":

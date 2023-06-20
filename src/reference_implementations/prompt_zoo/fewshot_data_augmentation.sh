@@ -26,6 +26,7 @@ LOAD_PARAPHRASER=${LOAD_PARA}
 SLURM_JOB_ID=${SLURM_JOB_ID}
 METRIC_TO_SAVE=${METRIC_TO_SAVE}
 PROMPT_LEN=${LEN}
+PARA_MODEL_PATH=${PARA_MODEL_PATH}
 
 checkpoint_path=/checkpoint/$USER/${SLURM_JOB_ID}
 
@@ -38,6 +39,10 @@ mkdir -p ${model_path}
 
 # delay purge in the checkpoint and job_id
 touch ${checkpoint_path}/DELAYPURGE
+
+if [ "${LOAD_PARAPHRASER}" = "1" ]; then
+    cp -r ${PARA_MODEL_PATH}/bart_model_best_step ${model_path}/
+fi
 
 if [ "${TASK_NAME}" = "sst2" ]; then
 
@@ -71,6 +76,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --fewshot_sample_size ${FEWSHOT_SIZE} \
     --exp_type ${EXPERIMENT_TYPE} \
     --model_path ${model_path} \
+    --para_model_path ${model_path} \
     --checkpoint best_step \
     --max_epochs 50 \
     --learning_rate ${LEARN_RATE} \
