@@ -5,7 +5,7 @@ exps=(all_finetune)
 seeds=(11 42 1993 2023 12321)
 tasks=(SetFit_sst5)
 augs=(0 1)
-fewshot_sizes=(16 128)
+fewshot_sizes=(32)
 
 for i in ${!rates[@]};
 do
@@ -55,7 +55,7 @@ exps=(input_finetune output_finetune)
 seeds=(11 42 1993 2023 12321)
 tasks=(SetFit_sst5)
 augs=(0 1)
-fewshot_sizes=(16 128)
+fewshot_sizes=(32)
 
 for i in ${!rates[@]};
 do
@@ -105,7 +105,7 @@ exps=(soft_prompt_finetune)
 seeds=(11 42 1993 2023 12321)
 tasks=(SetFit_sst5)
 augs=(0 1)
-fewshot_sizes=(16 128)
+fewshot_sizes=(32)
 
 for i in ${!rates[@]};
 do
@@ -155,7 +155,7 @@ exps=(classifier_finetune)
 seeds=(11 42 1993 2023 12321)
 tasks=(SetFit_sst5)
 augs=(0 1)
-fewshot_sizes=(16 128)
+fewshot_sizes=(32)
 
 for i in ${!rates[@]};
 do
@@ -205,7 +205,7 @@ exps=(gradient_search)
 seeds=(11 42 1993 2023 12321)
 tasks=(SetFit_sst5)
 augs=(0 1)
-fewshot_sizes=(16 128)
+fewshot_sizes=(32)
 
 for i in ${!rates[@]};
 do
