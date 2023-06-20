@@ -4,13 +4,13 @@ rates=(0.00001)
 exps=(all_finetune)
 seeds=(11 42 1993 2023 12321)
 tasks=(sst2)
-losses=(pg mml)
-sampling_methods=(on_policy off_policy)
+losses=(pg)
+sampling_methods=(on_policy)
 sampling_algs=(beam_search top_p mixed)
 
 for i in ${!rates[@]};
 do
-	rate=${rates[$i]}
+    rate=${rates[$i]}
     for j in ${!exps[@]};
     do
         exp=${exps[$j]}
@@ -29,24 +29,22 @@ do
                         for s_m in ${!sampling_methods[@]};
                         do
                             sampling_method=${sampling_methods[$s_m]}
-                            sbatch  src/reference_implementations/run_singlenode_prompt.slrm \
-                                src/reference_implementations/prompt_zoo/fewshot_lmfps.sh \
-                                ./roberta-exps-logs \
-                                ${exp} \
-                                ${task} \
-                                ${seed} \
-                                2 \
-                                32 \
-                                ${rate} \
-                                0 \
-                                1 \
-                                0 \
-                                25 \
-                                ${loss} \
-                                ${sampling_method} \
-                                ${sampling_alg} \
-                                accuracy \
-                                0.6
+                            CUDA_VISIBLE_DEVICES=3 bash src/reference_implementations/prompt_zoo/fewshot_lmfps.sh \
+                                EXP_TYPE=${exp} \
+                                TASK=${task} \
+                                SEED=${seed} \
+                                NUM_CLASSES=2 \
+                                FEWSHOT_SIZE=32 \
+                                LR=${rate} \
+                                AUG=0 \
+                                TRAIN_PARA=1 \
+                                LOAD_PARA=0 \
+                                LEN=25 \
+                                PARA_LOSS=${loss} \
+                                SAMPLING_METHOD=${sampling_method} \
+                                SAMPLING_ALG=${sampling_alg} \
+                                METRIC_TO_SAVE=accuracy \
+                                KL_COEFFICIENT=0.6
                         done
                     done
                 done

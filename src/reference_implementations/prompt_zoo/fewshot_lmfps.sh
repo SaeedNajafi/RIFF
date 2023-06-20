@@ -12,7 +12,7 @@ done
 PROJECT_DIR=$( dirname -- "$0"; )
 
 # We source to keep the internal env variables defined.
-source ${PROJECT_DIR}/../setup_gpu_worker.sh
+# source ${PROJECT_DIR}/../setup_gpu_worker.sh
 
 LEARN_RATE=${LR}
 EXPERIMENT_TYPE=${EXP_TYPE}
@@ -30,7 +30,8 @@ SLURM_JOB_ID=${SLURM_JOB_ID}
 METRIC_TO_SAVE=${METRIC_TO_SAVE}
 KL_COEFFICIENT=${KL_COEFFICIENT}
 
-checkpoint_path=/checkpoint/$USER/${SLURM_JOB_ID}
+# checkpoint_path=/checkpoint/$USER/${SLURM_JOB_ID}
+checkpoint_path=~/checkpoint/
 
 experiment_name=${TASK_NAME}_${NUM_CLASSES}_${FEWSHOT_SIZE}_${EXPERIMENT_TYPE}_${RANDOM_SEED}
 experiment_name=${experiment_name}_${LEARN_RATE}_${DATA_AUG}_${TRAIN_PARAPHRASER}_${LOAD_PARAPHRASER}_${PARA_LOSS}_${SAMPLING_METHOD}_${SAMPLING_ALG}_${METRIC_TO_SAVE}_${KL_COEFFICIENT}
