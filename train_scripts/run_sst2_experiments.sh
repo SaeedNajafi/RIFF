@@ -5,7 +5,7 @@ rates=(0.00001)
 exps=(all_finetune)
 seeds=(11 42 1993 2023 12321)
 tasks=(sst2)
-augs=(0)
+augs=(1)
 fewshot_sizes=(32)
 
 for i in ${!rates[@]};
@@ -53,7 +53,7 @@ rates=(0.001)
 exps=(input_finetune output_finetune)
 seeds=(11 42 1993 2023 12321)
 tasks=(sst2)
-augs=(0)
+augs=(1)
 fewshot_sizes=(32)
 
 for i in ${!rates[@]};
@@ -74,7 +74,7 @@ do
                     for f in ${!fewshot_sizes[@]};
                     do
                         fewshot_size=${fewshot_sizes[$f]}
-                        CUDA_VISIBLE_DEVICES=0 bash src/reference_implementations/prompt_zoo/fewshot_data_augmentation.sh \
+                        CUDA_VISIBLE_DEVICES=2 bash src/reference_implementations/prompt_zoo/fewshot_data_augmentation.sh \
                                 EXP_TYPE=${exp} \
                                 TASK=${task} \
                                 SEED=${seed} \
@@ -101,7 +101,7 @@ rates=(0.001)
 exps=(soft_prompt_finetune)
 seeds=(11 42 1993 2023 12321)
 tasks=(sst2)
-augs=(0)
+augs=(1)
 fewshot_sizes=(32)
 
 for i in ${!rates[@]};
@@ -122,7 +122,7 @@ do
                     for f in ${!fewshot_sizes[@]};
                     do
                         fewshot_size=${fewshot_sizes[$f]}
-                        CUDA_VISIBLE_DEVICES=0 bash src/reference_implementations/prompt_zoo/fewshot_data_augmentation.sh \
+                        CUDA_VISIBLE_DEVICES=3 bash src/reference_implementations/prompt_zoo/fewshot_data_augmentation.sh \
                                 EXP_TYPE=${exp} \
                                 TASK=${task} \
                                 SEED=${seed} \
@@ -149,7 +149,7 @@ rates=(0.01)
 exps=(classifier_finetune)
 seeds=(11 42 1993 2023 12321)
 tasks=(sst2)
-augs=(0)
+augs=(1)
 fewshot_sizes=(32)
 
 for i in ${!rates[@]};
@@ -170,7 +170,7 @@ do
                     for f in ${!fewshot_sizes[@]};
                     do
                         fewshot_size=${fewshot_sizes[$f]}
-                        CUDA_VISIBLE_DEVICES=0 bash src/reference_implementations/prompt_zoo/fewshot_data_augmentation.sh \
+                        CUDA_VISIBLE_DEVICES=3 bash src/reference_implementations/prompt_zoo/fewshot_data_augmentation.sh \
                                 EXP_TYPE=${exp} \
                                 TASK=${task} \
                                 SEED=${seed} \

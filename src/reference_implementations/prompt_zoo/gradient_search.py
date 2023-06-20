@@ -11,7 +11,7 @@ import torch
 from absl import flags
 from transformers import AutoTokenizer, RobertaForMaskedLM
 
-from src.reference_implementations.prompt_zoo.data_utility import augment_batch, tokenize_samples, white_space_fix
+from src.reference_implementations.prompt_zoo.data_utility import augment_batch, white_space_fix
 from src.reference_implementations.prompt_zoo.prompted_lm import MyBaseLM, Paraphraser
 
 FLAGS = flags.FLAGS
@@ -202,6 +202,7 @@ class SearchRoberta(MyBaseLM):
         template_scores = class_log_ps.view(batch_size, len(prompt_templates))
         if para_log_ps is None:
             return template_scores
+        """
         else:
             orig_batch_size = batch_size // (FLAGS.test_sample_size + 1)
             template_scores_arr = []
@@ -218,6 +219,7 @@ class SearchRoberta(MyBaseLM):
                 )
                 template_scores_arr.append(idx_template_score)
             return torch.stack(template_scores_arr, dim=0)
+        """
 
     def train(self, batch: torch.utils.data.Dataset) -> Dict[str, float]:
         """The train loop for gradient-search method."""
@@ -235,6 +237,7 @@ class SearchRoberta(MyBaseLM):
             )
 
             # compute the log probability of the paraphrases being generated.
+            """
             batch_size, seq_len = batch["para_input_ids"].size()
             batch["para_input_ids"] = (
                 batch["para_input_ids"]
@@ -248,8 +251,9 @@ class SearchRoberta(MyBaseLM):
                 .expand(batch_size, FLAGS.test_sample_size, seq_len)
                 .reshape(-1, seq_len)
             )
-            tokenize_samples(batch, paraphrases, self.para_tokenizer)
-            para_log_ps = self.para_model.bart_forward_pass(batch, train=False)
+            # tokenize_samples(batch, paraphrases, self.para_tokenizer)
+            # para_log_ps = self.para_model.bart_forward_pass(batch, train=False)
+            """
 
         prompt_index = random.randint(0, FLAGS.prompt_length - 1)
         template_log_likelihood = self.score_templates(

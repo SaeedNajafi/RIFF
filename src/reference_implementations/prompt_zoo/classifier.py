@@ -6,7 +6,7 @@ import torch
 from absl import flags
 from transformers import AutoTokenizer, RobertaModel
 
-from src.reference_implementations.prompt_zoo.data_utility import augment_batch, tokenize_samples
+from src.reference_implementations.prompt_zoo.data_utility import augment_batch
 from src.reference_implementations.prompt_zoo.prompt_optimizers import optimizer_definer
 from src.reference_implementations.prompt_zoo.prompted_lm import MyBaseLM, Paraphraser
 
@@ -62,6 +62,7 @@ class FFClassifier(torch.nn.Module):
         neg_log_likelihoods = self.loss_fun(logits, class_indices)
         if para_log_ps is None:
             return neg_log_likelihoods.mean(dim=0)
+        """
         else:
             neg_log_likelihoods = self.loss_fun(logits, class_indices)
             batch_size = class_indices.size()[0] // (FLAGS.test_sample_size + 1)
@@ -76,6 +77,7 @@ class FFClassifier(torch.nn.Module):
                 )
                 loss += idx_loss
             return loss / float(batch_size)
+        """
 
 
 class ClassifierLM(MyBaseLM):
@@ -238,6 +240,7 @@ class ClassifierLM(MyBaseLM):
             )
 
             # compute the log probability of the paraphrases being generated.
+            """
             batch_size, seq_len = batch["para_input_ids"].size()
             batch["para_input_ids"] = (
                 batch["para_input_ids"]
@@ -252,7 +255,8 @@ class ClassifierLM(MyBaseLM):
                 .reshape(-1, seq_len)
             )
             tokenize_samples(batch, paraphrases, self.para_tokenizer)
-            para_log_ps = self.para_model.bart_forward_pass(batch, train=False)
+            # para_log_ps = self.para_model.bart_forward_pass(batch, train=False)
+            """
 
         loaded_batch = self.move_to_gpu(batch, keys=["input_ids", "attention_mask", "class_indices"])
 

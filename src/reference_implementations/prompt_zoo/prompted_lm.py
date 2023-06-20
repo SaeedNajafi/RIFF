@@ -439,6 +439,7 @@ class RobertaPrompted(MyBaseLM):
             to_train_lm = True
 
             # compute the log probability of the paraphrases being generated.
+            """
             batch_size, seq_len = batch["para_input_ids"].size()
             batch["para_input_ids"] = (
                 batch["para_input_ids"]
@@ -453,7 +454,8 @@ class RobertaPrompted(MyBaseLM):
                 .reshape(-1, seq_len)
             )
             tokenize_samples(batch, paraphrases, self.para_tokenizer)
-            para_log_ps = self.para_model.bart_forward_pass(batch, train=False)
+            # para_log_ps = self.para_model.bart_forward_pass(batch, train=False)
+            """
 
         elif self.enable_paraphrase_training == 1:
             potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
@@ -569,11 +571,13 @@ class RobertaPrompted(MyBaseLM):
 
         elif self.enable_data_augmentation == 1:
             # re-weight each paraphrase log likelihood using the probability of the paraphrase model.
-            para_log_ps = para_log_ps.reshape(batch_size, FLAGS.test_sample_size)
-            class_log_ps = class_log_ps.reshape(batch_size, FLAGS.test_sample_size + 1)
-            normal_class_log_ps = class_log_ps[:, 0]
-            paraphrase_class_log_ps = class_log_ps[:, 1:]
-            objective = torch.sum(torch.exp(para_log_ps) * paraphrase_class_log_ps, dim=1) + normal_class_log_ps
+            # para_log_ps = para_log_ps.reshape(batch_size, FLAGS.test_sample_size)
+            # class_log_ps = class_log_ps.reshape(batch_size, FLAGS.test_sample_size + 1)
+            # normal_class_log_ps = class_log_ps[:, 0]
+            # paraphrase_class_log_ps = class_log_ps[:, 1:]
+            # print(torch.exp(para_log_ps))
+            # objective = torch.sum(torch.exp(para_log_ps) * paraphrase_class_log_ps, dim=1) + normal_class_log_ps
+            objective = class_log_ps
             loss = -objective.mean(dim=0)
             loss_value = loss.item()
 
