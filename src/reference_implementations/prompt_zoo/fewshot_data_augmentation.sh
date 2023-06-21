@@ -12,7 +12,7 @@ done
 PROJECT_DIR=$( dirname -- "$0"; )
 
 # We source to keep the internal env variables defined.
-# source ${PROJECT_DIR}/../setup_gpu_worker.sh
+source ${PROJECT_DIR}/../setup_gpu_worker.sh
 
 LEARN_RATE=${LR}
 EXPERIMENT_TYPE=${EXP_TYPE}
@@ -28,8 +28,7 @@ METRIC_TO_SAVE=${METRIC_TO_SAVE}
 PROMPT_LEN=${LEN}
 PARA_MODEL_PATH=${PARA_MODEL_PATH}
 
-# checkpoint_path=/checkpoint/$USER/${SLURM_JOB_ID}
-checkpoint_path=~/checkpoint
+checkpoint_path=/checkpoint/$USER/${SLURM_JOB_ID}
 
 experiment_name=${TASK_NAME}_${NUM_CLASSES}_${FEWSHOT_SIZE}_${EXPERIMENT_TYPE}_${RANDOM_SEED}
 experiment_name=${experiment_name}_${LEARN_RATE}_${PROMPT_LEN}_${DATA_AUG}_${TRAIN_PARAPHRASER}_${LOAD_PARAPHRASER}_${METRIC_TO_SAVE}
@@ -79,7 +78,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --model_path ${model_path} \
     --para_model_path ${model_path} \
     --checkpoint best_step \
-    --max_epochs 20 \
+    --max_epochs 50 \
     --learning_rate ${LEARN_RATE} \
     --training_steps 1000000 \
     --steps_per_checkpoint 8 \
