@@ -2,11 +2,11 @@
 
 rates=(0.00001)
 exps=(all_finetune)
-seeds=(11 42 1993 2023 12321)
+seeds=(11)
 tasks=(sst2)
 losses=(pg)
 sampling_methods=(on_policy)
-sampling_algs=(beam_search top_p mixed)
+sampling_algs=(top_p)
 
 for i in ${!rates[@]};
 do
@@ -29,7 +29,7 @@ do
                         for s_m in ${!sampling_methods[@]};
                         do
                             sampling_method=${sampling_methods[$s_m]}
-                            CUDA_VISIBLE_DEVICES=3 bash src/reference_implementations/prompt_zoo/fewshot_lmfps.sh \
+                            CUDA_VISIBLE_DEVICES=2 bash src/reference_implementations/prompt_zoo/fewshot_lmfps.sh \
                                 EXP_TYPE=${exp} \
                                 TASK=${task} \
                                 SEED=${seed} \

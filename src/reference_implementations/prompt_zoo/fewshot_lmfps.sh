@@ -54,7 +54,7 @@ fi
 # train phase
 python -m src.reference_implementations.prompt_zoo.trainer \
     --train_batch_size 8 \
-    --eval_batch_size 8 \
+    --eval_batch_size 32 \
     --mode train \
     --seed ${RANDOM_SEED} \
     --task_name ${TASK_NAME} \
@@ -92,7 +92,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
 
 # test phase
 python -m src.reference_implementations.prompt_zoo.trainer \
-    --eval_batch_size 8 \
+    --eval_batch_size 32 \
     --mode test \
     --seed ${RANDOM_SEED} \
     --task_name ${TASK_NAME} \
