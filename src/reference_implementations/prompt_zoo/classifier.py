@@ -55,14 +55,13 @@ class FFClassifier(torch.nn.Module):
         hidden_states: torch.Tensor,
         input_mask: torch.Tensor,
         class_indices: torch.Tensor,
-        para_log_ps: Optional[torch.Tensor] = None,
+        enable_data_augmentation: Optional[bool] = False
     ) -> torch.Tensor:
         """Compute the cross-entropy loss for the above classifier."""
         _, logits = self.forward(hidden_states, input_mask)
         neg_log_likelihoods = self.loss_fun(logits, class_indices)
-        if para_log_ps is None:
+        if not enable_data_augmentation:
             return neg_log_likelihoods.mean(dim=0)
-        """
         else:
             neg_log_likelihoods = self.loss_fun(logits, class_indices)
             batch_size = class_indices.size()[0] // (FLAGS.test_sample_size + 1)
@@ -71,14 +70,9 @@ class FFClassifier(torch.nn.Module):
                 idx_neg_log_likelihoods = neg_log_likelihoods[
                     idx * (FLAGS.test_sample_size + 1) : (idx + 1) * (FLAGS.test_sample_size + 1)
                 ]
-                idx_para_log_ps = para_log_ps[idx * FLAGS.test_sample_size : (idx + 1) * FLAGS.test_sample_size]
-                idx_loss = idx_neg_log_likelihoods[0] + torch.sum(
-                    torch.exp(idx_para_log_ps) * idx_neg_log_likelihoods[1:], dim=0
-                )
+                idx_loss = 0.5 * idx_neg_log_likelihoods[0] + 0.5 * torch.mean(idx_neg_log_likelihoods[1:], dim=0)
                 loss += idx_loss
             return loss / float(batch_size)
-        """
-
 
 class ClassifierLM(MyBaseLM):
     """Wrapper class around the LM Model with a classifier on top of the LM."""
@@ -106,6 +100,8 @@ class ClassifierLM(MyBaseLM):
                 # this is just to use the basic pre-trained paraphraser.
                 self.para_model = Paraphraser(seed, device=0, mode=FLAGS.mode, fixed=True)
                 self.para_tokenizer = self.para_model.tokenizer
+
+            self.sample_memory: Dict[str, List[str]] = {}
 
         self.setup_models()
 
@@ -166,7 +162,8 @@ class ClassifierLM(MyBaseLM):
         dummy_labels = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
 
-        paraphrases = self.para_model.generate_beam_paraphrases(batch, num_return_seq=FLAGS.test_sample_size)
+        paraphrases = self.para_model.generate_top_p_paraphrases(batch, num_return_seq=FLAGS.test_sample_size,
+        temperature=FLAGS.test_temperature)
         augment_batch(
             batch,
             paraphrases,
@@ -206,12 +203,11 @@ class ClassifierLM(MyBaseLM):
                 index * (FLAGS.test_sample_size + 1) : (index + 1) * (FLAGS.test_sample_size + 1), :
             ]
             for class_idx in range(FLAGS.num_classes):
-                scores_str = ",".join([str(score) for score in scores[:, class_idx]])
                 avg_score = numpy.mean(scores[1:, class_idx])
                 output_row = {
                     "potential_class": str(class_idx),
                     "prediction_score": avg_score,
-                    "all_prediction_scores": scores_str,
+                    "all_prediction_score": 0.5 * avg_score + 0.5 * scores[0, class_idx],
                     "original_prediction_score": scores[0, class_idx],
                     "gold_class": str(batch["class_indices"][index * (FLAGS.test_sample_size + 1)].item()),
                     "paraphrases": paraphrases[index * FLAGS.test_sample_size : (index + 1) * FLAGS.test_sample_size],
@@ -222,11 +218,34 @@ class ClassifierLM(MyBaseLM):
     def train(self, batch: torch.utils.data.Dataset) -> Dict[str, float]:
         """The classifier training step."""
         self.train_mode_on()
-        para_log_ps = None
         if self.enable_data_augmentation == 1:
             # dummy_labels doesn't have any effect for classifier_finetuning.
             dummy_labels = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
-            paraphrases = self.para_model.generate_beam_paraphrases(batch, num_return_seq=FLAGS.test_sample_size)
+            paraphrases_input_text = self.para_tokenizer.batch_decode(
+                batch["para_input_ids"], skip_special_tokens=True
+            )
+            batch_size = len(paraphrases_input_text)
+            paraphrases_indices: Dict[int, List[str]] = {}
+            missed_indices = []
+            for idx, para_input_text in enumerate(paraphrases_input_text):
+                if para_input_text in self.sample_memory:
+                    paraphrases_indices[idx] = self.sample_memory[para_input_text]
+                else:
+                    missed_indices.append(idx)
+            if len(missed_indices) > 0:
+                new_paraphrases = self.para_model.generate_top_p_paraphrases(
+                    batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
+                )
+                for missed_idx in missed_indices:
+                    new_samples = new_paraphrases[
+                        missed_idx * FLAGS.test_sample_size : (missed_idx + 1) * FLAGS.test_sample_size
+                    ]
+                    paraphrases_indices[missed_idx] = new_samples
+                    self.sample_memory[paraphrases_input_text[missed_idx]] = new_samples
+
+            paraphrases = []
+            for idx in range(batch_size):
+                paraphrases.extend(paraphrases_indices[idx])
             augment_batch(batch, paraphrases, self.tokenizer, dummy_labels, num_return_seq=FLAGS.test_sample_size)
 
             batch_size = batch["class_indices"].size()[0]
@@ -238,25 +257,6 @@ class ClassifierLM(MyBaseLM):
                     -1,
                 )
             )
-
-            # compute the log probability of the paraphrases being generated.
-            """
-            batch_size, seq_len = batch["para_input_ids"].size()
-            batch["para_input_ids"] = (
-                batch["para_input_ids"]
-                .reshape(batch_size, 1, seq_len)
-                .expand(batch_size, FLAGS.test_sample_size, seq_len)
-                .reshape(-1, seq_len)
-            )
-            batch["para_attention_mask"] = (
-                batch["para_attention_mask"]
-                .reshape(batch_size, 1, seq_len)
-                .expand(batch_size, FLAGS.test_sample_size, seq_len)
-                .reshape(-1, seq_len)
-            )
-            tokenize_samples(batch, paraphrases, self.para_tokenizer)
-            # para_log_ps = self.para_model.bart_forward_pass(batch, train=False)
-            """
 
         loaded_batch = self.move_to_gpu(batch, keys=["input_ids", "attention_mask", "class_indices"])
 
@@ -272,7 +272,7 @@ class ClassifierLM(MyBaseLM):
             encoder_hidden_states,
             loaded_batch["attention_mask"],
             loaded_batch["class_indices"],
-            para_log_ps=para_log_ps,
+            enable_data_augmentation=self.enable_data_augmentation == 1
         )
         loss_value = loss.item()
 
