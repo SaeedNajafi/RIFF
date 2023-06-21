@@ -439,6 +439,7 @@ class RobertaPrompted(MyBaseLM):
             paraphrases_input_text = self.para_tokenizer.batch_decode(
                 batch["para_input_ids"], skip_special_tokens=True
             )
+            batch_size = len(paraphrases_input_text)
             paraphrases_indices: Dict[int, List[str]] = {}
             missed_indices = []
             for idx, para_input_text in enumerate(paraphrases_input_text):
@@ -458,7 +459,7 @@ class RobertaPrompted(MyBaseLM):
                     self.sample_memory[paraphrases_input_text[missed_idx]] = new_samples
 
             paraphrases = []
-            for idx in range(len(paraphrases_input_text)):
+            for idx in range(batch_size):
                 paraphrases.extend(paraphrases_indices[idx])
             augment_batch(batch, paraphrases, self.tokenizer, potentials_str, num_return_seq=FLAGS.test_sample_size)
             to_train_lm = True
@@ -576,7 +577,11 @@ class RobertaPrompted(MyBaseLM):
             self.para_model.optimizer.step()
 
         elif self.enable_data_augmentation == 1:
-            loss = -class_log_ps.mean(dim=0)
+            class_log_ps = class_log_ps.reshape(batch_size, FLAGS.test_sample_size + 1)
+            normal_class_log_ps = class_log_ps[:, 0]
+            paraphrase_class_log_ps = class_log_ps[:, 1:]
+            objective = 0.5 * normal_class_log_ps + 0.5 * paraphrase_class_log_ps.mean(dim=1)
+            loss = -objective.mean(dim=0)
             loss_value = loss.item()
 
             # backProp
@@ -649,13 +654,12 @@ class RobertaPrompted(MyBaseLM):
 
         for index, potential_str in enumerate(potentials_str):
             scores = class_log_ps[index * (FLAGS.test_sample_size + 1) : (index + 1) * (FLAGS.test_sample_size + 1)]
-            scores_str = ",".join([str(score) for score in scores])
             avg_score = numpy.mean(scores[1:])
             para_index = (index // FLAGS.num_classes) * FLAGS.num_classes
             output_row = {
                 "potential_class": potential_str.strip(),
                 "prediction_score": avg_score,
-                "all_prediction_scores": scores_str,
+                "all_prediction_score": 0.5 * scores[0] + 0.5 * avg_score,
                 "original_prediction_score": scores[0],
                 "gold_class": batch["gold_classes"][index],
                 "paraphrases": paraphrases[
