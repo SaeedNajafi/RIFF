@@ -1,5 +1,5 @@
 """This is a module to train a classifier on top of the LM."""
-from typing import Dict, Iterator, Optional, Tuple
+from typing import Dict, Iterator, List, Optional, Tuple
 
 import numpy
 import torch
@@ -55,7 +55,7 @@ class FFClassifier(torch.nn.Module):
         hidden_states: torch.Tensor,
         input_mask: torch.Tensor,
         class_indices: torch.Tensor,
-        enable_data_augmentation: Optional[bool] = False
+        enable_data_augmentation: Optional[bool] = False,
     ) -> torch.Tensor:
         """Compute the cross-entropy loss for the above classifier."""
         _, logits = self.forward(hidden_states, input_mask)
@@ -73,6 +73,7 @@ class FFClassifier(torch.nn.Module):
                 idx_loss = 0.5 * idx_neg_log_likelihoods[0] + 0.5 * torch.mean(idx_neg_log_likelihoods[1:], dim=0)
                 loss += idx_loss
             return loss / float(batch_size)
+
 
 class ClassifierLM(MyBaseLM):
     """Wrapper class around the LM Model with a classifier on top of the LM."""
@@ -162,8 +163,9 @@ class ClassifierLM(MyBaseLM):
         dummy_labels = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
 
-        paraphrases = self.para_model.generate_top_p_paraphrases(batch, num_return_seq=FLAGS.test_sample_size,
-        temperature=FLAGS.test_temperature)
+        paraphrases = self.para_model.generate_top_p_paraphrases(
+            batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
+        )
         augment_batch(
             batch,
             paraphrases,
@@ -272,7 +274,7 @@ class ClassifierLM(MyBaseLM):
             encoder_hidden_states,
             loaded_batch["attention_mask"],
             loaded_batch["class_indices"],
-            enable_data_augmentation=self.enable_data_augmentation == 1
+            enable_data_augmentation=self.enable_data_augmentation == 1,
         )
         loss_value = loss.item()
 

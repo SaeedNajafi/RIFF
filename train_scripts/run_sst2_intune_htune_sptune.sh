@@ -1,7 +1,7 @@
 #!/bin/bash
 
 rates=(0.001)
-exps=(gradient_search)
+exps=(soft_prompt_finetune input_finetune output_finetune)
 seeds=(11 42 1993 2023 12321)
 tasks=(sst2)
 augs=(1)

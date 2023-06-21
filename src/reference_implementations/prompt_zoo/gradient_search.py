@@ -189,6 +189,7 @@ class SearchRoberta(MyBaseLM):
         batch: torch.utils.data.Dataset,
         prompt_templates: List[PromptTemplate],
         train: bool = False,
+        for_augmentation: Optional[bool] = False,
     ) -> torch.Tensor:
         """Run a forward computation over the batch for each prompt templates
         and compute the log probability over the batch for that given prompt
@@ -201,7 +202,7 @@ class SearchRoberta(MyBaseLM):
         class_log_ps = self.gradient_search_forward_pass(batch, train, prompt_lists)
 
         template_scores = class_log_ps.view(batch_size, len(prompt_templates))
-        if self.enable_data_augmentation == 0:
+        if not for_augmentation:
             return template_scores
         else:
             # compute the correct objective for data augmentation.
@@ -211,7 +212,9 @@ class SearchRoberta(MyBaseLM):
                 idx_template_scores = template_scores[
                     idx * (FLAGS.test_sample_size + 1) : (idx + 1) * (FLAGS.test_sample_size + 1), :
                 ]
-                idx_template_score = 0.5 * idx_template_scores[0, :] + 0.5 * torch.mean(idx_template_scores[1:, :], dim=0)
+                idx_template_score = 0.5 * idx_template_scores[0, :] + 0.5 * torch.mean(
+                    idx_template_scores[1:, :], dim=0
+                )
                 template_scores_arr.append(idx_template_score)
             return torch.stack(template_scores_arr, dim=0)
 
@@ -244,11 +247,18 @@ class SearchRoberta(MyBaseLM):
             paraphrases = []
             for idx in range(batch_size):
                 paraphrases.extend(paraphrases_indices[idx])
-            augment_batch(batch, paraphrases, self.tokenizer, potentials_str, num_return_seq=FLAGS.test_sample_size, for_gradient_search=True)
+            augment_batch(
+                batch,
+                paraphrases,
+                self.tokenizer,
+                potentials_str,
+                num_return_seq=FLAGS.test_sample_size,
+                for_gradient_search=True,
+            )
 
         prompt_index = random.randint(0, FLAGS.prompt_length - 1)
         template_log_likelihood = self.score_templates(
-            batch, self.search_memory.beam, train=True
+            batch, self.search_memory.beam, train=True, for_augmentation=self.enable_data_augmentation == 1
         )
         template_log_likelihood = template_log_likelihood.mean(dim=0)  # mean across batch_size
         beam_candidates = self.search_memory.generate_beam_candidates(
@@ -256,7 +266,9 @@ class SearchRoberta(MyBaseLM):
             log_likelihoods=template_log_likelihood,
             prompt_step=prompt_index,
         )
-        beam_candidate_scores = self.score_templates(batch, beam_candidates, train=False)
+        beam_candidate_scores = self.score_templates(
+            batch, beam_candidates, train=False, for_augmentation=self.enable_data_augmentation == 1
+        )
         beam_candidate_scores = beam_candidate_scores.mean(dim=0)  # mean across batch_size
         for index, score in enumerate(beam_candidate_scores.tolist()):
             beam_candidates[index].score = score
@@ -275,7 +287,7 @@ class SearchRoberta(MyBaseLM):
         """The main prediction loop for a given potential class label using a
         beam of templates."""
         top_template = self.search_memory.beam[0]
-        class_log_ps = self.score_templates(batch, [top_template], train=False)
+        class_log_ps = self.score_templates(batch, [top_template], train=False, for_augmentation=False)
         class_log_ps = class_log_ps.mean(dim=1)  # mean across the beam size.
         class_log_ps = class_log_ps.cpu().detach().numpy()
 
@@ -301,8 +313,9 @@ class SearchRoberta(MyBaseLM):
         beam of templates and the paraphraser."""
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
         potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
-        paraphrases = self.para_model.generate_top_p_paraphrases(batch, num_return_seq=FLAGS.test_sample_size,
-                                                        temperature=FLAGS.test_temperature)
+        paraphrases = self.para_model.generate_top_p_paraphrases(
+            batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
+        )
         augment_batch(
             batch,
             paraphrases,
@@ -313,7 +326,7 @@ class SearchRoberta(MyBaseLM):
         )
 
         top_template = self.search_memory.beam[0]
-        class_log_ps = self.score_templates(batch, [top_template], train=False)
+        class_log_ps = self.score_templates(batch, [top_template], train=False, for_augmentation=True)
         class_log_ps = class_log_ps.mean(dim=1)  # mean across the beam size.
         class_log_ps = class_log_ps.cpu().detach().numpy()
 
