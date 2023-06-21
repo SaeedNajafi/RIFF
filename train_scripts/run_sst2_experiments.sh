@@ -5,7 +5,7 @@ exps=(all_finetune)
 seeds=(11 42 1993 2023 12321)
 tasks=(sst2)
 augs=(1)
-fewshot_sizes=(128)
+fewshot_sizes=(32)
 
 for i in ${!rates[@]};
 do
@@ -50,6 +50,7 @@ do
     done
 done
 
+:'
 rates=(0.001)
 exps=(input_finetune output_finetune)
 seeds=(11 42 1993 2023 12321)
@@ -100,7 +101,6 @@ do
     done
 done
 
-:'
 rates=(0.001)
 exps=(soft_prompt_finetune)
 seeds=(11 42 1993 2023 12321)
