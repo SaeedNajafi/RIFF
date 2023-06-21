@@ -137,7 +137,7 @@ class SearchRoberta(MyBaseLM):
             initial_template = "In this task, you are given sentences from movie reviews. \
                 The task is to classify a sentence as 'great' if the sentiment of the \
                     sentence is positive or as 'terrible' if the sentiment of the sentence is negative."
-        elif task_name == "SetFit/sst5":
+        elif task_name == "SetFit_sst5":
             initial_template = "In this task, you are given sentences from movie reviews. \
             Based on the given review, classify it to one of the five classes: \
                 (1) terrible, (2) bad, (3) okay, (4) good, and (5) great."
