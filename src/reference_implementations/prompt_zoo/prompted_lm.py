@@ -401,7 +401,7 @@ class RobertaPrompted(MyBaseLM):
                 # this is just to use the basic pre-trained paraphraser.
                 self.para_model = Paraphraser(seed, device=0, mode=FLAGS.mode, fixed=True)
                 self.para_tokenizer = self.para_model.tokenizer
-            
+
             self.sample_memory: Dict[str, List[str]] = {}
 
         elif self.enable_paraphrase_training == 1:
@@ -436,30 +436,30 @@ class RobertaPrompted(MyBaseLM):
         to_train_lm = True
         if self.enable_data_augmentation == 1:
             potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
-            paraphrases_input_text = self.para_tokenizer.batch_decode(batch["para_input_ids"], skip_special_tokens=True)
+            paraphrases_input_text = self.para_tokenizer.batch_decode(
+                batch["para_input_ids"], skip_special_tokens=True
+            )
             paraphrases_indices: Dict[int, List[str]] = {}
             missed_indices = []
             for idx, para_input_text in enumerate(paraphrases_input_text):
                 if para_input_text in self.sample_memory:
-                    print("hit")
                     paraphrases_indices[idx] = self.sample_memory[para_input_text]
                 else:
-                    print("miss")
                     missed_indices.append(idx)
             if len(missed_indices) > 0:
-                new_paraphrases = self.para_model.generate_top_p_paraphrases(batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature)
+                new_paraphrases = self.para_model.generate_top_p_paraphrases(
+                    batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
+                )
                 for missed_idx in missed_indices:
-                    new_samples = new_paraphrases[missed_idx * FLAGS.test_sample_size: (missed_idx+1) * FLAGS.test_sample_size]
+                    new_samples = new_paraphrases[
+                        missed_idx * FLAGS.test_sample_size : (missed_idx + 1) * FLAGS.test_sample_size
+                    ]
                     paraphrases_indices[missed_idx] = new_samples
                     self.sample_memory[paraphrases_input_text[missed_idx]] = new_samples
-            
+
             paraphrases = []
             for idx in range(len(paraphrases_input_text)):
                 paraphrases.extend(paraphrases_indices[idx])
-            print("saeed")
-            print(paraphrases_input_text)
-            print(paraphrases)
-            print("saeed")
             augment_batch(batch, paraphrases, self.tokenizer, potentials_str, num_return_seq=FLAGS.test_sample_size)
             to_train_lm = True
 
@@ -635,8 +635,9 @@ class RobertaPrompted(MyBaseLM):
 
         potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
-        paraphrases = self.para_model.generate_top_p_paraphrases(batch, num_return_seq=FLAGS.test_sample_size,
-                                                                 temperature=FLAGS.test_temperature)
+        paraphrases = self.para_model.generate_top_p_paraphrases(
+            batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
+        )
         augment_batch(batch, paraphrases, self.tokenizer, potentials_str, num_return_seq=FLAGS.test_sample_size)
 
         if FLAGS.exp_type == "soft_prompt_finetune":

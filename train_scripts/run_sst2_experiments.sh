@@ -1,12 +1,11 @@
 #!/bin/bash
 
-:'
 rates=(0.00001)
 exps=(all_finetune)
 seeds=(11 42 1993 2023 12321)
 tasks=(sst2)
 augs=(1)
-fewshot_sizes=(32)
+fewshot_sizes=(128)
 
 for i in ${!rates[@]};
 do
@@ -49,6 +48,7 @@ do
     done
 done
 
+:'
 rates=(0.001)
 exps=(input_finetune output_finetune)
 seeds=(11 42 1993 2023 12321)
@@ -192,7 +192,6 @@ do
         done
     done
 done
-'
 
 rates=(0.001)
 exps=(gradient_search)
@@ -241,3 +240,4 @@ do
         done
     done
 done
+'
