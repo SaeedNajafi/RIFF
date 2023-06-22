@@ -448,7 +448,7 @@ class RobertaPrompted(MyBaseLM):
         if FLAGS.exp_type == "soft_prompt_finetune":
             self.model_pool["roberta_model"] = create_softprompt_roberta()
 
-        if FLAGS.exp_type == "classifier_finetune":
+        elif FLAGS.exp_type == "classifier_finetune":
             self.model_pool["roberta_model"] = RobertaModel.from_pretrained(FLAGS.pretrained_model)
 
             # use the d_model from the LM config defined internally from huggingface.

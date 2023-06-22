@@ -1,12 +1,6 @@
 #!/bin/bash
 
-rates=(0.00001)
-exps=(all_finetune)
-#seeds=(11 42 1993 2023 12321)
-seeds=(11)
-tasks=(sst2)
-augs=(0)
-fewshot_sizes=(32)
+seeds=(11 42 1993 2023 12321)
 
 for i in ${!rates[@]};
 do

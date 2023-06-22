@@ -12,7 +12,16 @@ FLAGS = flags.FLAGS
 
 
 def sentiment_metric(prediction_file: str) -> Dict[str, float]:
-    """Compute the classification accuracy for sentiment classification."""
+    """Compute the classification accuracy for sentiment classification. We
+    report the following metrics:
+
+    1 - accuracy: is the classification accuracy obtained by averaging the prediction scores across
+                  the paraphrases of the input.
+    2 - original_accuracy: is the classification accuracy obtained by the prediction score
+                  of the original input text.
+    3 - all_accuracy: is the classification accuracy obtained by averaging the prediction scores
+                  from the paraphrases and the original input text.
+    """
 
     df = pd.read_csv(prediction_file, delimiter=",")
 
@@ -28,64 +37,31 @@ def sentiment_metric(prediction_file: str) -> Dict[str, float]:
 
     return_metrics: Dict[str, float] = {}
 
-    if "prediction_score" in df.columns:
-        # accuracy based on the scores of the paraphrases
-        scores = df["prediction_score"].tolist()
-        prediction_scores = np.array(scores).reshape((len(predictions) // num_labels, num_labels))
-        max_predictions = np.argmax(prediction_scores, axis=1)
-        max_labels = []
-        for index in range(len(predictions) // num_labels):
-            labels_row = prediction_labels[index]
-            max_labels.append(labels_row[max_predictions[index]])
+    metrics = {
+        "prediction_score": "accuracy",
+        "original_prediction_score": "original_accuracy",
+        "all_prediction_score": "all_accuracy",
+    }
 
-        corrects = 0.0
-        total = 0.0
-        for index in range(len(predictions) // num_labels):
-            total += 1.0
-            if gold_labels[index * num_labels] == max_labels[index]:
-                corrects += 1.0
+    for metric_column, metric in metrics.items():
+        if metric_column in df.columns:
+            scores = df[metric_column].tolist()
+            prediction_scores = np.array(scores).reshape((len(predictions) // num_labels, num_labels))
+            max_predictions = np.argmax(prediction_scores, axis=1)
+            max_labels = []
+            for index in range(len(predictions) // num_labels):
+                labels_row = prediction_labels[index]
+                max_labels.append(labels_row[max_predictions[index]])
 
-        accuracy = corrects / total
-        return_metrics["accuracy"] = accuracy
+            corrects = 0.0
+            total = 0.0
+            for index in range(len(predictions) // num_labels):
+                total += 1.0
+                if gold_labels[index * num_labels] == max_labels[index]:
+                    corrects += 1.0
 
-    if "original_prediction_score" in df.columns:
-        # accuracy based on the original input sentence.
-        scores = df["original_prediction_score"].tolist()
-        prediction_scores = np.array(scores).reshape((len(predictions) // num_labels, num_labels))
-        max_predictions = np.argmax(prediction_scores, axis=1)
-        max_labels = []
-        for index in range(len(predictions) // num_labels):
-            labels_row = prediction_labels[index]
-            max_labels.append(labels_row[max_predictions[index]])
-
-        corrects = 0.0
-        total = 0.0
-        for index in range(len(predictions) // num_labels):
-            total += 1.0
-            if gold_labels[index * num_labels] == max_labels[index]:
-                corrects += 1.0
-
-        accuracy = corrects / total
-        return_metrics["original_accuracy"] = accuracy
-
-    if "all_prediction_score" in df.columns:
-        scores = df["all_prediction_score"].tolist()
-        prediction_scores = np.array(scores).reshape((len(predictions) // num_labels, num_labels))
-        max_predictions = np.argmax(prediction_scores, axis=1)
-        max_labels = []
-        for index in range(len(predictions) // num_labels):
-            labels_row = prediction_labels[index]
-            max_labels.append(labels_row[max_predictions[index]])
-
-        corrects = 0.0
-        total = 0.0
-        for index in range(len(predictions) // num_labels):
-            total += 1.0
-            if gold_labels[index * num_labels] == max_labels[index]:
-                corrects += 1.0
-
-        accuracy = corrects / total
-        return_metrics["all_accuracy"] = accuracy
+            accuracy = corrects / total
+            return_metrics[metric] = accuracy
 
     return return_metrics
 
