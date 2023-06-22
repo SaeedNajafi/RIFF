@@ -1,19 +1,25 @@
 #!/bin/bash
 
+# For reading key=value arguments
+for ARGUMENT in "$@"
+do
+	KEY=$(echo $ARGUMENT | cut -f1 -d=)
+	KEY_LENGTH=${#KEY}
+	VALUE="${ARGUMENT:$KEY_LENGTH+1}"
+	export "$KEY"="$VALUE"
+done
+
 echo "Hostname: $(hostname -s)"
 echo "Node Rank ${SLURM_PROCID}"
 
-# prepare environment
-source ${VIRTUAL_ENV}/bin/activate
+if [ "${CLUSTER_NAME}" = "narval" ]; then
+    # prepare environment in the narval cluster.
+    module load python/3.9.6 StdEnv/2020 gcc/9.3.0 cuda/11.4 arrow/11.0.0
+    source ${VIRTUAL_ENV}/bin/activate
 
-# Define these env variables to run ML models on cuda and gpu workers properly.
-# without these, tensorflow or jax will not detect any GPU cards.
-# we point to the specific cuda and cudnn versions available on the cluster.
+elif [ "${CLUSTER_NAME}" = "vcluster" ]; then
+    source ${VIRTUAL_ENV}/bin/activate
 
-#export PATH="${VIRTUAL_ENV}/bin:/pkgs/cuda-11.3/bin:$PATH"
-
-#export LD_LIBRARY_PATH="/scratch/ssd001/pkgs/cudnn-11.4-v8.2.4.15/lib64:/scratch/ssd001/pkgs/cuda-11.3/targets/x86_64-linux/lib"
-
-#export XLA_FLAGS='--xla_gpu_simplify_all_fp_conversions --xla_gpu_all_reduce_combine_threshold_bytes=136314880 ${XLA_FLAGS}'
+fi
 
 echo "Using Python from: $(which python)"

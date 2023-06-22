@@ -1,14 +1,11 @@
 #!/bin/bash
 
-#SBATCH --job-name=prompt-roberta-large
+#SBATCH --job-name=prompt-experiments
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=4
-#SBATCH --gres=gpu:1
+#SBATCH --tasks-per-node=1
 #SBATCH --mem=8G
-#SBATCH --partition=a40
-#SBATCH --qos=normal
+#SBATCH --cpus-per-task=4
 #SBATCH --output=job_%x_%j.out
 #SBATCH --error=job_%x_%j.err
 
@@ -24,18 +21,6 @@
 MAIN_HOST=$(hostname -s)
 export MASTER_ADDR=$MAIN_HOST
 export MASTER_PORT=52070
-
-# Set NCCL options
-# export NCCL_DEBUG=INFO
-# NCCL backend to communicate between GPU workers is not provided in vector's cluster.
-# Disable this option in slurm.
-export NCCL_IB_DISABLE=1
-
-if [[ "${SLURM_JOB_PARTITION}" == "t4v2" ]] || \
-    [[ "${SLURM_JOB_PARTITION}" == "rtx6000" ]]; then
-    echo export NCCL_SOCKET_IFNAME=bond0 on "${SLURM_JOB_PARTITION}"
-    export NCCL_SOCKET_IFNAME=bond0
-fi
 
 # Process input args
 SCRIPT=$1
@@ -77,8 +62,9 @@ KL_COEFFICIENT=${17}
 
 PARA_MODEL_PATH=${18}
 
-echo "Placing logs in: ${LOG_DIR}"
+CLUSTER_NAME=${19}
 
+echo "Placing logs in: ${LOG_DIR}"
 echo "World size: ${SLURM_NTASKS}"
 echo "Number of nodes: ${SLURM_NNODES}"
 NUM_GPUs=$(nvidia-smi --query-gpu=name --format=csv,noheader | wc -l)
@@ -90,12 +76,13 @@ mkdir -p "${LOG_DIR}"
 # Run on all nodes
 /opt/slurm/bin/srun -N"${SLURM_NNODES}" -l \
     bash -c "bash ${SCRIPT} \
-             EXP_TYPE=${EXP_TYPE} LR=${LR} \
-             SEED=${SEED} TASK=${TASK} LEN=${LEN} AUG=${AUG} \
-             TRAIN_PARA=${TRAIN_PARA} LOAD_PARA=${LOAD_PARA} \
-             PARA_LOSS=${PARA_LOSS} SAMPLING_METHOD=${SAMPLING_METHOD} \
-             SAMPLING_ALG=${SAMPLING_ALG} SLURM_JOB_ID=${SLURM_JOB_ID} \
-             METRIC_TO_SAVE=${METRIC_TO_SAVE} \
-             KL_COEFFICIENT=${KL_COEFFICIENT} \
-             FEWSHOT_SIZE=${FEWSHOT_SIZE} \
-             NUM_CLASSES=${NUM_CLASSES} PARA_MODEL_PATH=${PARA_MODEL_PATH} >> ${LOG_PATH} 2>&1"
+            CLUSTER_NAME=${CLUSTER_NAME} \
+            EXP_TYPE=${EXP_TYPE} LR=${LR} \
+            SEED=${SEED} TASK=${TASK} \
+            LEN=${LEN} AUG=${AUG} \
+            TRAIN_PARA=${TRAIN_PARA} LOAD_PARA=${LOAD_PARA} \
+            PARA_LOSS=${PARA_LOSS} SAMPLING_METHOD=${SAMPLING_METHOD} \
+            SAMPLING_ALG=${SAMPLING_ALG} SLURM_JOB_ID=${SLURM_JOB_ID} \
+            METRIC_TO_SAVE=${METRIC_TO_SAVE} KL_COEFFICIENT=${KL_COEFFICIENT} \
+            FEWSHOT_SIZE=${FEWSHOT_SIZE} NUM_CLASSES=${NUM_CLASSES} \
+            PARA_MODEL_PATH=${PARA_MODEL_PATH} >> ${LOG_PATH} 2>&1"

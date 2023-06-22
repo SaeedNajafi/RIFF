@@ -171,7 +171,9 @@ def launch_test_or_train() -> None:
         model = SearchRoberta(FLAGS.seed, FLAGS.task_name, FLAGS.enable_data_augmentation, FLAGS.load_paraphraser)
         eval_repeat_input = True
     elif FLAGS.exp_type == "classifier_finetune":
-        model = ClassifierLM(FLAGS.seed, FLAGS.enable_data_augmentation, FLAGS.load_paraphraser)
+        model = ClassifierLM(
+            FLAGS.seed, FLAGS.enable_data_augmentation, FLAGS.enable_paraphrase_training, FLAGS.load_paraphraser
+        )
         eval_repeat_input = False
 
     elif FLAGS.exp_type == "no_finetune":

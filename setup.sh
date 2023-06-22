@@ -13,6 +13,8 @@ function install_python () {
 		brew install python@3.9
 	elif [ "$OS" = "vcluster" ]; then
 		module load python/3.9.10
+	elif [ "$OS" = "narval" ]; then
+		module load python/3.9.6
 	fi
 }
 
@@ -27,6 +29,11 @@ function install_env () {
 		python -m venv $ENV_NAME-env
 		source $ENV_NAME-env/bin/activate
 		pip3 install --upgrade pip
+
+	elif [ "$OS" = "narval" ]; then
+		python -m venv $ENV_NAME-env
+		source $ENV_NAME-env/bin/activate
+		pip install --upgrade pip
 
 	elif [ "$OS" = "cirrus" ]; then
 		python -m venv $ENV_NAME-env
@@ -68,6 +75,11 @@ function install_ml_libraries () {
 
 		python -m pip install torch==1.12.1+cu113 torchvision==0.13.1+cu113 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu113
 
+	elif [ "$OS" = "narval" ]; then
+		python -m pip install --no-index tensorflow==2.11.0
+		python -m pip install --no-index torch torchvision torchtext torchaudio
+		module load StdEnv/2020  gcc/9.3.0  cuda/11.4 arrow/11.0.0
+		python -m pip install pyarrow
 	fi
 }
 

@@ -10,10 +10,6 @@ do
 done
 
 PROJECT_DIR=$( dirname -- "$0"; )
-
-# We source to keep the internal env variables defined.
-source ${PROJECT_DIR}/../setup_gpu_worker.sh
-
 LEARN_RATE=${LR}
 EXPERIMENT_TYPE=${EXP_TYPE}
 RANDOM_SEED=${SEED}
@@ -27,8 +23,23 @@ SLURM_JOB_ID=${SLURM_JOB_ID}
 METRIC_TO_SAVE=${METRIC_TO_SAVE}
 PROMPT_LEN=${LEN}
 PARA_MODEL_PATH=${PARA_MODEL_PATH}
+CLUSTER_NAME=${CLUSTER_NAME}
 
-checkpoint_path=/checkpoint/$USER/${SLURM_JOB_ID}
+# We source the python env inside a worker depending on the cluster.
+source ${PROJECT_DIR}/../setup_gpu_worker.sh CLUSTER_NAME=${CLUSTER_NAME}
+
+if [ "${CLUSTER_NAME}" = "narval" ]; then
+    checkpoint_path=/home/$USER/scratch/checkpoint/${SLURM_JOB_ID}
+
+elif [ "${CLUSTER_NAME}" = "vcluster" ]; then
+    checkpoint_path=/checkpoint/$USER/${SLURM_JOB_ID}
+
+elif [ "${CLUSTER_NAME}" = "linux" ]; then
+    checkpoint_path=~/checkpoint
+fi
+
+# create checkpoint path if it doesn't exist.
+mkdir -p ${checkpoint_path}
 
 experiment_name=${TASK_NAME}_${NUM_CLASSES}_${FEWSHOT_SIZE}_${EXPERIMENT_TYPE}_${RANDOM_SEED}
 experiment_name=${experiment_name}_${LEARN_RATE}_${PROMPT_LEN}_${DATA_AUG}_${TRAIN_PARAPHRASER}_${LOAD_PARAPHRASER}_${METRIC_TO_SAVE}
@@ -37,7 +48,7 @@ model_path=${checkpoint_path}/${experiment_name}
 
 mkdir -p ${model_path}
 
-# delay purge in the checkpoint and job_id
+# delay purge in the checkpoint and job_id, required for vcluster.
 touch ${checkpoint_path}/DELAYPURGE
 
 if [ "${LOAD_PARAPHRASER}" = "1" ]; then

@@ -1,125 +1,23 @@
 """This is a module to train a classifier on top of the LM."""
-from typing import Dict, Iterator, List, Optional, Tuple
+from typing import Dict, Iterator
 
 import numpy
 import torch
 from absl import flags
-from transformers import AutoTokenizer, RobertaModel
 
 from src.reference_implementations.prompt_zoo.data_utility import augment_batch
-from src.reference_implementations.prompt_zoo.prompt_optimizers import optimizer_definer
-from src.reference_implementations.prompt_zoo.prompted_lm import MyBaseLM, Paraphraser
+from src.reference_implementations.prompt_zoo.prompted_lm import RobertaPrompted
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_integer("classifier_hidden_d", 128, "The number of hidden units used in the classifier.")
-flags.DEFINE_integer("num_classes", 3, "Number of classes for classification. Only used in linear classifier.")
 
-
-class FFClassifier(torch.nn.Module):
-    """A feedforward multinomial logistic regression over the LM hidden
-    states."""
-
-    def __init__(self, model_d: int) -> None:
-        """Arguments:
-        model_d (int): The hidden dimension of LM;
-        """
-        super().__init__()
-
-        self.layer = torch.nn.Linear(model_d, FLAGS.classifier_hidden_d, bias=True)
-
-        # using gelu activation over relu
-        # https://arxiv.org/abs/1606.08415v4
-        self.act = torch.nn.GELU()
-        self.classifier = torch.nn.Linear(FLAGS.classifier_hidden_d, FLAGS.num_classes, bias=True)
-        self.log_softmax = torch.nn.LogSoftmax(dim=1)
-        self.loss_fun = torch.nn.NLLLoss(reduction="none")
-
-    def forward(self, hidden_states: torch.Tensor, input_mask: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Pass the hidden_vector into the classifier."""
-        # mask the correct hidden_states from non-masked tokens.
-        # masked tokens are zero!
-        b_sz, seq_len, h_dim = hidden_states.size()
-        extended_mask = input_mask.view(b_sz, seq_len, 1).expand_as(hidden_states)
-        good_hidden_states = hidden_states * extended_mask
-        # average pooling as the input feature vector.
-        hidden_vector = torch.sum(good_hidden_states, dim=1) / torch.sum(extended_mask, dim=1)
-
-        feature_vector = self.act(self.layer(hidden_vector))
-        scores = self.classifier(feature_vector)
-        logits = self.log_softmax(scores)
-        return scores, logits
-
-    def compute_loss(
-        self,
-        hidden_states: torch.Tensor,
-        input_mask: torch.Tensor,
-        class_indices: torch.Tensor,
-        enable_data_augmentation: Optional[bool] = False,
-    ) -> torch.Tensor:
-        """Compute the cross-entropy loss for the above classifier."""
-        _, logits = self.forward(hidden_states, input_mask)
-        neg_log_likelihoods = self.loss_fun(logits, class_indices)
-        if not enable_data_augmentation:
-            return neg_log_likelihoods.mean(dim=0)
-        else:
-            neg_log_likelihoods = self.loss_fun(logits, class_indices)
-            batch_size = class_indices.size()[0] // (FLAGS.test_sample_size + 1)
-            loss = 0.0
-            for idx in range(batch_size):
-                idx_neg_log_likelihoods = neg_log_likelihoods[
-                    idx * (FLAGS.test_sample_size + 1) : (idx + 1) * (FLAGS.test_sample_size + 1)
-                ]
-                idx_loss = 0.5 * idx_neg_log_likelihoods[0] + 0.5 * torch.mean(idx_neg_log_likelihoods[1:], dim=0)
-                loss += idx_loss
-            return loss / float(batch_size)
-
-
-class ClassifierLM(MyBaseLM):
+class ClassifierLM(RobertaPrompted):
     """Wrapper class around the LM Model with a classifier on top of the LM."""
 
-    def __init__(self, seed: int, enable_data_augmentation: int, load_paraphraser: int) -> None:
-        super().__init__(seed, device=0)
-
-        # construct tokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(FLAGS.pretrained_model)
-
-        # construct the underlying model
-        if FLAGS.exp_type == "classifier_finetune":
-            self.model_pool["roberta_model"] = RobertaModel.from_pretrained(FLAGS.pretrained_model)
-
-        # use the d_model from the LM config defined internally from huggingface.
-        self.model_pool["classifier_model"] = FFClassifier(self.model_pool["roberta_model"].config.hidden_size)
-
-        self.enable_data_augmentation = enable_data_augmentation
-        if self.enable_data_augmentation == 1:
-            if load_paraphraser == 1:
-                # this is to load the fine-tuned paraphraser.
-                self.para_model = Paraphraser(seed, device=0, mode="test", fixed=False)
-                self.para_tokenizer = self.para_model.tokenizer
-            else:
-                # this is just to use the basic pre-trained paraphraser.
-                self.para_model = Paraphraser(seed, device=0, mode=FLAGS.mode, fixed=True)
-                self.para_tokenizer = self.para_model.tokenizer
-
-            self.sample_memory: Dict[str, List[str]] = {}
-
-        self.setup_models()
-
-        if FLAGS.mode == "train" and FLAGS.exp_type == "classifier_finetune":
-            # create optimizer only for training.
-            # based on the experiment type, setup the optimizer.
-            self.optimizer = optimizer_definer["classifier_finetune"](self.model_pool)
-
-        elif FLAGS.mode in ["test", "inference", "eval"]:
-            # load from the given checkpoint.
-            self.load_from_checkpoint()
-
-    def predict(self, batch: torch.utils.data.Dataset) -> Iterator[Dict[str, str]]:
-        """Based on the ensembling type, run the prediction."""
-        if FLAGS.ensemble_type == "paraphrase_predict":
-            return self.paraphrase_and_predict(batch)
-        return self.no_ensemble_predict(batch)
+    def __init__(
+        self, seed: int, enable_data_augmentation: int, enable_paraphrase_training: int, load_paraphraser: int
+    ) -> None:
+        super().__init__(seed, enable_data_augmentation, enable_paraphrase_training, load_paraphraser)
 
     def no_ensemble_predict(self, batch: torch.utils.data.Dataset) -> Iterator[Dict[str, str]]:
         """The main prediction loop using a separate classifier."""
@@ -153,8 +51,8 @@ class ClassifierLM(MyBaseLM):
                 yield output_row
 
     def paraphrase_and_predict(self, batch: torch.utils.data.Dataset) -> Iterator[Dict[str, str]]:
-        """Generate multiple paraphrases along the original input and return all
-        the results.
+        """Generate multiple paraphrases along the original input and return
+        all the results.
 
         For each example, the first score belongs to the original input.
         """
@@ -223,31 +121,7 @@ class ClassifierLM(MyBaseLM):
         if self.enable_data_augmentation == 1:
             # dummy_labels doesn't have any effect for classifier_finetuning.
             dummy_labels = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
-            paraphrases_input_text = self.para_tokenizer.batch_decode(
-                batch["para_input_ids"], skip_special_tokens=True
-            )
-            batch_size = len(paraphrases_input_text)
-            paraphrases_indices: Dict[int, List[str]] = {}
-            missed_indices = []
-            for idx, para_input_text in enumerate(paraphrases_input_text):
-                if para_input_text in self.sample_memory:
-                    paraphrases_indices[idx] = self.sample_memory[para_input_text]
-                else:
-                    missed_indices.append(idx)
-            if len(missed_indices) > 0:
-                new_paraphrases = self.para_model.generate_top_p_paraphrases(
-                    batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
-                )
-                for missed_idx in missed_indices:
-                    new_samples = new_paraphrases[
-                        missed_idx * FLAGS.test_sample_size : (missed_idx + 1) * FLAGS.test_sample_size
-                    ]
-                    paraphrases_indices[missed_idx] = new_samples
-                    self.sample_memory[paraphrases_input_text[missed_idx]] = new_samples
-
-            paraphrases = []
-            for idx in range(batch_size):
-                paraphrases.extend(paraphrases_indices[idx])
+            paraphrases = self.draw_samples_for_augmentation(batch)
             augment_batch(batch, paraphrases, self.tokenizer, dummy_labels, num_return_seq=FLAGS.test_sample_size)
 
             batch_size = batch["class_indices"].size()[0]
