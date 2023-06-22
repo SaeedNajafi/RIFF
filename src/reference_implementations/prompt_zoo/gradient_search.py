@@ -326,7 +326,7 @@ class SearchRoberta(MyBaseLM):
         )
 
         top_template = self.search_memory.beam[0]
-        class_log_ps = self.score_templates(batch, [top_template], train=False, for_augmentation=True)
+        class_log_ps = self.score_templates(batch, [top_template], train=False, for_augmentation=False)
         class_log_ps = class_log_ps.mean(dim=1)  # mean across the beam size.
         class_log_ps = class_log_ps.cpu().detach().numpy()
 

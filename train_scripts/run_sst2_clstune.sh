@@ -25,7 +25,7 @@ do
                     for f in ${!fewshot_sizes[@]};
                     do
                         fewshot_size=${fewshot_sizes[$f]}
-                        bash src/reference_implementations/prompt_zoo/fewshot_data_augmentation_lambda.sh \
+                        bash src/reference_implementations/prompt_zoo/fewshot_data_augmentation_lambda_clstune.sh \
                             EXP_TYPE=${exp} \
                             TASK=${task} \
                             SEED=${seed} \

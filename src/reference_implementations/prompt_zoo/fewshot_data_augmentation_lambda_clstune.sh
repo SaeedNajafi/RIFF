@@ -46,7 +46,7 @@ fi
 if [ "${TASK_NAME}" = "sst2" ]; then
 
     instruction_type="manual_template_research_sst2_with_instruction"
-    train_batch_size=4
+    train_batch_size=8
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
         instruction_type="manual_template_research_sst2_no_instruction"
         train_batch_size=2
@@ -61,11 +61,7 @@ elif [ "${TASK_NAME}" = "SetFit_sst5" ]; then
     fi
 fi
 
-ensembling="paraphrase_predict"
-if [ "${DATA_AUG}" = "0" ]; then
-        ensembling="no_ensemble"
-fi
-
+'''
 # train phase
 python -m src.reference_implementations.prompt_zoo.trainer \
     --train_batch_size ${train_batch_size} \
@@ -82,7 +78,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --model_path ${model_path} \
     --para_model_path ${model_path} \
     --checkpoint best_step \
-    --max_epochs 100 \
+    --max_epochs 20 \
     --learning_rate ${LEARN_RATE} \
     --training_steps 1000000 \
     --steps_per_checkpoint 8 \
@@ -94,16 +90,22 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --enable_data_augmentation ${DATA_AUG} \
     --enable_paraphrase_training ${TRAIN_PARAPHRASER} \
     --load_paraphraser ${LOAD_PARAPHRASER} \
-    --ensemble_type ${ensembling} \
+    --ensemble_type no_ensemble \
     --test_temperature 1.0 \
     --test_sample_size 8 \
     --metric_to_save ${METRIC_TO_SAVE} \
     --g_beam_size 1 \
     --top_k 20
+'''
+
+ensembling="paraphrase_predict"
+if [ "${DATA_AUG}" = "0" ]; then
+        ensembling="no_ensemble"
+fi
 
 # test phase
 python -m src.reference_implementations.prompt_zoo.trainer \
-    --eval_batch_size 16 \
+    --eval_batch_size 4 \
     --mode test \
     --seed ${RANDOM_SEED} \
     --task_name ${TASK_NAME} \

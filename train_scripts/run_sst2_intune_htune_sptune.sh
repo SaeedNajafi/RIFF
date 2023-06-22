@@ -1,8 +1,8 @@
 #!/bin/bash
 
 rates=(0.001)
-exps=(soft_prompt_finetune input_finetune output_finetune)
-seeds=(11 42 1993 2023 12321)
+exps=(soft_prompt_finetune)
+seeds=(11)
 tasks=(sst2)
 augs=(1)
 fewshot_sizes=(32)
@@ -39,7 +39,7 @@ do
                             PARA_LOSS="dummy" \
                             SAMPLING_METHOD="dummy" \
                             SAMPLING_ALG="dummy" \
-                            METRIC_TO_SAVE=original_accuracy \
+                            METRIC_TO_SAVE=all_accuracy \
                             KL_COEFFICIENT=0.0
                     done
                 done
