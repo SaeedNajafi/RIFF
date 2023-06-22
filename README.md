@@ -27,3 +27,10 @@ You can also get pre-commit to fix your code
 ```
 pre-commit run
 ```
+
+# Running the Experiment on the Narval Cluster.
+```
+bash train_scripts/run_augmentation_experiments.sh \
+    TIME=0-3:00 AUG=0 LR=0.001 EXP_TYPE=soft_prompt_finetune \
+    TASK=sst2 FEWSHOT_SIZE=32 CLUSTER_NAME=narval NUM_CLASSES=2
+```
