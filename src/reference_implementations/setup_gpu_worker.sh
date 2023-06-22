@@ -12,14 +12,8 @@ done
 echo "Hostname: $(hostname -s)"
 echo "Node Rank ${SLURM_PROCID}"
 
-if [ "${CLUSTER_NAME}" = "narval" ]; then
-    # prepare environment in the narval cluster.
-    module load python/3.9.6 StdEnv/2020 gcc/9.3.0 cuda/11.4 arrow/11.0.0
+if [ "${CLUSTER_NAME}" = "vcluster" ]; then
     source ${VIRTUAL_ENV}/bin/activate
-
-elif [ "${CLUSTER_NAME}" = "vcluster" ]; then
-    source ${VIRTUAL_ENV}/bin/activate
-
 fi
 
 echo "Using Python from: $(which python)"

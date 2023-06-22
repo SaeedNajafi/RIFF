@@ -127,11 +127,25 @@ class SearchRoberta(MyBaseLM):
     def __init__(self, seed: int, task_name: str, enable_data_augmentation: int, load_paraphraser: int) -> None:
         super().__init__(seed, device=0)
 
+        NARVAL_PATH = "/home/saeednjf/scratch/paraphrase_inputs_for_prompts/models"
+
         # construct tokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(FLAGS.pretrained_model)
+        try:
+            # construct tokenizer.
+            self.tokenizer = AutoTokenizer.from_pretrained(FLAGS.pretrained_model)
+        except Exception:
+            self.tokenizer = AutoTokenizer.from_pretrained(f"{NARVAL_PATH}/roberta-large-tokenizer")
 
         # construct the underlying roberta model
-        self.model_pool["roberta_model"] = RobertaForMaskedLM.from_pretrained(FLAGS.pretrained_model)
+        try:
+            roberta_model = RobertaForMaskedLM.from_pretrained(FLAGS.pretrained_model)
+        except Exception:
+            # load the local pre-trained model on narval.
+            # path to the local pre-trained models on the narval cluster.
+            path = f"{NARVAL_PATH}/roberta-large-masked-lm"
+            roberta_model = RobertaForMaskedLM.from_pretrained(path)
+
+        self.model_pool["roberta_model"] = roberta_model
 
         if task_name == "sst2":
             initial_template = "In this task, you are given sentences from movie reviews. \

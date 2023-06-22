@@ -60,9 +60,11 @@ METRIC_TO_SAVE=${16}
 
 KL_COEFFICIENT=${17}
 
-PARA_MODEL_PATH=${18}
+CLUSTER_NAME=${18}
 
-CLUSTER_NAME=${19}
+PARA_MODEL_PATH=${19}
+
+
 
 echo "Placing logs in: ${LOG_DIR}"
 echo "World size: ${SLURM_NTASKS}"
@@ -74,7 +76,7 @@ echo "GPUs per node: ${NUM_GPUs}"
 mkdir -p "${LOG_DIR}"
 
 # Run on all nodes
-/opt/slurm/bin/srun -N"${SLURM_NNODES}" -l \
+srun -N"${SLURM_NNODES}" -l \
     bash -c "bash ${SCRIPT} \
             CLUSTER_NAME=${CLUSTER_NAME} \
             EXP_TYPE=${EXP_TYPE} LR=${LR} \

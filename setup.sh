@@ -80,6 +80,7 @@ function install_ml_libraries () {
 		python -m pip install --no-index torch torchvision torchtext torchaudio
 		module load StdEnv/2020  gcc/9.3.0  cuda/11.4 arrow/11.0.0
 		python -m pip install pyarrow
+		python -m pip install datasets
 	fi
 }
 
@@ -97,7 +98,7 @@ function install_prompt_package () {
 
 function install_reference_methods () {
 	if [ "$ENV_NAME" = "prompt_torch" ]; then
-		python -m pip install transformers datasets sentencepiece nltk evaluate bert-score supar pandas scikit-learn
+		python -m pip install transformers datasets sentencepiece nltk evaluate bert-score supar pandas scikit-learn tensorboard absl-py
 
 	fi
 

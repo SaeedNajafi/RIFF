@@ -53,8 +53,9 @@ if [ "${CLUSTER_NAME}" = "narval" ]; then
             ${SAMPLING_ALG} \
             ${METRIC_TO_SAVE} \
             ${KL_COEFFICIENT} \
-            ${PARA_MODEL_PATH} \
-            ${CLUSTER_NAME}
+            ${CLUSTER_NAME} \
+            ${PARA_MODEL_PATH}
+
 
 elif [ "${CLUSTER_NAME}" = "vcluster" ]; then
     sbatch \
@@ -79,8 +80,9 @@ elif [ "${CLUSTER_NAME}" = "vcluster" ]; then
             ${SAMPLING_ALG} \
             ${METRIC_TO_SAVE} \
             ${KL_COEFFICIENT} \
-            ${PARA_MODEL_PATH} \
-            ${CLUSTER_NAME}
+            ${CLUSTER_NAME} \
+            ${PARA_MODEL_PATH}
+
 
 elif [ "${CLUSTER_NAME}" = "linux" ]; then
     bash ${SCRIPT} \

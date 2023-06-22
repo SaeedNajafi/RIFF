@@ -77,6 +77,9 @@ flags.DEFINE_float(
 flags.DEFINE_integer("classifier_hidden_d", 128, "The number of hidden units used in the classifier.")
 flags.DEFINE_integer("num_classes", 3, "Number of classes for classification. Only used in linear classifier.")
 
+# path to the local pre-trained models on the narval cluster.
+NARVAL_PATH = "/home/saeednjf/scratch/paraphrase_inputs_for_prompts/models"
+
 
 class MyBaseLM(torch.nn.Module):
     """Base LM class for different finetuning + prompt-tuning experiments."""
@@ -359,8 +362,14 @@ class Paraphraser(MyBaseLM):
         super().__init__(seed, device)
 
         # construct tokenizer
-        self.tokenizer = BartTokenizer.from_pretrained(paraphrase_model_name)
-        self.model_pool["bart_model"] = BartForConditionalGeneration.from_pretrained(paraphrase_model_name)
+        try:
+            self.tokenizer = BartTokenizer.from_pretrained(paraphrase_model_name)
+            self.model_pool["bart_model"] = BartForConditionalGeneration.from_pretrained(paraphrase_model_name)
+        except Exception:
+            # for narval cluster.
+            path = f"{NARVAL_PATH}/stanford-oval/paraphraser-bart-large"
+            self.tokenizer = BartTokenizer.from_pretrained(path)
+            self.model_pool["bart_model"] = BartForConditionalGeneration.from_pretrained(path)
         self.fixed = fixed
 
         self.setup_models()
@@ -441,21 +450,32 @@ class RobertaPrompted(MyBaseLM):
     ) -> None:
         super().__init__(seed, device=0)
 
-        # construct tokenizer.
-        self.tokenizer = AutoTokenizer.from_pretrained(FLAGS.pretrained_model)
+        try:
+            # construct tokenizer.
+            self.tokenizer = AutoTokenizer.from_pretrained(FLAGS.pretrained_model)
+        except Exception:
+            self.tokenizer = AutoTokenizer.from_pretrained(f"{NARVAL_PATH}/roberta-large-tokenizer")
 
         # construct the underlying model
         if FLAGS.exp_type == "soft_prompt_finetune":
             self.model_pool["roberta_model"] = create_softprompt_roberta()
 
         elif FLAGS.exp_type == "classifier_finetune":
-            self.model_pool["roberta_model"] = RobertaModel.from_pretrained(FLAGS.pretrained_model)
+            try:
+                self.model_pool["roberta_model"] = RobertaModel.from_pretrained(FLAGS.pretrained_model)
+            except Exception:
+                path = f"{NARVAL_PATH}/roberta-large-model"
+                self.model_pool["roberta_model"] = RobertaModel.from_pretrained(path)
 
             # use the d_model from the LM config defined internally from huggingface.
             self.model_pool["classifier_model"] = FFClassifier(self.model_pool["roberta_model"].config.hidden_size)
         else:
-            # construct the underlying model.
-            self.model_pool["roberta_model"] = RobertaForMaskedLM.from_pretrained(FLAGS.pretrained_model)
+            try:
+                # construct the underlying model.
+                self.model_pool["roberta_model"] = RobertaForMaskedLM.from_pretrained(FLAGS.pretrained_model)
+            except Exception:
+                path = f"{NARVAL_PATH}/roberta-large-masked-lm"
+                self.model_pool["roberta_model"] = RobertaForMaskedLM.from_pretrained(path)
 
         self.enable_data_augmentation = enable_data_augmentation
         self.enable_paraphrase_training = enable_paraphrase_training
