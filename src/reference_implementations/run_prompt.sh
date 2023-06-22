@@ -35,7 +35,7 @@ if [ "${CLUSTER_NAME}" = "narval" ]; then
         --account=def-afyshe-ab \
         --gres=gpu:a100:1 \
         --time=${TIME} \
-        ./run_prompt.slrm \
+        src/reference_implementations/run_prompt.slrm \
             ${SCRIPT} \
             ${LOG_DIR} \
             ${EXP_TYPE} \
@@ -61,7 +61,7 @@ elif [ "${CLUSTER_NAME}" = "vcluster" ]; then
         --gres=gpu:1 \
         --partition=a40 \
         --qos=normal \
-        ./run_prompt.slrm \
+        src/reference_implementations/run_prompt.slrm \
             ${SCRIPT} \
             ${LOG_DIR} \
             ${EXP_TYPE} \
