@@ -47,7 +47,7 @@ fi
 if [ "${TASK_NAME}" = "sst2" ]; then
 
     instruction_type="manual_template_research_sst2_with_instruction"
-    train_batch_size=8
+    train_batch_size=2
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
         instruction_type="manual_template_research_sst2_no_instruction"
         train_batch_size=2
@@ -55,17 +55,22 @@ if [ "${TASK_NAME}" = "sst2" ]; then
 
 elif [ "${TASK_NAME}" = "SetFit_sst5" ]; then
     instruction_type="manual_template_research_sst5_with_instruction"
-    train_batch_size=8
+    train_batch_size=2
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
         instruction_type="manual_template_research_sst5_no_instruction"
         train_batch_size=2
     fi
 fi
 
+ensembling="paraphrase_predict"
+if [ "${DATA_AUG}" = "0" ]; then
+        ensembling="no_ensemble"
+fi
+
 # train phase
 python -m src.reference_implementations.prompt_zoo.trainer \
     --train_batch_size ${train_batch_size} \
-    --eval_batch_size 32 \
+    --eval_batch_size 8 \
     --mode train \
     --seed ${RANDOM_SEED} \
     --task_name ${TASK_NAME} \
@@ -78,7 +83,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --model_path ${model_path} \
     --para_model_path ${model_path} \
     --checkpoint best_step \
-    --max_epochs 20 \
+    --max_epochs 100 \
     --learning_rate ${LEARN_RATE} \
     --training_steps 1000000 \
     --steps_per_checkpoint 8 \
@@ -90,21 +95,16 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --enable_data_augmentation ${DATA_AUG} \
     --enable_paraphrase_training ${TRAIN_PARAPHRASER} \
     --load_paraphraser ${LOAD_PARAPHRASER} \
-    --ensemble_type no_ensemble \
+    --ensemble_type ${ensembling} \
     --test_temperature 1.0 \
     --test_sample_size 8 \
     --metric_to_save ${METRIC_TO_SAVE} \
     --g_beam_size 1 \
     --top_k 20
 
-ensembling="paraphrase_predict"
-if [ "${DATA_AUG}" = "0" ]; then
-        ensembling="no_ensemble"
-fi
-
 # test phase
 python -m src.reference_implementations.prompt_zoo.trainer \
-    --eval_batch_size 32 \
+    --eval_batch_size 8 \
     --mode test \
     --seed ${RANDOM_SEED} \
     --task_name ${TASK_NAME} \
