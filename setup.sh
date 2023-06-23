@@ -61,8 +61,6 @@ function install_ml_libraries () {
 	elif [ "$OS" = "vcluster" ]; then
 		python -m pip install tensorflow-gpu==2.11.0
 		python -m pip install torch torchvision torchaudio
-		# download apex from https://github.com/SaeedNajafi/VectorWorkshop
-		tar xf apex.tar.gz -C ./$ENV_NAME-env/lib/python3.9/site-packages/
 
 	elif [ "$OS" = "cirrus" ]; then
 		python -m pip install tensorflow-gpu==2.11.0

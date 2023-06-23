@@ -370,13 +370,13 @@ def create_sentiment_dataset(
     if shuffle:
         # this is training phase.
         dataloader = DataLoader(
-            dataset, batch_size=FLAGS.train_batch_size, shuffle=True, pinned_memory=True, num_workers=3
+            dataset, batch_size=FLAGS.train_batch_size, shuffle=True, pin_memory=True, num_workers=3
         )
     else:
         # this is inference phase.
         # keep repeated inputs in the same batch:
         FLAGS.eval_batch_size *= FLAGS.num_classes
         dataloader = DataLoader(
-            dataset, batch_size=FLAGS.eval_batch_size, shuffle=False, pinned_memory=True, num_workers=3
+            dataset, batch_size=FLAGS.eval_batch_size, shuffle=False, pin_memory=True, num_workers=3
         )
     return dataloader
