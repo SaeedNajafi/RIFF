@@ -1,5 +1,6 @@
 #!/bin/bash
 
+:'
 rates=(0.00001)
 exps=(all_finetune)
 seeds=(11 42 1993 2023 12321)
@@ -99,10 +100,12 @@ do
         done
     done
 done
+'
 
 rates=(0.001)
 exps=(soft_prompt_finetune)
-seeds=(11 42 1993 2023 12321)
+#seeds=(11 42 1993 2023 12321)
+seeds=(11)
 tasks=(sst2)
 augs=(0 1)
 fewshot_sizes=(32)
@@ -150,7 +153,7 @@ do
     done
 done
 
-
+:'
 rates=(0.01)
 exps=(classifier_finetune)
 seeds=(11 42 1993 2023 12321)
@@ -250,3 +253,4 @@ do
         done
     done
 done
+'

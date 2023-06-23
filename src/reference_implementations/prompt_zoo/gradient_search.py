@@ -123,7 +123,14 @@ class SearchRoberta(RobertaPrompted):
     them during training.
     """
 
-    def __init__(self, seed: int, task_name: str, enable_data_augmentation: int, enable_paraphrase_training: int, load_paraphraser: int) -> None:
+    def __init__(
+        self,
+        seed: int,
+        task_name: str,
+        enable_data_augmentation: int,
+        enable_paraphrase_training: int,
+        load_paraphraser: int,
+    ) -> None:
         super().__init__(seed, enable_data_augmentation, enable_paraphrase_training, load_paraphraser)
 
         if task_name == "sst2":
@@ -197,7 +204,7 @@ class SearchRoberta(RobertaPrompted):
         """The train loop for gradient-search method."""
         if self.enable_data_augmentation == 1:
             potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
-            paraphrases = draw_samples_for_augmentation(self, batch: torch.utils.data.Dataset)
+            paraphrases = self.draw_samples_for_augmentation(batch)
             augment_batch(
                 batch,
                 paraphrases,

@@ -30,6 +30,7 @@ TIME=${TIME}
 SCRIPT=${SCRIPT}
 LOG_DIR=${LOG_DIR}
 
+
 if [ "${CLUSTER_NAME}" = "narval" ]; then
     sbatch \
         --account=def-afyshe-ab \

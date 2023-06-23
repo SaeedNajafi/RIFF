@@ -2,10 +2,10 @@
 experiment type with the LM."""
 
 from typing import Dict, Optional
+
 import apex
 import torch
 from absl import flags
-from torch.optim import AdamW
 from torch.optim.optimizer import Optimizer
 
 FLAGS = flags.FLAGS
