@@ -67,6 +67,11 @@ function install_ml_libraries () {
 		# Installs torch for python 3.9.10 and cuda 11.3. These are fixed for cluster cuda version.
 		pip install torch==1.12.1+cu113 torchvision==0.13.1+cu113 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu113 --no-cache-dir
 
+		git clone https://github.com/NVIDIA/apex
+		cd apex
+		python -m pip install -v --disable-pip-version-check --no-cache-dir --no-build-isolation --config-settings "--build-option=--cpp_ext" --config-settings "--build-option=--cuda_ext" ./
+		python -m pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
+
 		# Installs the jax wheel compatible with Cuda >= 11.1 and cudnn >= 8.0.5. These are fixed for cluster cuda version.
 		pip install "jax[cuda11_cudnn805]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 
@@ -78,6 +83,10 @@ function install_ml_libraries () {
 	elif [ "$OS" = "narval" ]; then
 		python -m pip install --no-index tensorflow==2.11.0
 		python -m pip install --no-index torch torchvision torchtext torchaudio
+		git clone https://github.com/NVIDIA/apex
+		cd apex
+		python -m pip install -v --disable-pip-version-check --no-cache-dir --no-build-isolation --config-settings "--build-option=--cpp_ext" --config-settings "--build-option=--cuda_ext" ./
+		python -m pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
 		module load StdEnv/2020  gcc/9.3.0  cuda/11.4 arrow/11.0.0
 		python -m pip install pyarrow
 		python -m pip install datasets

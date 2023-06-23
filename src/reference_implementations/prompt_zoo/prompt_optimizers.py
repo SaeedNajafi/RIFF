@@ -2,7 +2,7 @@
 experiment type with the LM."""
 
 from typing import Dict, Optional
-
+import apex
 import torch
 from absl import flags
 from torch.optim import AdamW
@@ -23,7 +23,9 @@ def construct_optimizer(model: torch.nn.Module, second_model: Optional[torch.nn.
         # concatinate the second module parameters and register in the optimizer.
         params += list(second_model.parameters())
 
-    optimizer = AdamW(params, lr=FLAGS.learning_rate, weight_decay=FLAGS.weight_decay_rate, amsgrad=True)
+    # speedups with apex
+    # https://nvidia.github.io/apex/optimizers.html
+    optimizer = apex.optimizers.FusedAdam(params, lr=FLAGS.learning_rate, weight_decay=FLAGS.weight_decay_rate)
 
     return optimizer
 
