@@ -44,6 +44,7 @@ def input_embeddings_opt(opt_args: OPTIMIZER_ARGS_TYPE) -> Optimizer:
 
     model: torch.nn.Module = opt_args["roberta_model"]
     for name, param in model.named_parameters():
+        name = name.removeprefix("_orig_mod.")  # remove prefix of compiled model.
         if name in [
             "roberta.embeddings.word_embeddings.weight",
             "roberta.embeddings.LayerNorm.weight",
@@ -62,6 +63,7 @@ def output_embeddings_opt(opt_args: OPTIMIZER_ARGS_TYPE) -> Optimizer:
 
     model: torch.nn.Module = opt_args["roberta_model"]
     for name, param in model.named_parameters():
+        name = name.removeprefix("_orig_mod.")  # remove prefix of compiled model.
         if name in [
             "lm_head.dense.weight",
             "lm_head.dense.bias",
@@ -112,6 +114,7 @@ def prompt_model_opt(opt_args: OPTIMIZER_ARGS_TYPE) -> Optimizer:
 
     model: torch.nn.Module = opt_args["roberta_model"]
     for name, param in model.named_parameters():
+        name = name.removeprefix("_orig_mod.")  # remove prefix of compiled model.
         if name == "roberta.embeddings.word_embeddings.prompt_embedder.weight":
             param.requires_grad = True
         else:

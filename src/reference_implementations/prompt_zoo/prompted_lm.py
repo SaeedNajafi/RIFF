@@ -110,6 +110,9 @@ class MyBaseLM(torch.nn.Module):
         for model_name, model in self.model_pool.items():
             model.to(self.device)
 
+            # compile the pytorch model for speedup.
+            self.model_pool[model_name] = torch.compile(model)
+
         self.loss_func = self.loss_func.to(self.device)
 
     def load_from_checkpoint(self, model_path: Optional[str] = None) -> None:

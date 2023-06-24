@@ -8,6 +8,7 @@ training/inference.
 import csv
 import io
 import os
+import time
 from typing import Any, Callable, Dict, Iterator, Optional, Tuple
 
 import numpy as np
@@ -75,6 +76,7 @@ def train_model(
 ) -> None:
     """Run the model on input data; for training or inference."""
     if FLAGS.mode == "train":
+        start_time = time.time()
         writer = SummaryWriter(FLAGS.model_path)
         epoch = 0
         global_step = 0
@@ -143,6 +145,8 @@ def train_model(
 
         # delete the eval_file
         os.remove(eval_file)
+        end_time = time.time()
+        print(f"Training finished in {end_time - start_time} seconds!")
     else:
         raise Exception(f"the mode {FLAGS.mode} is not for training.")
 
@@ -168,7 +172,13 @@ def launch_test_or_train() -> None:
     """Launch the testing or training phase for the prompting experiments."""
 
     if FLAGS.exp_type == "gradient_search":
-        model = SearchRoberta(FLAGS.seed, FLAGS.task_name, FLAGS.enable_data_augmentation, FLAGS.load_paraphraser)
+        model = SearchRoberta(
+            FLAGS.seed,
+            FLAGS.task_name,
+            FLAGS.enable_data_augmentation,
+            FLAGS.enable_paraphrase_training,
+            FLAGS.load_paraphraser,
+        )
         eval_repeat_input = True
     elif FLAGS.exp_type == "classifier_finetune":
         model = ClassifierLM(
