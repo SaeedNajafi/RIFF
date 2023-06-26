@@ -23,7 +23,7 @@ def construct_optimizer(model: torch.nn.Module, second_model: Optional[torch.nn.
         # concatinate the second module parameters and register in the optimizer.
         params += list(second_model.parameters())
 
-    optimizer = AdamW(params, lr=FLAGS.learning_rate, weight_decay=FLAGS.weight_decay_rate, amsgrad=True)
+    optimizer = AdamW(params, lr=FLAGS.learning_rate, weight_decay=FLAGS.weight_decay_rate, amsgrad=True, fused=True)
 
     return optimizer
 
