@@ -2,7 +2,7 @@
 pytorch datasets."""
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import torch
 from absl import flags
@@ -126,7 +126,7 @@ def template_data(
     class_to_id: Dict[str, int],
     sentences: List[str],
     labels: List[str],
-    repeat_input: bool,
+    repeat_input: Optional[bool] = False,
 ) -> SentimentRawData:
     """Helper function to format the data for the models.
 
@@ -212,7 +212,9 @@ def template_data(
     )
 
 
-def read_sst_sentiment_file(split_name: str, task_name: str, repeat_input: bool = False) -> SentimentRawData:
+def read_sst_sentiment_file(
+    split_name: str, task_name: str, eval_repeat_input: Optional[bool] = False
+) -> Tuple[Union[SentimentRawData, None], Union[SentimentRawData, None]]:
     """Load the sst sentiment analysis split for train, validation or test."""
     assert split_name in {"train", "validation", "test"}
     if task_name == "SetFit_sst5":
@@ -251,27 +253,47 @@ def read_sst_sentiment_file(split_name: str, task_name: str, repeat_input: bool 
             remove_columns=["text", "label", "label_text"],
         )
 
-    if FLAGS.classification_type == "fewshot" and split_name not in ["validation", "test"]:
-        new_dataset = new_dataset.shuffle(FLAGS.seed)
-
-    if task_name == "sst2":
-        label_counter = {val: 0 for val in sst2_mapping.values()}
-    elif task_name == "SetFit_sst5":
-        label_counter = {val: 0 for val in sst5_mapping.values()}
-
-    sentences = []
-    labels = []
-    for row in new_dataset:
-        label_counter[row["sentiment"]] = label_counter.get(row["sentiment"], 0) + 1
-        if FLAGS.classification_type == "fewshot" and split_name not in ["validation", "test"]:
-            if label_counter[row["sentiment"]] <= FLAGS.fewshot_sample_size:
-                sentences.append(row["sentence"])
-                labels.append(row["sentiment"])
-        else:
+    if split_name in ["validation", "test"]:
+        sentences = []
+        labels = []
+        for row in new_dataset:
             sentences.append(row["sentence"])
             labels.append(row["sentiment"])
+        return None, template_data(class_to_id, sentences, labels, eval_repeat_input)
 
-    return template_data(class_to_id, sentences, labels, repeat_input)
+    elif FLAGS.classification_type == "fewshot":
+        new_dataset = new_dataset.shuffle(FLAGS.seed)
+        # train for fewshot.
+        if task_name == "sst2":
+            label_counter = {val: 0 for val in sst2_mapping.values()}
+        elif task_name == "SetFit_sst5":
+            label_counter = {val: 0 for val in sst5_mapping.values()}
+
+        train_sentences = []
+        train_labels = []
+        val_sentences = []
+        val_labels = []
+        for row in new_dataset:
+            label_counter[row["sentiment"]] = label_counter.get(row["sentiment"], 0) + 1
+            if label_counter[row["sentiment"]] <= FLAGS.fewshot_sample_size:
+                train_sentences.append(row["sentence"])
+                train_labels.append(row["sentiment"])
+            elif (FLAGS.fewshot_sample_size + 1) <= label_counter[row["sentiment"]] <= FLAGS.fewshot_sample_size * 2:
+                val_sentences.append(row["sentence"])
+                val_labels.append(row["sentiment"])
+
+        return template_data(class_to_id, train_sentences, train_labels, False), template_data(
+            class_to_id, val_sentences, val_labels, eval_repeat_input
+        )
+
+    else:
+        # this is train split for fullshot.
+        sentences = []
+        labels = []
+        for row in new_dataset:
+            sentences.append(row["sentence"])
+            labels.append(row["sentiment"])
+        return template_data(class_to_id, sentences, labels, False), None
 
 
 class SentimentDataset(Dataset):
@@ -354,29 +376,31 @@ def create_sentiment_dataset(
     tokenizer: AutoTokenizer,
     file_name: str,
     task_name: str,
-    shuffle: bool,
-    repeat_input: bool = False,
+    eval_repeat_input: Optional[bool] = False,
     para_tokenizer: Optional[T5Tokenizer] = None,
-) -> DataLoader:
+) -> Tuple[DataLoader, DataLoader]:
     """Function to create the required huggingface dataset to train the T5
     models on the sentiment analysis task."""
 
     if task_name in ["sst2", "SetFit_sst5"]:
-        rawdata = read_sst_sentiment_file(file_name, task_name, repeat_input)
+        train_rawdata, eval_rawdata = read_sst_sentiment_file(file_name, task_name, eval_repeat_input)
     else:
         raise Exception(f"this {task_name} is not supported!")
 
-    dataset = tokenize_data(rawdata, tokenizer, para_tokenizer)
-    if shuffle:
+    train_dataloader = None
+    eval_dataloader = None
+    if train_rawdata is not None:
+        train_dataset = tokenize_data(train_rawdata, tokenizer, para_tokenizer)
         # this is training phase.
-        dataloader = DataLoader(
-            dataset, batch_size=FLAGS.train_batch_size, shuffle=True, pin_memory=True, num_workers=3
+        train_dataloader = DataLoader(
+            train_dataset, batch_size=FLAGS.train_batch_size, shuffle=True, pin_memory=True, num_workers=3
         )
-    else:
+    if eval_rawdata is not None:
+        eval_dataset = tokenize_data(eval_rawdata, tokenizer, para_tokenizer)
         # this is inference phase.
         # keep repeated inputs in the same batch:
         FLAGS.eval_batch_size *= FLAGS.num_classes
-        dataloader = DataLoader(
-            dataset, batch_size=FLAGS.eval_batch_size, shuffle=False, pin_memory=True, num_workers=3
+        eval_dataloader = DataLoader(
+            eval_dataset, batch_size=FLAGS.eval_batch_size, shuffle=False, pin_memory=True, num_workers=3
         )
-    return dataloader
+    return train_dataloader, eval_dataloader

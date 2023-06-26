@@ -204,25 +204,28 @@ def launch_test_or_train() -> None:
         para_tokenizer = model.para_tokenizer
 
     if FLAGS.mode == "train":
-        train_dataloader = create_sentiment_dataset(
-            tokenizer=model.tokenizer,
-            file_name=FLAGS.train_file,
-            task_name=FLAGS.task_name,
-            shuffle=True,
-            repeat_input=False,
-            para_tokenizer=para_tokenizer,
-        )
-
-        # for fewshot experiments, sample the same number of examples as the validation data.
-        eval_file = FLAGS.train_file if FLAGS.classification_type == "fewshot" else FLAGS.dev_file
-        eval_dataloader = create_sentiment_dataset(
-            tokenizer=model.tokenizer,
-            file_name=eval_file,
-            task_name=FLAGS.task_name,
-            shuffle=False,
-            repeat_input=eval_repeat_input,
-            para_tokenizer=para_tokenizer,
-        )
+        if FLAGS.classification_type == "fewshot":
+            train_dataloader, eval_dataloader = create_sentiment_dataset(
+                tokenizer=model.tokenizer,
+                file_name=FLAGS.train_file,
+                task_name=FLAGS.task_name,
+                eval_repeat_input=eval_repeat_input,
+                para_tokenizer=para_tokenizer,
+            )
+        else:
+            train_dataloader, _ = create_sentiment_dataset(
+                tokenizer=model.tokenizer,
+                file_name=FLAGS.train_file,
+                task_name=FLAGS.task_name,
+                para_tokenizer=para_tokenizer,
+            )
+            _, eval_dataloader = create_sentiment_dataset(
+                tokenizer=model.tokenizer,
+                file_name=FLAGS.dev_file,
+                task_name=FLAGS.task_name,
+                eval_repeat_input=eval_repeat_input,
+                para_tokenizer=para_tokenizer,
+            )
         train_model(
             model=model,
             metric=sentiment_metric,
@@ -231,12 +234,11 @@ def launch_test_or_train() -> None:
         )
 
     elif FLAGS.mode in ["test", "inference", "eval", "no_finetune_test"]:
-        test_dataloader = create_sentiment_dataset(
+        _, test_dataloader = create_sentiment_dataset(
             tokenizer=model.tokenizer,
             file_name=FLAGS.test_file,
             task_name=FLAGS.task_name,
-            shuffle=False,
-            repeat_input=eval_repeat_input,
+            eval_repeat_input=eval_repeat_input,
             para_tokenizer=para_tokenizer,
         )
         test_model(model=model, metric=sentiment_metric, test_dataloader=test_dataloader)
