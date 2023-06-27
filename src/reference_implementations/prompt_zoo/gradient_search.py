@@ -144,6 +144,11 @@ class SearchRoberta(RobertaPrompted):
         instruct_ids = self.tokenizer(white_space_fix(initial_template), add_special_tokens=False)["input_ids"]
         self.search_memory = PromptSearchMemory(instruct_ids)
 
+        if FLAGS.mode in ["test", "inference", "eval"]:
+            # load from the given checkpoint.
+            # search memory is now defined, and it can be used.
+            self.load_from_checkpoint()
+
     def load_from_checkpoint(self, model_path: Optional[str] = None) -> None:
         """Load the optimized prompt templates from the specified checkpoint
         name and update the internal beam."""

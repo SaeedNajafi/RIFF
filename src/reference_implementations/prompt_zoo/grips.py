@@ -12,7 +12,7 @@ import os
 import pickle
 import string
 from dataclasses import dataclass
-from typing import Any, Dict, Iterator, List, Tuple, Union
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 import nltk
 import numpy as np
@@ -21,10 +21,11 @@ from absl import flags
 from nltk.tokenize import sent_tokenize, word_tokenize
 from nltk.tokenize.treebank import TreebankWordDetokenizer
 from supar import Parser
-from transformers import PegasusForConditionalGeneration, PegasusTokenizer, T5ForConditionalGeneration, T5Tokenizer
+from transformers import PegasusForConditionalGeneration, PegasusTokenizer
 
+from src.reference_implementations.prompt_zoo.data_utility import augment_batch
 from src.reference_implementations.prompt_zoo.metrics import grips_sentiment_metric
-from src.reference_implementations.prompt_zoo.prompted_t5 import MyBaseT5
+from src.reference_implementations.prompt_zoo.prompted_lm import RobertaPrompted
 
 FLAGS = flags.FLAGS
 
@@ -33,11 +34,6 @@ flags.DEFINE_string("level", default="phrase", help="level at which edit operati
 flags.DEFINE_string("meta_dir", default="grips_logs/", help="folder location to store metadata of search")
 flags.DEFINE_string("meta_name", default="search.txt", help="file name to store metadata of search")
 flags.DEFINE_integer("num_candidates", default=5, help="Number of candidates in each iteration (m)")
-flags.DEFINE_string(
-    "grips_initial_prompt",
-    "In this task, your job is to generate the sentiment of the next sentence in the output.",
-    "An initial instruction to append to the start of the sentence.",
-)
 
 nltk.download("punkt")
 
@@ -56,13 +52,30 @@ class GripsPromptTemplate:
     score: float
 
 
-class GRIPSSearch(MyBaseT5):
+class GRIPSSearch(RobertaPrompted):
     """GRIPS: Gradient-free, Edit-based Instruction Search for
-    Prompting Large Language Models over T5 large language model."""
+    Prompting Large Language Models over Roberta-large language model."""
 
-    def __init__(self, edit_operations: List[str] = ["del", "swap", "sub", "add"]) -> None:
+    def __init__(
+        self,
+        seed: int,
+        task_name: str,
+        enable_data_augmentation: int,
+        enable_paraphrase_training: int,
+        load_paraphraser: int,
+        edit_operations: List[str] = ["del", "swap", "sub", "add"],
+    ) -> None:
         """This initializes parser used to extract phrases."""
-        super().__init__()
+        super().__init__(seed, enable_data_augmentation, enable_paraphrase_training, load_paraphraser)
+
+        if task_name == "sst2":
+            initial_template = "In this task, you are given sentences from movie reviews. \
+                The task is to classify a sentence as 'great' if the sentiment of the \
+                    sentence is positive or as 'terrible' if the sentiment of the sentence is negative."
+        elif task_name == "SetFit_sst5":
+            initial_template = "In this task, you are given sentences from movie reviews. \
+            Based on the given review, classify it to one of the five classes: \
+                (1) terrible, (2) bad, (3) okay, (4) good, and (5) great."
 
         # space of edit ops to be considered
         self.edit_operations = edit_operations
@@ -73,25 +86,20 @@ class GRIPSSearch(MyBaseT5):
         self.parser = Parser.load("crf-con-en")
         self.use_add = "add" in self.edit_operations
 
-        # construct main T5 tokenizer.
-        self.tokenizer = T5Tokenizer.from_pretrained(FLAGS.t5_pretrained_model)
-
-        # construct the underlying main T5 model.
-        t5_model = T5ForConditionalGeneration.from_pretrained(FLAGS.t5_pretrained_model)
-
-        self.model_pool["t5_model"] = t5_model
-
         if "sub" in self.edit_operations:
             # the paraphrase model used by the GRIPS paper.
             para_model_name = "tuner007/pegasus_paraphrase"
             # this is the tokenizer and the model for the paraphrase Pegasus.
-            self.para_tokenizer = PegasusTokenizer.from_pretrained(para_model_name)
-            self.para_model = PegasusForConditionalGeneration.from_pretrained(para_model_name).to(self.device)
+            self.grips_para_tokenizer = PegasusTokenizer.from_pretrained(para_model_name)
+            self.grips_para_model = PegasusForConditionalGeneration.from_pretrained(para_model_name).to(self.device)
 
         # initialize the base candidate into a prompt template.
-        self.run_pre_train_loop(FLAGS.grips_initial_prompt)
+        self.run_pre_train_loop(initial_template)
 
-        self.setup_models()
+        if FLAGS.mode in ["test", "inference", "eval"]:
+            # load from the given checkpoint.
+            # search memory is now defined, and it can be used.
+            self.load_from_checkpoint()
 
     def run_pre_train_loop(self, base_instruction: str) -> None:
         """Define the prompt template based on the given base candidate."""
@@ -126,7 +134,7 @@ class GRIPSSearch(MyBaseT5):
         self.current_candidate_template.tokens = instruction_ids
         self.current_candidate_template.score = -float("inf")
 
-    def load_from_checkpoint(self) -> None:
+    def load_from_checkpoint(self, model_path: Optional[str] = None) -> None:
         """Load the optimized prompt template from the specified checkpoint
         name and update the internal candidate."""
         m_path = FLAGS.model_path
@@ -143,11 +151,10 @@ class GRIPSSearch(MyBaseT5):
         except Exception as e:
             raise Exception("Could not load the checkpoint due to error:{}".format(e))
 
-    def save(self) -> None:
+    def save(self, checkpoint_name: str, model_path: Optional[str] = None) -> None:
         """Save the optimized prompt template to the model_path for the
         specified checkpoint name."""
         m_path = FLAGS.model_path
-        checkpoint_name = FLAGS.checkpoint
         if not os.path.exists(m_path):
             os.makedirs(m_path)
 
@@ -155,7 +162,10 @@ class GRIPSSearch(MyBaseT5):
             pickle.dump(self.current_candidate_template, outp, pickle.HIGHEST_PROTOCOL)
 
     def score_templates(
-        self, batch: torch.utils.data.Dataset, prompt_templates: List[GripsPromptTemplate]
+        self,
+        batch: torch.utils.data.Dataset,
+        prompt_templates: List[GripsPromptTemplate],
+        for_augmentation: Optional[bool] = False,
     ) -> torch.Tensor:
         """Run a forward computation over the batch for each prompt templates
         and compute the log probability over the batch for each prompt
@@ -165,32 +175,141 @@ class GRIPSSearch(MyBaseT5):
 
         # for grips, we always use the backbone LM for inference.
         # no need to compute gradients: train=False.
-        class_log_ps = self.forward_pass(batch, train=False, prompt_lists=prompt_lists)
+        class_log_ps = self.gradient_search_forward_pass(batch, train=False, prompt_lists=prompt_lists)
 
         template_scores = class_log_ps.view(batch_size, len(prompt_templates))
-        return template_scores
+        if not for_augmentation:
+            return template_scores
+        else:
+            # compute the correct objective for data augmentation.
+            orig_batch_size = batch_size // (FLAGS.test_sample_size + 1)
+            template_scores_arr = []
+            for idx in range(orig_batch_size):
+                idx_template_scores = template_scores[
+                    idx * (FLAGS.test_sample_size + 1) : (idx + 1) * (FLAGS.test_sample_size + 1), :
+                ]
+                idx_template_score = 0.5 * idx_template_scores[0, :] + 0.5 * torch.mean(
+                    idx_template_scores[1:, :], dim=0
+                )
+                template_scores_arr.append(idx_template_score)
+            return torch.stack(template_scores_arr, dim=0)
 
-    def predict(self, batch: torch.utils.data.Dataset) -> Iterator[Dict[str, Union[str, float]]]:
+    def grips_internal_predict(self, batch: torch.utils.data.Dataset) -> Iterator[Dict[str, Union[str, float]]]:
         """The main prediction loop for a given candidate over a batch from the
-        search set."""
-        class_log_ps = self.score_templates(batch, [self.current_candidate_template])
+        search set.
+        This function is used only during the training phase of grips.
+        """
+        inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
+        potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
+        if self.enable_data_augmentation == 1:
+            paraphrases = self.draw_samples_for_augmentation(batch)
+            augment_batch(
+                batch,
+                paraphrases,
+                self.tokenizer,
+                potentials_str,
+                num_return_seq=FLAGS.test_sample_size,
+                for_gradient_search=True,
+            )
+
+        class_log_ps = self.score_templates(batch, [self.current_candidate_template], for_augmentation=False)
         # mean across the prompt templates.
         # for grips, we only evaluate one candidate prompt template at a time, so the mean doesn't have an effect.
         class_log_ps = class_log_ps.mean(dim=1)
+        class_log_ps = class_log_ps.cpu().detach().numpy()
+
+        prompt_str = self.tokenizer.batch_decode(self.current_candidate_template.tokens, skip_special_tokens=True)
+        print("evaluating batch with prompt template:", prompt_str)
+
+        if self.enable_data_augmentation == 1:
+            for index, potential_str in enumerate(potentials_str):
+                scores = class_log_ps[
+                    index * (FLAGS.test_sample_size + 1) : (index + 1) * (FLAGS.test_sample_size + 1)
+                ]
+                avg_score = np.mean(scores[1:])
+                para_index = (index // FLAGS.num_classes) * FLAGS.num_classes
+                output_row = {
+                    "potential_class": potential_str.strip(),
+                    "prediction_score": 0.5 * avg_score + 0.5 * scores[0],
+                    "gold_class": batch["gold_classes"][index],
+                    "paraphrases": paraphrases[
+                        para_index * FLAGS.test_sample_size : (para_index + 1) * FLAGS.test_sample_size
+                    ],
+                    "original_inputs": inputs_str[index].strip(),
+                }
+                yield output_row
+
+        else:
+            for index, potential_class in enumerate(potentials_str):
+                output_row = {
+                    "potential_class": potential_class.strip(),
+                    "prediction_score": class_log_ps[index],
+                    "prompt_str": prompt_str,
+                    "original_inputs": inputs_str[index].strip(),
+                    "gold_class": batch["gold_classes"][index],
+                }
+                yield output_row
+
+    def no_ensemble_predict(self, batch: torch.utils.data.Dataset) -> Iterator[Dict[str, str]]:
+        """The main prediction loop for a given potential class label in the grips method."""
+        class_log_ps = self.score_templates(batch, [self.current_candidate_template], for_augmentation=False)
+        class_log_ps = class_log_ps.mean(dim=1)  # mean across the beam size.
         class_log_ps = class_log_ps.cpu().detach().numpy()
 
         # not efficient, but let's pair potential class along the prediction scores.
         # all transformer special tokens will be removed.
         # same labels have been repeated once per template in beam.
         potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
+        inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
         prompt_str = self.tokenizer.batch_decode(self.current_candidate_template.tokens, skip_special_tokens=True)
         print("evaluating batch with prompt template:", prompt_str)
         for index, potential_class in enumerate(potentials_str):
             output_row = {
-                "potential_class": potential_class,
-                "prediction_score": class_log_ps[index],
+                "potential_class": potential_class.strip(),
+                "original_prediction_score": class_log_ps[index],
                 "prompt_str": prompt_str,
+                "original_inputs": inputs_str[index].strip(),
                 "gold_class": batch["gold_classes"][index],
+            }
+            yield output_row
+
+    def paraphrase_and_predict(self, batch: torch.utils.data.Dataset) -> Iterator[Dict[str, str]]:
+        """The main prediction loop for a given potential class label using a
+        beam of templates and the paraphraser."""
+        inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
+        potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
+        paraphrases = self.para_model.generate_top_p_paraphrases(
+            batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
+        )
+        augment_batch(
+            batch,
+            paraphrases,
+            self.tokenizer,
+            potentials_str,
+            num_return_seq=FLAGS.test_sample_size,
+            for_gradient_search=True,
+        )
+
+        class_log_ps = self.score_templates(batch, [self.current_candidate_template], for_augmentation=False)
+        class_log_ps = class_log_ps.mean(dim=1)  # mean across the beam size.
+        class_log_ps = class_log_ps.cpu().detach().numpy()
+
+        prompt_str = self.tokenizer.batch_decode(self.current_candidate_template.tokens, skip_special_tokens=True)
+        print("evaluating batch with prompt template:", prompt_str)
+        for index, potential_str in enumerate(potentials_str):
+            scores = class_log_ps[index * (FLAGS.test_sample_size + 1) : (index + 1) * (FLAGS.test_sample_size + 1)]
+            avg_score = np.mean(scores[1:])
+            para_index = (index // FLAGS.num_classes) * FLAGS.num_classes
+            output_row = {
+                "potential_class": potential_str.strip(),
+                "prediction_score": avg_score,
+                "all_prediction_score": 0.5 * avg_score + 0.5 * scores[0],
+                "original_prediction_score": scores[0],
+                "gold_class": batch["gold_classes"][index],
+                "paraphrases": paraphrases[
+                    para_index * FLAGS.test_sample_size : (para_index + 1) * FLAGS.test_sample_size
+                ],
+                "original_inputs": inputs_str[index].strip(),
             }
             yield output_row
 
@@ -202,7 +321,7 @@ class GRIPSSearch(MyBaseT5):
         with io.open(prediction_file, mode="w", encoding="utf-8") as out_fp:
             writer = csv.writer(out_fp, quotechar='"', quoting=csv.QUOTE_ALL)
             header_written = False
-            for ret_row in self.predict(batch):
+            for ret_row in self.grips_internal_predict(batch):
                 if not header_written:
                     headers = ret_row.keys()
                     writer.writerow(headers)
@@ -419,17 +538,17 @@ class GRIPSSearch(MyBaseT5):
 
         This is useful to support the substitution operation.
         """
-        paraphrase_batch = self.para_tokenizer(
+        paraphrase_batch = self.grips_para_tokenizer(
             [input_text], truncation=True, padding="longest", max_length=60, return_tensors="pt"
         ).to(self.device)
-        translated = self.para_model.generate(
+        translated = self.grips_para_model.generate(
             **paraphrase_batch,
             max_length=60,
             num_beams=num_beams,
             num_return_sequences=num_return_sequences,
             temperature=1.5,
         )
-        tgt_text = self.para_tokenizer.batch_decode(translated, skip_special_tokens=True)
+        tgt_text = self.grips_para_tokenizer.batch_decode(translated, skip_special_tokens=True)
         return tgt_text
 
     def delete_phrase(self, candidate: str, phrase: str) -> str:

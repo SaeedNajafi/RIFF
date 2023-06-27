@@ -71,12 +71,12 @@ def grips_sentiment_metric(prediction_file: str) -> float:
     used in grips training."""
     # pick the class with the highest score among the possible class labels!
     df = pd.read_csv(prediction_file, delimiter=",")
-    gold_labels = [label.strip() for label in df["gold_class"].tolist()]
+    gold_labels = [str(label).strip() for label in df["gold_class"].tolist()]
     num_labels = len(set(gold_labels))
     golds = np.array(gold_labels).reshape((len(gold_labels) // num_labels, num_labels))[:, 0]
 
     # This relies on the assumption that there is a prediction score for every label. (i.e. n label scores per input)
-    predictions = [label.strip(" </s>") for label in df["potential_class"].tolist()]
+    predictions = [str(label).strip(" </s>") for label in df["potential_class"].tolist()]
     scores = df["prediction_score"].tolist()
 
     assert len(predictions) % num_labels == 0

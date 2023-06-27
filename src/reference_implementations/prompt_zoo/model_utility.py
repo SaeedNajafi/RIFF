@@ -69,7 +69,7 @@ def modify_inputs_outputs(batch: torch.utils.data.Dataset, prompt_lists: Optiona
             masked_labels=batch["masked_labels"],
         )
 
-    elif FLAGS.exp_type == "gradient_search" and prompt_lists:
+    elif FLAGS.exp_type in ["gradient_search", "grips"] and prompt_lists:
         input_ids_stack = []
         input_mask_stack = []
         masked_labels_stack = []

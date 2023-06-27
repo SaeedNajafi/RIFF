@@ -58,18 +58,18 @@ fi
 if [ "${TASK_NAME}" = "sst2" ]; then
 
     instruction_type="manual_template_research_sst2_with_instruction"
-    train_batch_size=16
+    train_batch_size=4
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
         instruction_type="manual_template_research_sst2_no_instruction"
-        train_batch_size=2
+        train_batch_size=4
     fi
 
 elif [ "${TASK_NAME}" = "SetFit_sst5" ]; then
     instruction_type="manual_template_research_sst5_with_instruction"
-    train_batch_size=16
+    train_batch_size=4
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
         instruction_type="manual_template_research_sst5_no_instruction"
-        train_batch_size=2
+        train_batch_size=4
     fi
 fi
 
@@ -94,13 +94,13 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --model_path ${model_path} \
     --para_model_path ${model_path} \
     --checkpoint best_step \
-    --max_epochs 100 \
+    --max_epochs 1 \
     --learning_rate ${LEARN_RATE} \
     --training_steps 1000000 \
     --steps_per_checkpoint 8 \
     --source_max_length 128 \
     --decoder_max_length 128 \
-    --weight_decay_rate 0.00001 \
+    --weight_decay_rate 0.0001 \
     --instruction_type ${instruction_type} \
     --pretrained_model roberta-large \
     --enable_data_augmentation ${DATA_AUG} \
@@ -111,7 +111,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --test_sample_size 8 \
     --metric_to_save ${METRIC_TO_SAVE} \
     --g_beam_size 1 \
-    --top_k 20
+    --top_k 8
 
 # test phase
 python -m src.reference_implementations.prompt_zoo.trainer \
@@ -138,4 +138,4 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --test_temperature 1.0 \
     --test_sample_size 8 \
     --g_beam_size 1 \
-    --top_k 20
+    --top_k 8

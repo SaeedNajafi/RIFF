@@ -506,12 +506,12 @@ class RobertaPrompted(MyBaseLM):
 
         self.setup_models()
 
-        if FLAGS.mode == "train" and FLAGS.exp_type not in ["gradient_search"]:
+        if FLAGS.mode == "train" and FLAGS.exp_type not in ["gradient_search", "grips"]:
             # create optimizer only for training.
             # based on the experiment type, setup the optimizer.
             self.optimizer = optimizer_definer[FLAGS.exp_type](self.model_pool)
 
-        elif FLAGS.mode in ["test", "inference", "eval"]:
+        elif FLAGS.mode in ["test", "inference", "eval"] and FLAGS.exp_type not in ["gradient_search", "grips"]:
             # load from the given checkpoint.
             self.load_from_checkpoint()
 

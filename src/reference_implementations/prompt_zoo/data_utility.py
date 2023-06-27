@@ -213,7 +213,10 @@ def template_data(
 
 
 def read_sst_sentiment_file(
-    split_name: str, task_name: str, eval_repeat_input: Optional[bool] = False
+    split_name: str,
+    task_name: str,
+    eval_repeat_input: Optional[bool] = False,
+    train_repeat_input: Optional[bool] = False,
 ) -> Tuple[Union[SentimentRawData, None], Union[SentimentRawData, None]]:
     """Load the sst sentiment analysis split for train, validation or test."""
     assert split_name in {"train", "validation", "test"}
@@ -282,18 +285,23 @@ def read_sst_sentiment_file(
                 val_sentences.append(row["sentence"])
                 val_labels.append(row["sentiment"])
 
-        return template_data(class_to_id, train_sentences, train_labels, False), template_data(
+        return template_data(class_to_id, train_sentences, train_labels, train_repeat_input), template_data(
             class_to_id, val_sentences, val_labels, eval_repeat_input
         )
 
     else:
+        if train_repeat_input:
+            # the dataloader will not shuffle the dataset,
+            # we should shuffle before repeating the input.
+            new_dataset = new_dataset.shuffle(FLAGS.seed)
+
         # this is train split for fullshot.
         sentences = []
         labels = []
         for row in new_dataset:
             sentences.append(row["sentence"])
             labels.append(row["sentiment"])
-        return template_data(class_to_id, sentences, labels, False), None
+        return template_data(class_to_id, sentences, labels, train_repeat_input), None
 
 
 class SentimentDataset(Dataset):
@@ -377,13 +385,16 @@ def create_sentiment_dataset(
     file_name: str,
     task_name: str,
     eval_repeat_input: Optional[bool] = False,
+    train_repeat_input: Optional[bool] = False,
     para_tokenizer: Optional[T5Tokenizer] = None,
 ) -> Tuple[DataLoader, DataLoader]:
     """Function to create the required huggingface dataset to train the T5
     models on the sentiment analysis task."""
 
     if task_name in ["sst2", "SetFit_sst5"]:
-        train_rawdata, eval_rawdata = read_sst_sentiment_file(file_name, task_name, eval_repeat_input)
+        train_rawdata, eval_rawdata = read_sst_sentiment_file(
+            file_name, task_name, eval_repeat_input, train_repeat_input
+        )
     else:
         raise Exception(f"this {task_name} is not supported!")
 
@@ -391,9 +402,15 @@ def create_sentiment_dataset(
     eval_dataloader = None
     if train_rawdata is not None:
         train_dataset = tokenize_data(train_rawdata, tokenizer, para_tokenizer)
+        # with train_repeat_input True, we like to do inference on the train mini-batch as used in the grips method.
+        shuffle = not train_repeat_input
+        if train_repeat_input:
+            # we like to read all the repeated rows in the same batch.
+            FLAGS.train_batch_size *= FLAGS.num_classes
+
         # this is training phase.
         train_dataloader = DataLoader(
-            train_dataset, batch_size=FLAGS.train_batch_size, shuffle=True, pin_memory=True, num_workers=3
+            train_dataset, batch_size=FLAGS.train_batch_size, shuffle=shuffle, pin_memory=True, num_workers=3
         )
     if eval_rawdata is not None:
         eval_dataset = tokenize_data(eval_rawdata, tokenizer, para_tokenizer)
