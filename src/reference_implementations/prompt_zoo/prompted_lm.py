@@ -111,7 +111,8 @@ class MyBaseLM(torch.nn.Module):
             model.to(self.device)
 
             # compile the pytorch model for speedup.
-            self.model_pool[model_name] = torch.compile(model, mode="max-autotune")
+            # compile is slow in my code!!!
+            # self.model_pool[model_name] = torch.compile(model, mode="max-autotune")
 
         self.loss_func = self.loss_func.to(self.device)
 

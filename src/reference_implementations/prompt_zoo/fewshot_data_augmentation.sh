@@ -58,18 +58,18 @@ fi
 if [ "${TASK_NAME}" = "sst2" ]; then
 
     instruction_type="manual_template_research_sst2_with_instruction"
-    train_batch_size=4
+    train_batch_size=16
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
         instruction_type="manual_template_research_sst2_no_instruction"
-        train_batch_size=4
+        train_batch_size=2
     fi
 
 elif [ "${TASK_NAME}" = "SetFit_sst5" ]; then
     instruction_type="manual_template_research_sst5_with_instruction"
-    train_batch_size=4
+    train_batch_size=16
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
         instruction_type="manual_template_research_sst5_no_instruction"
-        train_batch_size=4
+        train_batch_size=2
     fi
 fi
 
@@ -100,7 +100,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --steps_per_checkpoint 8 \
     --source_max_length 128 \
     --decoder_max_length 128 \
-    --weight_decay_rate 0.0001 \
+    --weight_decay_rate 0.00001 \
     --instruction_type ${instruction_type} \
     --pretrained_model roberta-large \
     --enable_data_augmentation ${DATA_AUG} \
@@ -115,7 +115,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
 
 # test phase
 python -m src.reference_implementations.prompt_zoo.trainer \
-    --eval_batch_size 8 \
+    --eval_batch_size 4 \
     --mode test \
     --seed ${RANDOM_SEED} \
     --task_name ${TASK_NAME} \
