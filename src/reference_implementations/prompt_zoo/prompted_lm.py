@@ -530,6 +530,7 @@ class RobertaPrompted(MyBaseLM):
         """
         paraphrases_input_text = self.para_tokenizer.batch_decode(batch["para_input_ids"], skip_special_tokens=True)
         batch_size = len(paraphrases_input_text)
+        print("draw samples batch_size", batch_size)
         paraphrases_indices: Dict[int, List[str]] = {}
         missed_indices = []
         for idx, para_input_text in enumerate(paraphrases_input_text):

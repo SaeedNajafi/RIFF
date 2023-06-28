@@ -94,7 +94,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --model_path ${model_path} \
     --para_model_path ${model_path} \
     --checkpoint best_step \
-    --max_epochs 1 \
+    --max_epochs 2 \
     --learning_rate ${LEARN_RATE} \
     --training_steps 1000000 \
     --steps_per_checkpoint 8 \
@@ -111,7 +111,12 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --test_sample_size 8 \
     --metric_to_save ${METRIC_TO_SAVE} \
     --g_beam_size 1 \
-    --top_k 8
+    --top_k 8 \
+    --num_candidates 8 \
+    --num_compose 1 \
+    --meta_dir . \
+    --meta_name search.txt \
+    --level word
 
 # test phase
 python -m src.reference_implementations.prompt_zoo.trainer \
@@ -138,4 +143,9 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --test_temperature 1.0 \
     --test_sample_size 8 \
     --g_beam_size 1 \
-    --top_k 8
+    --top_k 8 \
+    --num_candidates 8 \
+    --num_compose 1 \
+    --meta_dir . \
+    --meta_name search.txt \
+    --level word

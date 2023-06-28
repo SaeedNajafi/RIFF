@@ -6,6 +6,7 @@ paper: https://arxiv.org/pdf/2203.07281.pdf
 github link: https://github.com/archiki/GrIPS
 """
 
+import copy
 import csv
 import io
 import os
@@ -203,8 +204,9 @@ class GRIPSSearch(RobertaPrompted):
         potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
         if self.enable_data_augmentation == 1:
             paraphrases = self.draw_samples_for_augmentation(batch)
+            new_batch = copy.deepcopy(batch)
             augment_batch(
-                batch,
+                new_batch,  # send a copy of the original batch that will be modified.
                 paraphrases,
                 self.tokenizer,
                 potentials_str,
@@ -212,7 +214,7 @@ class GRIPSSearch(RobertaPrompted):
                 for_gradient_search=True,
             )
 
-        class_log_ps = self.score_templates(batch, [self.current_candidate_template], for_augmentation=False)
+        class_log_ps = self.score_templates(new_batch, [self.current_candidate_template], for_augmentation=False)
         # mean across the prompt templates.
         # for grips, we only evaluate one candidate prompt template at a time, so the mean doesn't have an effect.
         class_log_ps = class_log_ps.mean(dim=1)

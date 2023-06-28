@@ -69,31 +69,35 @@ def sentiment_metric(prediction_file: str) -> Dict[str, float]:
 def grips_sentiment_metric(prediction_file: str) -> float:
     """Compute the balanced accuracy + entropy for sentiment classification
     used in grips training."""
-    # pick the class with the highest score among the possible class labels!
     df = pd.read_csv(prediction_file, delimiter=",")
-    gold_labels = [str(label).strip() for label in df["gold_class"].tolist()]
+
+    gold_labels = [str(label) for label in df["gold_class"].tolist()]
+
+    # pick the class with the highest score among the possible class labels!
     num_labels = len(set(gold_labels))
-    golds = np.array(gold_labels).reshape((len(gold_labels) // num_labels, num_labels))[:, 0]
-
     # This relies on the assumption that there is a prediction score for every label. (i.e. n label scores per input)
-    predictions = [str(label).strip(" </s>") for label in df["potential_class"].tolist()]
-    scores = df["prediction_score"].tolist()
-
+    predictions = [str(label).strip("<s>").strip("</s>").strip() for label in df["potential_class"].tolist()]
     assert len(predictions) % num_labels == 0
     prediction_labels = np.array(predictions).reshape((len(predictions) // num_labels, num_labels))
+    scores = df["prediction_score"].tolist()
     prediction_scores = np.array(scores).reshape((len(predictions) // num_labels, num_labels))
     max_predictions = np.argmax(prediction_scores, axis=1)
-    max_labels = prediction_labels[:, max_predictions][0]
+    max_labels = []
+    golds = []
+    for index in range(len(predictions) // num_labels):
+        labels_row = prediction_labels[index]
+        max_labels.append(labels_row[max_predictions[index]])
+        golds.append(gold_labels[index * num_labels])
 
-    per_label_correct = {g_label: 0 for g_label in list(set(gold_labels))}
+    per_label_correct = {g_label: 0 for g_label in list(set(golds))}
     total = 0.0
-    for index, gold in enumerate(golds):
+    for index in range(len(predictions) // num_labels):
         total += 1.0
-        if gold == max_labels[index]:
-            per_label_correct[gold] += 1
+        if golds[index] == max_labels[index]:
+            per_label_correct[golds[index]] += 1
 
     per_label_frequencies = [count / total for count in per_label_correct.values()]
-    balanced_acc = balanced_accuracy_score(y_true=golds, y_pred=max_labels)
+    balanced_acc = balanced_accuracy_score(y_true=np.array(golds), y_pred=np.array(max_labels))
 
     # 10 is a factor used in the grips implementation.
     return np.round(100 * balanced_acc, 2) + 10 * entropy(np.array(per_label_frequencies))
