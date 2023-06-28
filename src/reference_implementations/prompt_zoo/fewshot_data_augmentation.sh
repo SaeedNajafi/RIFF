@@ -74,8 +74,10 @@ elif [ "${TASK_NAME}" = "SetFit_sst5" ]; then
 fi
 
 ensembling="paraphrase_predict"
+METRIC_TO_SAVE="all_accuracy"
 if [ "${DATA_AUG}" = "0" ]; then
         ensembling="no_ensemble"
+        METRIC_TO_SAVE="original_accuracy"
 fi
 
 # train phase

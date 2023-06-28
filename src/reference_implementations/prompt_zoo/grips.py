@@ -202,9 +202,11 @@ class GRIPSSearch(RobertaPrompted):
         """
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
         potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
+        new_batch = batch
         if self.enable_data_augmentation == 1:
-            paraphrases = self.draw_samples_for_augmentation(batch)
             new_batch = copy.deepcopy(batch)
+        if self.enable_data_augmentation == 1:
+            paraphrases = self.draw_samples_for_augmentation(new_batch)
             augment_batch(
                 new_batch,  # send a copy of the original batch that will be modified.
                 paraphrases,
@@ -336,7 +338,9 @@ class GRIPSSearch(RobertaPrompted):
         """The train loop for grips method over search set given by batch."""
 
         # we need to compute the score of the current candidate on the current search set.
-        self.current_candidate_template.score = self.grips_score(batch, prediction_file="grips_temp_scores.csv")
+        self.current_candidate_template.score = self.grips_score(
+            batch, prediction_file=f"{FLAGS.model_path}/grips_temp_scores.csv"
+        )
         base_score = self.current_candidate_template.score
 
         # keeping track of what value phrases got deleted to create the key candidate.
@@ -418,7 +422,7 @@ class GRIPSSearch(RobertaPrompted):
         for c_idx, candidate in enumerate(candidates):
             # update the current candidate and compute its score.
             self.update_candidate(candidate)
-            candidate_score = self.grips_score(batch, prediction_file="grips_temp_scores.csv")
+            candidate_score = self.grips_score(batch, prediction_file=f"{FLAGS.model_path}/grips_temp_scores.csv")
             self.current_candidate_template.score = candidate_score
             scores.append(candidate_score)
             self.meta_file.write(f"Score for Candidate {str(c_idx)} : \t {str(candidate_score)} \n")

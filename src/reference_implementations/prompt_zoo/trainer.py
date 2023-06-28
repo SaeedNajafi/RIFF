@@ -183,7 +183,7 @@ def launch_test_or_train() -> None:
         eval_repeat_input = True
         train_repeat_input = False
 
-    if FLAGS.exp_type == "grips":
+    elif FLAGS.exp_type == "grips":
         model = GRIPSSearch(
             FLAGS.seed,
             FLAGS.task_name,
