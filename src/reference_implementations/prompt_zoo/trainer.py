@@ -281,6 +281,7 @@ def main(argv: Any) -> None:
         "classifier_finetune",
         "no_finetune",
         "grips",
+        "lora_finetune",
     ]:
         launch_test_or_train()
 

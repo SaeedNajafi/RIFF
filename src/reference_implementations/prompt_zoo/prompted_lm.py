@@ -8,6 +8,7 @@ from typing import Dict, Iterator, List, Optional, Tuple
 import numpy
 import torch
 from absl import flags
+from peft import LoraConfig, TaskType, get_peft_model
 from transformers import AutoTokenizer, BartForConditionalGeneration, BartTokenizer, RobertaForMaskedLM, RobertaModel
 
 from src.reference_implementations.prompt_zoo.data_utility import augment_batch, tokenize_samples
@@ -480,6 +481,14 @@ class RobertaPrompted(MyBaseLM):
             except Exception:
                 path = f"{NARVAL_PATH}/roberta-large-masked-lm"
                 self.model_pool["roberta_model"] = RobertaForMaskedLM.from_pretrained(path)
+
+            if FLAGS.exp_type == "lora_finetune":
+                inference_mode = False if FLAGS.mode == "train" else True
+                peft_config = LoraConfig(
+                    task_type=TaskType.SEQ_CLS, inference_mode=inference_mode, r=8, lora_alpha=32, lora_dropout=0.1
+                )
+                self.model_pool["roberta_model"] = get_peft_model(self.model_pool["roberta_model"], peft_config)
+                self.model_pool["roberta_model"].print_trainable_parameters()
 
         self.enable_data_augmentation = enable_data_augmentation
         self.enable_paraphrase_training = enable_paraphrase_training

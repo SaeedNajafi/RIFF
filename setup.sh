@@ -90,7 +90,8 @@ function install_prompt_package () {
 
 function install_reference_methods () {
 	if [ "$ENV_NAME" = "prompt_torch" ]; then
-		python -m pip install transformers datasets sentencepiece nltk evaluate bert-score supar pandas scikit-learn tensorboard absl-py
+		python -m pip install transformers datasets sentencepiece nltk
+		python -m pip install evaluate bert-score supar pandas scikit-learn tensorboard absl-py peft
 
 	fi
 
