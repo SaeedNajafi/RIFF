@@ -405,6 +405,7 @@ class Paraphraser(MyBaseLM):
             no_repeat_ngram_size=FLAGS.no_repeat_ngram_size,
             num_beams=num_return_seq,
             early_stopping=True,
+            repetition_penalty=10.0,
             max_length=128,
             num_return_sequences=num_return_seq,
             output_scores=True,

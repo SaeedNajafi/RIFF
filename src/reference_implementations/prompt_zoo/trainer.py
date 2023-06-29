@@ -204,13 +204,13 @@ def launch_test_or_train() -> None:
         train_repeat_input = False
 
     elif FLAGS.exp_type == "no_finetune":
+        FLAGS.mode = "no_finetune_test"
         model = RobertaPrompted(
             FLAGS.seed, FLAGS.enable_data_augmentation, FLAGS.enable_paraphrase_training, FLAGS.load_paraphraser
         )
         eval_repeat_input = True
         train_repeat_input = False
         # change the flag to use the pre-trained weights only.
-        FLAGS.mode = "no_finetune_test"
     else:
         model = RobertaPrompted(
             FLAGS.seed, FLAGS.enable_data_augmentation, FLAGS.enable_paraphrase_training, FLAGS.load_paraphraser
