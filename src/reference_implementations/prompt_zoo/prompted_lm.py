@@ -2,6 +2,7 @@
 downstream NLP datasets."""
 
 import os
+import random
 from abc import abstractmethod
 from typing import Dict, Iterator, List, Optional, Tuple
 
@@ -391,19 +392,20 @@ class Paraphraser(MyBaseLM):
             # load from the given checkpoint.
             self.load_from_checkpoint(FLAGS.para_model_path)
 
-    def generate_diverse_beam_paraphrases(self, batch: torch.utils.data.Dataset, num_return_seq: int, train_mode: bool = False) -> List[str]:
+    def generate_diverse_beam_paraphrases(
+        self, batch: torch.utils.data.Dataset, num_return_seq: int, train_mode: bool = False
+    ) -> List[str]:
         """The main prediction loop to generate paraphrases."""
         self.predict_mode_on()
         loaded_batch = self.move_to_gpu(batch, keys=["para_input_ids", "para_attention_mask"])
 
         bart_model = self.model_pool["bart_model"]
-        
+
         sample_list_size = num_return_seq
         if train_mode:
             # in train mode, draw more samples but then sample from the larger list to promote diversity.
             sample_list_size = 8 * num_return_seq
 
-        predictions = []
         predictions_output = bart_model.generate(
             input_ids=loaded_batch["para_input_ids"],
             attention_mask=loaded_batch["para_attention_mask"],
@@ -422,15 +424,14 @@ class Paraphraser(MyBaseLM):
         batch_size = len(predictions_output.sequences) // sample_list_size
         selected_samples = []
         for idx in range(batch_size):
-            to_sample_from = predictions_output.sequences[idx * sample_list_size: (idx+1) * sample_list_size]
+            to_sample_from = predictions_output.sequences[idx * sample_list_size : (idx + 1) * sample_list_size]
             # sample without replacement.
-            selected_samples.extend(random.sample(to_sample_from, num_return_seq))
+            selected_samples.extend(random.sample(list(to_sample_from), num_return_seq))
 
         # all special tokens will be removed.
         predictions_str = self.tokenizer.batch_decode(selected_samples, skip_special_tokens=True)
         predictions_str = [pred.strip() for pred in predictions_str]
         return predictions_str
-
 
     def generate_top_p_paraphrases(
         self, batch: torch.utils.data.Dataset, num_return_seq: int, temperature: float, train_mode: bool = False
@@ -447,25 +448,25 @@ class Paraphraser(MyBaseLM):
             sample_list_size = 8 * num_return_seq
 
         predictions_output = bart_model.generate(
-                input_ids=loaded_batch["para_input_ids"],
-                attention_mask=loaded_batch["para_attention_mask"],
-                no_repeat_ngram_size=FLAGS.no_repeat_ngram_size,
-                do_sample=True,
-                top_p=0.99,
-                temperature=temperature,
-                max_length=128,
-                num_return_sequences=sample_list_size,
-                output_scores=True,
-                return_dict_in_generate=True,
-                use_cache=True,
+            input_ids=loaded_batch["para_input_ids"],
+            attention_mask=loaded_batch["para_attention_mask"],
+            no_repeat_ngram_size=FLAGS.no_repeat_ngram_size,
+            do_sample=True,
+            top_p=0.99,
+            temperature=temperature,
+            max_length=128,
+            num_return_sequences=sample_list_size,
+            output_scores=True,
+            return_dict_in_generate=True,
+            use_cache=True,
         )
 
         batch_size = len(predictions_output.sequences) // sample_list_size
         selected_samples = []
         for idx in range(batch_size):
-            to_sample_from = predictions_output.sequences[idx * sample_list_size: (idx+1) * sample_list_size]
+            to_sample_from = predictions_output.sequences[idx * sample_list_size : (idx + 1) * sample_list_size]
             # sample without replacement.
-            selected_samples.extend(random.sample(to_sample_from, num_return_seq))
+            selected_samples.extend(random.sample(list(to_sample_from), num_return_seq))
 
         # all special tokens will be removed.
         predictions_str = self.tokenizer.batch_decode(selected_samples, skip_special_tokens=True)
@@ -574,9 +575,6 @@ class RobertaPrompted(MyBaseLM):
             else:
                 missed_indices.append(idx)
         if len(missed_indices) > 0:
-            # new_paraphrases = self.para_model.generate_top_p_paraphrases(
-            #     batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
-            # )
             new_paraphrases = self.para_model.generate_diverse_beam_paraphrases(
                 batch, num_return_seq=FLAGS.test_sample_size, train_mode=False
             )
@@ -618,18 +616,26 @@ class RobertaPrompted(MyBaseLM):
 
                 if FLAGS.sampling_algorithm == "top_p":
                     samples = sampling_model.generate_top_p_paraphrases(
-                        batch, num_return_seq=FLAGS.train_sample_size, temperature=FLAGS.train_temperature
+                        batch,
+                        num_return_seq=FLAGS.train_sample_size,
+                        temperature=FLAGS.train_temperature,
+                        train_mode=True,
                     )
 
-                elif FLAGS.sampling_algorithm == "beam_search":
-                    samples = sampling_model.generate_beam_paraphrases(batch, num_return_seq=FLAGS.train_sample_size)
+                elif FLAGS.sampling_algorithm == "diverse_beam_search":
+                    samples = sampling_model.generate_diverse_beam_paraphrases(
+                        batch, num_return_seq=FLAGS.train_sample_size, train_mode=True
+                    )
 
                 elif FLAGS.sampling_algorithm == "mixed":
                     top_p_samples = sampling_model.generate_top_p_paraphrases(
-                        batch, num_return_seq=FLAGS.train_sample_size, temperature=FLAGS.train_temperature
+                        batch,
+                        num_return_seq=FLAGS.train_sample_size,
+                        temperature=FLAGS.train_temperature,
+                        train_mode=True,
                     )
-                    beam_samples = sampling_model.generate_beam_paraphrases(
-                        batch, num_return_seq=FLAGS.train_sample_size
+                    beam_samples = sampling_model.generate_diverse_beam_paraphrases(
+                        batch, num_return_seq=FLAGS.train_sample_size, train_mode=True
                     )
                     batch_size = len(top_p_samples) // FLAGS.train_sample_size
 
@@ -779,10 +785,9 @@ class RobertaPrompted(MyBaseLM):
 
         potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
-        # paraphrases = self.para_model.generate_top_p_paraphrases(
-        #    batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
-        # )
-        paraphrases = self.para_model.generate_diverse_beam_paraphrases(batch, num_return_seq=FLAGS.test_sample_size, train_mode=False)
+        paraphrases = self.para_model.generate_diverse_beam_paraphrases(
+            batch, num_return_seq=FLAGS.test_sample_size, train_mode=False
+        )
         augment_batch(batch, paraphrases, self.tokenizer, potentials_str, num_return_seq=FLAGS.test_sample_size)
 
         if FLAGS.exp_type == "soft_prompt_finetune":

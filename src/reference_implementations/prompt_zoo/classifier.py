@@ -61,8 +61,8 @@ class ClassifierLM(RobertaPrompted):
         dummy_labels = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
 
-        paraphrases = self.para_model.generate_top_p_paraphrases(
-            batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
+        paraphrases = self.para_model.generate_diverse_beam_paraphrases(
+            batch, num_return_seq=FLAGS.test_sample_size, train_mode=False
         )
         augment_batch(
             batch,
