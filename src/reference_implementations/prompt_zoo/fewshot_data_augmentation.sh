@@ -80,7 +80,7 @@ if [ "${DATA_AUG}" = "0" ]; then
         METRIC_TO_SAVE="original_accuracy"
 fi
 
-'''
+
 # train phase
 python -m src.reference_implementations.prompt_zoo.trainer \
     --train_batch_size ${train_batch_size} \
@@ -120,11 +120,11 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --meta_dir . \
     --meta_name search.txt \
     --level word
-'''
+
 
 # test phase
 python -m src.reference_implementations.prompt_zoo.trainer \
-    --eval_batch_size 32 \
+    --eval_batch_size 4 \
     --mode test \
     --seed ${RANDOM_SEED} \
     --task_name ${TASK_NAME} \
