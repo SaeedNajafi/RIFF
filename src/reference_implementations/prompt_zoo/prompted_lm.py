@@ -391,7 +391,7 @@ class Paraphraser(MyBaseLM):
             # load from the given checkpoint.
             self.load_from_checkpoint(FLAGS.para_model_path)
 
-    def generate_beam_paraphrases(self, batch: torch.utils.data.Dataset, num_return_seq: int) -> List[str]:
+    def generate_diverse_beam_paraphrases(self, batch: torch.utils.data.Dataset, num_return_seq: int) -> List[str]:
         """The main prediction loop to generate paraphrases."""
         self.predict_mode_on()
         loaded_batch = self.move_to_gpu(batch, keys=["para_input_ids", "para_attention_mask"])
@@ -404,13 +404,14 @@ class Paraphraser(MyBaseLM):
             attention_mask=loaded_batch["para_attention_mask"],
             no_repeat_ngram_size=FLAGS.no_repeat_ngram_size,
             num_beams=num_return_seq,
+            num_beam_groups=num_return_seq,
+            diversity_penalty=2.0,
             early_stopping=True,
-            repetition_penalty=10.0,
             max_length=128,
             num_return_sequences=num_return_seq,
             output_scores=True,
-            length_penalty=1.0,  # this sth that I should investigate in the future!
             return_dict_in_generate=True,
+            use_cache=True,
         )
         predictions.extend(predictions_output.sequences)
 
@@ -750,9 +751,10 @@ class RobertaPrompted(MyBaseLM):
 
         potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
-        paraphrases = self.para_model.generate_top_p_paraphrases(
-            batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
-        )
+        # paraphrases = self.para_model.generate_top_p_paraphrases(
+        #    batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature
+        # )
+        paraphrases = self.para_model.generate_diverse_beam_paraphrases(batch, num_return_seq=FLAGS.test_sample_size)
         augment_batch(batch, paraphrases, self.tokenizer, potentials_str, num_return_seq=FLAGS.test_sample_size)
 
         if FLAGS.exp_type == "soft_prompt_finetune":
