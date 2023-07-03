@@ -415,7 +415,7 @@ class Paraphraser(MyBaseLM):
             diversity_penalty=2.0,
             early_stopping=True,
             max_length=128,
-            num_return_sequences=num_return_seq,
+            num_return_sequences=sample_list_size,
             output_scores=True,
             return_dict_in_generate=True,
             use_cache=True,
@@ -687,6 +687,7 @@ class RobertaPrompted(MyBaseLM):
                 )
                 paraphrase_class_log_ps = class_log_ps[:, 1:]
 
+                final_rewards = paraphrase_class_log_ps  # basic rewards.
                 final_rewards_z = z_scoring(paraphrase_class_log_ps - normal_class_log_ps)
 
                 if FLAGS.sampling_method in ["off_policy", "ppo"]:
@@ -706,15 +707,27 @@ class RobertaPrompted(MyBaseLM):
                         batch_size, FLAGS.train_sample_size, device=self.device, dtype=para_log_ps.dtype
                     )
 
-                if FLAGS.paraphrase_loss == "pg":
+                if FLAGS.paraphrase_loss == "pg_zscore":
                     pg_loss = -torch.mean(torch.mean(importance_ratio * para_log_ps * final_rewards_z, dim=1), dim=0)
                     loss = pg_loss
 
-                if FLAGS.paraphrase_loss == "mml":
+                elif FLAGS.paraphrase_loss == "pg_basic":
+                    pg_loss = -torch.mean(torch.mean(importance_ratio * para_log_ps * final_rewards, dim=1), dim=0)
+                    loss = pg_loss
+
+                elif FLAGS.paraphrase_loss == "mml_zscore":
                     if FLAGS.sampling_method == "off_policy":
                         ratio_log = para_log_ps - fixed_para_log_ps + final_rewards_z
                     elif FLAGS.sampling_method in ["on_policy", "ppo"]:
                         ratio_log = para_log_ps + final_rewards_z
+                    mml_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
+                    loss = mml_loss
+
+                elif FLAGS.paraphrase_loss == "mml_basic":
+                    if FLAGS.sampling_method == "off_policy":
+                        ratio_log = para_log_ps - fixed_para_log_ps + final_rewards
+                    elif FLAGS.sampling_method in ["on_policy", "ppo"]:
+                        ratio_log = para_log_ps + final_rewards
                     mml_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
                     loss = mml_loss
 
@@ -738,7 +751,6 @@ class RobertaPrompted(MyBaseLM):
         if self.enable_paraphrase_training == 1:
             # updates only the paraphrase model.
             self.grad_scalar.step(self.para_model.optimizer)
-            self.grad_scalar.update()
         else:
             # updates the main language model.
             self.grad_scalar.step(self.optimizer)

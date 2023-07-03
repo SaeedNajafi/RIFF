@@ -10,10 +10,6 @@ do
 done
 
 PROJECT_DIR=$( dirname -- "$0"; )
-
-# We source to keep the internal env variables defined.
-# source ${PROJECT_DIR}/../setup_gpu_worker.sh
-
 LEARN_RATE=${LR}
 EXPERIMENT_TYPE=${EXP_TYPE}
 RANDOM_SEED=${SEED}
@@ -29,9 +25,23 @@ SAMPLING_ALG=${SAMPLING_ALG}
 SLURM_JOB_ID=${SLURM_JOB_ID}
 METRIC_TO_SAVE=${METRIC_TO_SAVE}
 KL_COEFFICIENT=${KL_COEFFICIENT}
+CLUSTER_NAME=${CLUSTER_NAME}
 
-# checkpoint_path=/checkpoint/$USER/${SLURM_JOB_ID}
-checkpoint_path=~/checkpoint/
+# We source the python env inside a worker depending on the cluster.
+source ${PROJECT_DIR}/../setup_gpu_worker.sh CLUSTER_NAME=${CLUSTER_NAME}
+
+if [ "${CLUSTER_NAME}" = "narval" ]; then
+    checkpoint_path=/home/$USER/scratch/checkpoint/${SLURM_JOB_ID}
+
+elif [ "${CLUSTER_NAME}" = "vcluster" ]; then
+    checkpoint_path=/checkpoint/$USER/${SLURM_JOB_ID}
+
+elif [ "${CLUSTER_NAME}" = "linux" ]; then
+    checkpoint_path=~/checkpoint
+fi
+
+# create checkpoint path if it doesn't exist.
+mkdir -p ${checkpoint_path}
 
 experiment_name=${TASK_NAME}_${NUM_CLASSES}_${FEWSHOT_SIZE}_${EXPERIMENT_TYPE}_${RANDOM_SEED}
 experiment_name=${experiment_name}_${LEARN_RATE}_${DATA_AUG}_${TRAIN_PARAPHRASER}_${LOAD_PARAPHRASER}_${PARA_LOSS}_${SAMPLING_METHOD}_${SAMPLING_ALG}_${METRIC_TO_SAVE}_${KL_COEFFICIENT}
@@ -53,8 +63,8 @@ fi
 
 # train phase
 python -m src.reference_implementations.prompt_zoo.trainer \
-    --train_batch_size 8 \
-    --eval_batch_size 32 \
+    --train_batch_size 4 \
+    --eval_batch_size 8 \
     --mode train \
     --seed ${RANDOM_SEED} \
     --task_name ${TASK_NAME} \
@@ -67,19 +77,19 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --model_path ${model_path} \
     --para_model_path ${model_path} \
     --checkpoint best_step \
-    --max_epochs 20 \
+    --max_epochs 100 \
     --learning_rate ${LEARN_RATE} \
     --training_steps 1000000 \
     --steps_per_checkpoint 8 \
     --source_max_length 128 \
     --decoder_max_length 128 \
-    --weight_decay_rate 0.01 \
+    --weight_decay_rate 0.0001 \
     --instruction_type ${instruction_type} \
     --pretrained_model roberta-large \
     --enable_data_augmentation ${DATA_AUG} \
     --enable_paraphrase_training ${TRAIN_PARAPHRASER} \
     --load_paraphraser ${LOAD_PARAPHRASER} \
-    --ensemble_type no_ensemble \
+    --ensemble_type "paraphrase_predict" \
     --test_temperature 1.0 \
     --test_sample_size 8 \
     --train_temperature 1.0 \
@@ -92,7 +102,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
 
 # test phase
 python -m src.reference_implementations.prompt_zoo.trainer \
-    --eval_batch_size 32 \
+    --eval_batch_size 4 \
     --mode test \
     --seed ${RANDOM_SEED} \
     --task_name ${TASK_NAME} \

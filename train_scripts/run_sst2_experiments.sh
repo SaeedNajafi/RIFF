@@ -13,7 +13,7 @@ do
         aug=${augs[$g]}
         TOKENIZERS_PARALLELISM=false bash train_scripts/run_augmentation_experiments.sh \
             AUG=${aug} LR=${rate} \
-            EXP_TYPE=${exp} TASK=SetFit_sst5 \
-            FEWSHOT_SIZE=32 CLUSTER_NAME=vcluster NUM_CLASSES=5
+            EXP_TYPE=${exp} TASK=sst2 \
+            FEWSHOT_SIZE=32 CLUSTER_NAME=vcluster NUM_CLASSES=2
     done
 done

@@ -2,11 +2,11 @@
 
 rates=(0.00001)
 exps=(all_finetune)
-seeds=(11)
+seeds=(11 42 1993 2023 12321)
 tasks=(sst2)
-losses=(pg)
-sampling_methods=(on_policy)
-sampling_algs=(top_p)
+losses=(pg_basic mml_basic pg_zscore mml_zscore)
+sampling_methods=(on_policy off_policy)
+sampling_algs=(top_p diverse_beam_search mixed)
 
 for i in ${!rates[@]};
 do
@@ -29,7 +29,9 @@ do
                         for s_m in ${!sampling_methods[@]};
                         do
                             sampling_method=${sampling_methods[$s_m]}
-                            CUDA_VISIBLE_DEVICES=2 bash src/reference_implementations/prompt_zoo/fewshot_lmfps.sh \
+                            TOKENIZERS_PARALLELISM=false bash src/reference_implementations/run_prompt.sh \
+                                SCRIPT=src/reference_implementations/prompt_zoo/fewshot_lmfps.sh \
+                                LOG_DIR=./roberta-exps-logs-lmfps \
                                 EXP_TYPE=${exp} \
                                 TASK=${task} \
                                 SEED=${seed} \
@@ -44,7 +46,8 @@ do
                                 SAMPLING_METHOD=${sampling_method} \
                                 SAMPLING_ALG=${sampling_alg} \
                                 METRIC_TO_SAVE=accuracy \
-                                KL_COEFFICIENT=0.6
+                                KL_COEFFICIENT=0.6 \
+                                CLUSTER_NAME=vcluster
                         done
                     done
                 done
