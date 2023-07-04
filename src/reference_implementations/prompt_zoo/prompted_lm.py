@@ -69,7 +69,12 @@ flags.DEFINE_string(
 flags.DEFINE_string(
     "sampling_algorithm",
     "top_p",
-    "What algorithm to use for sampling? top_p or beam_search?",
+    "What algorithm to use for sampling? top_p or diverse beam_search?",
+)
+flags.DEFINE_string(
+    "test_sampling_algorithm",
+    "top_p",
+    "What algorithm to use for sampling for prediction? top_p or diverse beam_search?",
 )
 flags.DEFINE_float(
     "kl_penalty_coefficient",
@@ -575,9 +580,14 @@ class RobertaPrompted(MyBaseLM):
             else:
                 missed_indices.append(idx)
         if len(missed_indices) > 0:
-            new_paraphrases = self.para_model.generate_diverse_beam_paraphrases(
-                batch, num_return_seq=FLAGS.test_sample_size, train_mode=False
-            )
+            if FLAGS.test_sampling_algorithm == "diverse_beam_search":
+                new_paraphrases = self.para_model.generate_diverse_beam_paraphrases(
+                    batch, num_return_seq=FLAGS.test_sample_size, train_mode=False
+                )
+            elif FLAGS.test_sampling_algorithm == "top_p":
+                new_paraphrases = self.para_model.generate_top_p_paraphrases(
+                    batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature, train_mode=False
+                )
             for missed_idx in missed_indices:
                 new_samples = new_paraphrases[
                     missed_idx * FLAGS.test_sample_size : (missed_idx + 1) * FLAGS.test_sample_size
@@ -797,9 +807,14 @@ class RobertaPrompted(MyBaseLM):
 
         potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
-        paraphrases = self.para_model.generate_diverse_beam_paraphrases(
-            batch, num_return_seq=FLAGS.test_sample_size, train_mode=False
-        )
+        if FLAGS.test_sampling_algorithm == "diverse_beam_search":
+            paraphrases = self.para_model.generate_diverse_beam_paraphrases(
+                batch, num_return_seq=FLAGS.test_sample_size, train_mode=False
+            )
+        elif FLAGS.test_sampling_algorithm == "top_p":
+            paraphrases = self.para_model.generate_top_p_paraphrases(
+                batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature, train_mode=False
+            )
         augment_batch(batch, paraphrases, self.tokenizer, potentials_str, num_return_seq=FLAGS.test_sample_size)
 
         if FLAGS.exp_type == "soft_prompt_finetune":
