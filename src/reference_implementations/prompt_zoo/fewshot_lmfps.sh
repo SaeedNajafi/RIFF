@@ -98,7 +98,8 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --sampling_method ${SAMPLING_METHOD} \
     --sampling_algorithm ${SAMPLING_ALG} \
     --metric_to_save ${METRIC_TO_SAVE} \
-    --kl_penalty_coefficient ${KL_COEFFICIENT}
+    --kl_penalty_coefficient ${KL_COEFFICIENT} \
+    --test_sampling_algorithm "diverse_beam_search"
 
 # test phase
 python -m src.reference_implementations.prompt_zoo.trainer \
@@ -123,6 +124,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --load_paraphraser ${LOAD_PARAPHRASER} \
     --ensemble_type paraphrase_predict \
     --test_temperature 1.0 \
-    --test_sample_size 8
+    --test_sample_size 8 \
+    --test_sampling_algorithm "diverse_beam_search"
 
 rm -r -f ${model_path}/roberta_model_best_step
