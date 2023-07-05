@@ -57,18 +57,18 @@ fi
 
 if [ "${TASK_NAME}" = "sst2" ]; then
     instruction_type="manual_template_research_sst2_with_instruction"
-    train_batch_size=4
+    train_batch_size=8
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
         instruction_type="manual_template_research_sst2_no_instruction"
-        train_batch_size=4
+        train_batch_size=8
     fi
 
 elif [ "${TASK_NAME}" = "SetFit_sst5" ]; then
     instruction_type="manual_template_research_sst5_with_instruction"
-    train_batch_size=4
+    train_batch_size=8
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
         instruction_type="manual_template_research_sst5_no_instruction"
-        train_batch_size=4
+        train_batch_size=8
     fi
 fi
 
@@ -120,7 +120,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --meta_name search.txt \
     --level word \
     --test_sampling_algorithm "top_p" \
-    --use_cache 0
+    --use_cache 1
 
 
 # test phase
@@ -155,4 +155,4 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --meta_name search.txt \
     --level word \
     --test_sampling_algorithm "top_p" \
-    --use_cache 0
+    --use_cache 1
