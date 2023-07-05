@@ -85,6 +85,7 @@ flags.DEFINE_integer("classifier_hidden_d", 128, "The number of hidden units use
 flags.DEFINE_integer("num_classes", 2, "Number of classes for classification. Only used in linear classifier.")
 flags.DEFINE_integer("use_cache", 1, "Whether to use cache for the samples during training or not.")
 
+
 class MyBaseLM(torch.nn.Module):
     """Base LM class for different finetuning + prompt-tuning experiments."""
 
@@ -479,7 +480,6 @@ class RobertaPrompted(MyBaseLM):
     ) -> None:
         super().__init__(seed, device=0)
 
-        
         # construct tokenizer.
         self.tokenizer = AutoTokenizer.from_pretrained(FLAGS.pretrained_model)
 
