@@ -19,10 +19,12 @@ FEWSHOT_SIZE=${FEWSHOT_SIZE}
 DATA_AUG=${AUG}
 TRAIN_PARAPHRASER=${TRAIN_PARA}
 LOAD_PARAPHRASER=${LOAD_PARA}
+PARA_LOSS=${PARA_LOSS}
+SAMPLING_METHOD=${SAMPLING_METHOD}
+SAMPLING_ALG=${SAMPLING_ALG}
 SLURM_JOB_ID=${SLURM_JOB_ID}
 METRIC_TO_SAVE=${METRIC_TO_SAVE}
-PROMPT_LEN=${LEN}
-PARA_MODEL_PATH=${PARA_MODEL_PATH}
+KL_COEFFICIENT=${KL_COEFFICIENT}
 CLUSTER_NAME=${CLUSTER_NAME}
 
 # We source the python env inside a worker depending on the cluster.
@@ -42,47 +44,26 @@ fi
 mkdir -p ${checkpoint_path}
 
 experiment_name=${TASK_NAME}_${NUM_CLASSES}_${FEWSHOT_SIZE}_${EXPERIMENT_TYPE}_${RANDOM_SEED}
-experiment_name=${experiment_name}_${LEARN_RATE}_${PROMPT_LEN}_${DATA_AUG}_${TRAIN_PARAPHRASER}_${LOAD_PARAPHRASER}_${METRIC_TO_SAVE}
+experiment_name=${experiment_name}_${LEARN_RATE}_${DATA_AUG}_${TRAIN_PARAPHRASER}_${LOAD_PARAPHRASER}_${PARA_LOSS}_${SAMPLING_METHOD}_${SAMPLING_ALG}_${METRIC_TO_SAVE}_${KL_COEFFICIENT}
 
 model_path=${checkpoint_path}/${experiment_name}
 
 mkdir -p ${model_path}
 
-# delay purge in the checkpoint and job_id, required for vcluster.
+# delay purge in the checkpoint and job_id
 touch ${checkpoint_path}/DELAYPURGE
-
-if [ "${LOAD_PARAPHRASER}" = "1" ]; then
-    cp -r ${PARA_MODEL_PATH}/bart_model_best_step ${model_path}/
-fi
 
 if [ "${TASK_NAME}" = "sst2" ]; then
     instruction_type="manual_template_research_sst2_with_instruction"
-    train_batch_size=4
-    if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
-        instruction_type="manual_template_research_sst2_no_instruction"
-        train_batch_size=4
-    fi
 
 elif [ "${TASK_NAME}" = "SetFit_sst5" ]; then
     instruction_type="manual_template_research_sst5_with_instruction"
-    train_batch_size=4
-    if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
-        instruction_type="manual_template_research_sst5_no_instruction"
-        train_batch_size=4
-    fi
-fi
 
-ensembling="paraphrase_predict"
-METRIC_TO_SAVE="all_accuracy"
-if [ "${DATA_AUG}" = "0" ]; then
-        ensembling="no_ensemble"
-        METRIC_TO_SAVE="original_accuracy"
 fi
-
 
 # train phase
 python -m src.reference_implementations.prompt_zoo.trainer \
-    --train_batch_size ${train_batch_size} \
+    --train_batch_size 4 \
     --eval_batch_size 8 \
     --mode train \
     --seed ${RANDOM_SEED} \
@@ -108,20 +89,17 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --enable_data_augmentation ${DATA_AUG} \
     --enable_paraphrase_training ${TRAIN_PARAPHRASER} \
     --load_paraphraser ${LOAD_PARAPHRASER} \
-    --ensemble_type ${ensembling} \
+    --ensemble_type "paraphrase_predict" \
     --test_temperature 1.0 \
     --test_sample_size 8 \
+    --train_temperature 1.0 \
+    --train_sample_size 8 \
+    --paraphrase_loss ${PARA_LOSS} \
+    --sampling_method ${SAMPLING_METHOD} \
+    --sampling_algorithm ${SAMPLING_ALG} \
     --metric_to_save ${METRIC_TO_SAVE} \
-    --g_beam_size 1 \
-    --top_k 8 \
-    --num_candidates 8 \
-    --num_compose 1 \
-    --meta_dir . \
-    --meta_name search.txt \
-    --level word \
-    --test_sampling_algorithm "top_p" \
-    --use_cache 0
-
+    --kl_penalty_coefficient ${KL_COEFFICIENT} \
+    --test_sampling_algorithm "top_p"
 
 # test phase
 python -m src.reference_implementations.prompt_zoo.trainer \
@@ -144,15 +122,9 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --enable_data_augmentation ${DATA_AUG} \
     --enable_paraphrase_training ${TRAIN_PARAPHRASER} \
     --load_paraphraser ${LOAD_PARAPHRASER} \
-    --ensemble_type ${ensembling} \
+    --ensemble_type paraphrase_predict \
     --test_temperature 1.0 \
     --test_sample_size 8 \
-    --g_beam_size 1 \
-    --top_k 8 \
-    --num_candidates 8 \
-    --num_compose 1 \
-    --meta_dir . \
-    --meta_name search.txt \
-    --level word \
-    --test_sampling_algorithm "top_p" \
-    --use_cache 0
+    --test_sampling_algorithm "top_p"
+
+rm -r -f ${model_path}/roberta_model_best_step

@@ -73,7 +73,7 @@ flags.DEFINE_string(
 )
 flags.DEFINE_string(
     "test_sampling_algorithm",
-    "top_p",
+    "diverse_beam_search",
     "What algorithm to use for sampling for prediction? top_p or diverse beam_search?",
 )
 flags.DEFINE_float(
@@ -83,6 +83,7 @@ flags.DEFINE_float(
 )
 flags.DEFINE_integer("classifier_hidden_d", 128, "The number of hidden units used in the classifier.")
 flags.DEFINE_integer("num_classes", 2, "Number of classes for classification. Only used in linear classifier.")
+flags.DEFINE_integer("use_cache", 1, "Whether to use cache for the samples during training or not.")
 
 class MyBaseLM(torch.nn.Module):
     """Base LM class for different finetuning + prompt-tuning experiments."""
@@ -548,34 +549,50 @@ class RobertaPrompted(MyBaseLM):
         Keep using the previous samples drawn for the previous epochs
         during the data augmentation phase.
         """
-        paraphrases_input_text = self.para_tokenizer.batch_decode(batch["para_input_ids"], skip_special_tokens=True)
-        batch_size = len(paraphrases_input_text)
-        paraphrases_indices: Dict[int, List[str]] = {}
-        missed_indices = []
-        for idx, para_input_text in enumerate(paraphrases_input_text):
-            if para_input_text in self.sample_memory:
-                paraphrases_indices[idx] = self.sample_memory[para_input_text]
-            else:
-                missed_indices.append(idx)
-        if len(missed_indices) > 0:
+        if FLAGS.use_cache == 1:
+            paraphrases_input_text = self.para_tokenizer.batch_decode(
+                batch["para_input_ids"], skip_special_tokens=True
+            )
+            batch_size = len(paraphrases_input_text)
+            paraphrases_indices: Dict[int, List[str]] = {}
+            missed_indices = []
+            for idx, para_input_text in enumerate(paraphrases_input_text):
+                if para_input_text in self.sample_memory:
+                    paraphrases_indices[idx] = self.sample_memory[para_input_text]
+                else:
+                    missed_indices.append(idx)
+            if len(missed_indices) > 0:
+                if FLAGS.test_sampling_algorithm == "diverse_beam_search":
+                    new_paraphrases = self.para_model.generate_diverse_beam_paraphrases(
+                        batch, num_return_seq=FLAGS.test_sample_size, train_mode=False
+                    )
+                elif FLAGS.test_sampling_algorithm == "top_p":
+                    new_paraphrases = self.para_model.generate_top_p_paraphrases(
+                        batch,
+                        num_return_seq=FLAGS.test_sample_size,
+                        temperature=FLAGS.test_temperature,
+                        train_mode=False,
+                    )
+                for missed_idx in missed_indices:
+                    new_samples = new_paraphrases[
+                        missed_idx * FLAGS.test_sample_size : (missed_idx + 1) * FLAGS.test_sample_size
+                    ]
+                    paraphrases_indices[missed_idx] = new_samples
+                    self.sample_memory[paraphrases_input_text[missed_idx]] = new_samples
+
+            paraphrases = []
+            for idx in range(batch_size):
+                paraphrases.extend(paraphrases_indices[idx])
+
+        else:
             if FLAGS.test_sampling_algorithm == "diverse_beam_search":
-                new_paraphrases = self.para_model.generate_diverse_beam_paraphrases(
+                paraphrases = self.para_model.generate_diverse_beam_paraphrases(
                     batch, num_return_seq=FLAGS.test_sample_size, train_mode=False
                 )
             elif FLAGS.test_sampling_algorithm == "top_p":
-                new_paraphrases = self.para_model.generate_top_p_paraphrases(
+                paraphrases = self.para_model.generate_top_p_paraphrases(
                     batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature, train_mode=False
                 )
-            for missed_idx in missed_indices:
-                new_samples = new_paraphrases[
-                    missed_idx * FLAGS.test_sample_size : (missed_idx + 1) * FLAGS.test_sample_size
-                ]
-                paraphrases_indices[missed_idx] = new_samples
-                self.sample_memory[paraphrases_input_text[missed_idx]] = new_samples
-
-        paraphrases = []
-        for idx in range(batch_size):
-            paraphrases.extend(paraphrases_indices[idx])
 
         return paraphrases
 
