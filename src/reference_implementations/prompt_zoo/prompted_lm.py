@@ -31,7 +31,7 @@ flags.DEFINE_string("mode", "train", "the mode of run? train or test")
 flags.DEFINE_string("model_path", "/tmp/", "main directory to save or load the model from")
 flags.DEFINE_string("para_model_path", "/tmp/", "main directory to save or load the paraphrase model from")
 flags.DEFINE_string("checkpoint", None, "checkpoint name to load from.")
-flags.DEFINE_integer("top_k", 20, "Number of candidate tokens to replace the prompt token.")
+flags.DEFINE_integer("top_k", 8, "Number of candidate tokens to replace the prompt token.")
 flags.DEFINE_integer(
     "test_sample_size",
     8,
@@ -40,10 +40,10 @@ flags.DEFINE_integer(
 )
 flags.DEFINE_integer(
     "train_sample_size",
-    128,
+    8,
     "Number of paraphrases to generate using top-p sampling or beam search used for training the paraphraser",
 )
-flags.DEFINE_integer("g_beam_size", 20, "Number of prompt templates to consider for gradient-search beam search.")
+flags.DEFINE_integer("g_beam_size", 8, "Number of prompt templates to consider for gradient-search beam search.")
 flags.DEFINE_integer("no_repeat_ngram_size", 2, "related to generation with beam size.")
 flags.DEFINE_float(
     "test_temperature",
@@ -51,7 +51,7 @@ flags.DEFINE_float(
     "test or inference temperature for the softmax to smooth or sharpen the token probabilities.",
 )
 flags.DEFINE_float(
-    "train_temperature", 1.5, "training temperature for the softmax to smooth or sharpen the token probabilities."
+    "train_temperature", 1.0, "training temperature for the softmax to smooth or sharpen the token probabilities."
 )
 
 
@@ -82,11 +82,7 @@ flags.DEFINE_float(
     "What is the coefficient for the KL penalty used in the ppo algorithm?",
 )
 flags.DEFINE_integer("classifier_hidden_d", 128, "The number of hidden units used in the classifier.")
-flags.DEFINE_integer("num_classes", 3, "Number of classes for classification. Only used in linear classifier.")
-
-# path to the local pre-trained models on the narval cluster.
-NARVAL_PATH = "/home/saeednjf/scratch/paraphrase_inputs_for_prompts/models"
-
+flags.DEFINE_integer("num_classes", 2, "Number of classes for classification. Only used in linear classifier.")
 
 class MyBaseLM(torch.nn.Module):
     """Base LM class for different finetuning + prompt-tuning experiments."""
@@ -373,14 +369,8 @@ class Paraphraser(MyBaseLM):
         super().__init__(seed, device)
 
         # construct tokenizer
-        try:
-            self.tokenizer = BartTokenizer.from_pretrained(paraphrase_model_name)
-            self.model_pool["bart_model"] = BartForConditionalGeneration.from_pretrained(paraphrase_model_name)
-        except Exception:
-            # for narval cluster.
-            path = f"{NARVAL_PATH}/stanford-oval/paraphraser-bart-large"
-            self.tokenizer = BartTokenizer.from_pretrained(path)
-            self.model_pool["bart_model"] = BartForConditionalGeneration.from_pretrained(path)
+        self.tokenizer = BartTokenizer.from_pretrained(paraphrase_model_name)
+        self.model_pool["bart_model"] = BartForConditionalGeneration.from_pretrained(paraphrase_model_name)
         self.fixed = fixed
 
         self.setup_models()
@@ -488,33 +478,21 @@ class RobertaPrompted(MyBaseLM):
     ) -> None:
         super().__init__(seed, device=0)
 
-        try:
-            # construct tokenizer.
-            self.tokenizer = AutoTokenizer.from_pretrained(FLAGS.pretrained_model)
-        except Exception:
-            self.tokenizer = AutoTokenizer.from_pretrained(f"{NARVAL_PATH}/roberta-large-tokenizer")
+        
+        # construct tokenizer.
+        self.tokenizer = AutoTokenizer.from_pretrained(FLAGS.pretrained_model)
 
         # construct the underlying model
         if FLAGS.exp_type == "soft_prompt_finetune":
             self.model_pool["roberta_model"] = create_softprompt_roberta()
 
         elif FLAGS.exp_type == "classifier_finetune":
-            try:
-                self.model_pool["roberta_model"] = RobertaModel.from_pretrained(FLAGS.pretrained_model)
-            except Exception:
-                path = f"{NARVAL_PATH}/roberta-large-model"
-                self.model_pool["roberta_model"] = RobertaModel.from_pretrained(path)
-
+            self.model_pool["roberta_model"] = RobertaModel.from_pretrained(FLAGS.pretrained_model)
             # use the d_model from the LM config defined internally from huggingface.
             self.model_pool["classifier_model"] = FFClassifier(self.model_pool["roberta_model"].config.hidden_size)
         else:
-            try:
-                # construct the underlying model.
-                self.model_pool["roberta_model"] = RobertaForMaskedLM.from_pretrained(FLAGS.pretrained_model)
-            except Exception:
-                path = f"{NARVAL_PATH}/roberta-large-masked-lm"
-                self.model_pool["roberta_model"] = RobertaForMaskedLM.from_pretrained(path)
-
+            # construct the underlying model.
+            self.model_pool["roberta_model"] = RobertaForMaskedLM.from_pretrained(FLAGS.pretrained_model)
             if FLAGS.exp_type == "lora_finetune":
                 inference_mode = False if FLAGS.mode == "train" else True
                 peft_config = LoraConfig(
