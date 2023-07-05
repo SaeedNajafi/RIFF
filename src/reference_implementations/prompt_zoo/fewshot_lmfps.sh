@@ -63,7 +63,7 @@ fi
 
 # train phase
 python -m src.reference_implementations.prompt_zoo.trainer \
-    --train_batch_size 4 \
+    --train_batch_size 8 \
     --eval_batch_size 8 \
     --mode train \
     --seed ${RANDOM_SEED} \
@@ -99,11 +99,12 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --sampling_algorithm ${SAMPLING_ALG} \
     --metric_to_save ${METRIC_TO_SAVE} \
     --kl_penalty_coefficient ${KL_COEFFICIENT} \
-    --test_sampling_algorithm "diverse_beam_search"
+    --test_sampling_algorithm "top_p" \
+    --use_cache 1
 
 # test phase
 python -m src.reference_implementations.prompt_zoo.trainer \
-    --eval_batch_size 4 \
+    --eval_batch_size 8 \
     --mode test \
     --seed ${RANDOM_SEED} \
     --task_name ${TASK_NAME} \
@@ -125,6 +126,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --ensemble_type paraphrase_predict \
     --test_temperature 1.0 \
     --test_sample_size 8 \
-    --test_sampling_algorithm "diverse_beam_search"
+    --test_sampling_algorithm "top_p" \
+    --use_cache 1
 
 rm -r -f ${model_path}/roberta_model_best_step

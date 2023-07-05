@@ -30,8 +30,8 @@ do
                         do
                             sampling_method=${sampling_methods[$s_m]}
                             TOKENIZERS_PARALLELISM=false bash src/reference_implementations/run_prompt.sh \
-                                SCRIPT=src/reference_implementations/prompt_zoo/fewshot_lmfps_top_p.sh \
-                                LOG_DIR=./roberta-exps-logs-lmfps-top-p \
+                                SCRIPT=src/reference_implementations/prompt_zoo/fewshot_lmfps.sh \
+                                LOG_DIR=./roberta-exps-logs-lmfps \
                                 EXP_TYPE=${exp} \
                                 TASK=${task} \
                                 SEED=${seed} \
