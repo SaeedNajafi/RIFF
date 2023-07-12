@@ -6,7 +6,7 @@ seeds=(11 42 1993 2023 12321)
 tasks=(sst2)
 losses=(pg_basic mml_basic pg_zscore mml_zscore)
 sampling_methods=(on_policy off_policy)
-sampling_algs=(top_p diverse_beam_search mixed)
+sampling_algs=(top_p beam_search mixed)
 
 for i in ${!rates[@]};
 do
@@ -36,7 +36,7 @@ do
                                 TASK=${task} \
                                 SEED=${seed} \
                                 NUM_CLASSES=2 \
-                                FEWSHOT_SIZE=32 \
+                                FEWSHOT_SIZE=128 \
                                 LR=${rate} \
                                 AUG=0 \
                                 TRAIN_PARA=1 \
