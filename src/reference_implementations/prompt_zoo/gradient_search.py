@@ -269,8 +269,8 @@ class SearchRoberta(RobertaPrompted):
         beam of templates and the paraphraser."""
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
         potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
-        if FLAGS.test_sampling_algorithm == "diverse_beam_search":
-            paraphrases = self.para_model.generate_diverse_beam_paraphrases(
+        if FLAGS.test_sampling_algorithm == "beam_search":
+            paraphrases = self.para_model.generate_beam_paraphrases(
                 batch, num_return_seq=FLAGS.test_sample_size, train_mode=False
             )
         elif FLAGS.test_sampling_algorithm == "top_p":

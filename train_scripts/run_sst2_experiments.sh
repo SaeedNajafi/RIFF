@@ -1,8 +1,12 @@
 #!/bin/bash
 
-rates=(0.0001 0.00001 0.001 0.00001 0.001 0.001 0.5)
-exps=(lora_finetune all_finetune input_finetune output_finetune soft_prompt_finetune classifier_finetune gradient_search)
-augs=(0 1)
+# rates=(0.0001 0.00001 0.001 0.00001 0.001 0.001 0.5)
+# exps=(lora_finetune all_finetune input_finetune output_finetune soft_prompt_finetune classifier_finetune gradient_search)
+# augs=(0 1)
+
+rates=(0.5)
+exps=(gradient_search)
+augs=(1)
 
 for i in ${!rates[@]};
 do
