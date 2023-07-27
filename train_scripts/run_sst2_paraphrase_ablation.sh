@@ -3,14 +3,14 @@
 rates=(0.00001)
 exps=(all_finetune)
 #seeds=(11 42 1993 2023 12321)
-seeds=(12321)
+seeds=(42)
 tasks=(sst2)
 #losses=(pg_basic mml_basic pg_zscore mml_zscore)
 losses=(pg_basic)
 #sampling_methods=(on_policy off_policy)
-sampling_methods=(off_policy on_policy)
+sampling_methods=(on_policy)
 #sampling_algs=(top_p beam_search mixed)
-sampling_algs=(top_p mixed)
+sampling_algs=(beam_search)
 
 for i in ${!rates[@]};
 do
