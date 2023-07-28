@@ -237,19 +237,20 @@ As discussed in Section~\ref{paraphrase-objectives}, there are four learning asp
 In our initial comparison, we evaluate various decoding methods, such as beam search, top-p sampling, and mixed sampling, during the training phase to generate samples. We compute the average validation curves for both Maximum-Marginal Likelihood (MML) and Policy Gradient (PG) gradient approximations, considering different learning scenarios, including on-policy and off-policy learning, and whether we use basic rewards or normalized rewards. Figure~\ref{decoding_methods} illustrates the results. We observe that beam-search decoding performs the best when using MML gradient approximation. However, on average, top-p sampling achieves the highest score with PG gradient approximations.
 
 
-is between the MML and PG gradient approximations. As illustrated in Figure~\ref{pg-vs-mml-off-policy}, the MML gradient approximation outperforms the PG gradients in both off-policy and on-policy samplings (for on-policy result, please refer to Figure~\ref{pg-vs-mml-on-policy} in Appendix~\ref{training-paraphrase-extra:appendix}). One potential reason for this behavior could be the appropriate posterior coefficient assigned to the samples within the MML gradients (refer to Objective~\ref{mml-objective}).
-
 \begin{figure}[h]
 \begin{center}
-\includesvg[width=0.5\textwidth]{images/mml_vs_ppo.svg}
+\includesvg[width=0.5\textwidth]{images/mml_vs_pg.svg}
 \end{center}
-\caption{Average accuracy over five internal validation splits for the 128-shot classification on the SST2 dataset using MML gradient approximations. PPO helps with the degenerate paraphrases compared to on-policy sampling.}
-\label{mml-vs-ppo}
+\caption{Average accuracy over five internal validation splits for the 128-shot classification on the SST2 dataset using MML and PG gradient approximations.}
+\label{mml-vs-pg}
 \end{figure}
+
+Our next comparison is between the MML and PG gradient approximations using their best decoding technique. As illustrated in Figure~\ref{mml-vs-pg}, the MML gradient approximation outperforms the PG gradients in both off-policy and on-policy samplings. One potential reason for this behavior could be the appropriate posterior coefficient assigned to the samples within the MML gradients (refer to Objective~\ref{mml-objective}). 
+
 
 Additionally, Figure~\ref{mml-vs-ppo} compares off-policy sampling with the KL penalty introduced by the PPO regularization. We initially observe that on-policy learning, after a few training steps, tends to generate degenerate paraphrases which lead to random guessing when using the binary classifier. In contrast, the KL penalty incorporated with PPO shows a higher resistance to these degenerate paraphrases. Furthermore, the MML approximation with off-policy sampling outperforms the PPO penalty as well. Off-policy sampling outperforms on-policy sampling when averaged over three decoding techniques used for drawing training samples. This holds true for both MML and PG gradient approximations (See Figure~\ref{off-policy-vs-on-policy} in Appendix~\ref{training-paraphrase-extra:appendix}).
 
-Lastly, we evaluated and compared different decoding methods, including beam search, top-p sampling, and mixed sampling, during the training phase to generate samples. We also examined the impact of reward normalization in contrast to using the standard reward, i.e., the log-likelihood of the classifier. The corresponding validation curves for these experiments can be found in Appendix~\ref{training-paraphrase-extra:appendix}.
+We also examined the impact of reward normalization in contrast to using the standard reward, i.e., the log-likelihood of the classifier. The corresponding validation curves for these experiments can be found in Appendix~\ref{training-paraphrase-extra:appendix}.
 
 Upon investigating various elements of our learning objectives for fine-tuning the paraphrase generator, we find that the combination that delivers the best average performance across the validation splits includes: using MML gradient approximation, off-policy sampling, beam search for sample generation during training, and reward normalization. We name this combined approach our novel Language Model-Friendly Paraphrase Search (LMFPS) algorithm. In the subsequent experiments, we utilize LMFPS to generate paraphrases that augment the training splits while tuning the downstream language model.
 
