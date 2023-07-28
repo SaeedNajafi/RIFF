@@ -228,13 +228,16 @@ As discussed in Section~\ref{paraphrase-objectives}, there are four learning asp
 \begin{figure}[h]
 
 \begin{center}
-\includesvg[width=0.5\textwidth]{images/mml_vs_pg_off_policy.svg}
+\includesvg[width=0.5\textwidth]{images/decoding_methods.svg}
 \end{center}
-\caption{Average accuracy over five internal validation splits for the 128-shot classification on the SST2 dataset using off-policy sampling with MML and PG gradient approximations.}
-\label{pg-vs-mml-off-policy}
+\caption{The average accuracy for the 128-shot classification on the SST2 dataset is computed over five internal validation splits. We compare the performance of different text decoding techniques for both Maximum-Marginal Likelihood (MML) and Policy Gradient (PG) gradient approximations. Each data point represents an additional average across four combinations, taking into account off-policy and on-policy learning, as well as the use of basic rewards or normalized rewards.}
+\label{decoding_methods}
 \end{figure}
 
-Our first comparison is between the MML and PG gradient approximations. As illustrated in Figure~\ref{pg-vs-mml-off-policy}, the MML gradient approximation outperforms the PG gradients in both off-policy and on-policy samplings (for on-policy result, please refer to Figure~\ref{pg-vs-mml-on-policy} in Appendix~\ref{training-paraphrase-extra:appendix}). One potential reason for this behavior could be the appropriate posterior coefficient assigned to the samples within the MML gradients (refer to Objective~\ref{mml-objective}).
+In our initial comparison, we evaluate various decoding methods, such as beam search, top-p sampling, and mixed sampling, during the training phase to generate samples. We compute the average validation curves for both Maximum-Marginal Likelihood (MML) and Policy Gradient (PG) gradient approximations, considering different learning scenarios, including on-policy and off-policy learning, and whether we use basic rewards or normalized rewards. Figure~\ref{decoding_methods} illustrates the results. We observe that beam-search decoding performs the best when using MML gradient approximation. However, on average, top-p sampling achieves the highest score with PG gradient approximations.
+
+
+is between the MML and PG gradient approximations. As illustrated in Figure~\ref{pg-vs-mml-off-policy}, the MML gradient approximation outperforms the PG gradients in both off-policy and on-policy samplings (for on-policy result, please refer to Figure~\ref{pg-vs-mml-on-policy} in Appendix~\ref{training-paraphrase-extra:appendix}). One potential reason for this behavior could be the appropriate posterior coefficient assigned to the samples within the MML gradients (refer to Objective~\ref{mml-objective}).
 
 \begin{figure}[h]
 \begin{center}
