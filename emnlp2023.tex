@@ -47,7 +47,7 @@
 % and set <dim> to something 5cm or larger.
 
 \title{Language Model-Friendly Paraphrase Search \\
-for Robust Prompt Optimization}
+for Efficient Language Model Tuning}
 
 % Author information can be set in various styles:
 % For several authors from the same institution:
@@ -73,7 +73,7 @@ for Robust Prompt Optimization}
 \begin{document}
 \maketitle
 \begin{abstract}
-Pre-trained Language Models (PLMs) have shown remarkable performance when fine-tuned on downstream text processing tasks. Recent research has efficiently guided these large models to generate desired outputs for specific downstream tasks by optimizing the input prompts. However, prompt engineering research has primarily focused on finding effective prompts that can be combined with the original task input text and fed into PLMs. In this study, we investigate whether making small modifications to the original task input text can impact the final performance of downstream tasks when used alongside various discrete and continuous prompt optimization techniques. Our experiments on few-shot Natural Language Understanding (NLU) datasets reveal that augmenting the training datasets with paraphrases of input text significantly enhances the prompt optimization performance. To find paraphrases that best enhance the downstream language model, we propose a new learning objective based on maximum-marginal likelihood (MML) estimation and off-policy sampling to tune the paraphrase model. We show that MML with off-policy sampling outperforms recently proposed proximal policy optimization method, considering different text decoding strategies such as beam search and top-p sampling.
+Pre-trained Language Models (PLMs) have shown remarkable performance when refined for downstream text processing tasks. Recently, researchers have effectively guided PLMs to produce desired outputs for specific tasks by optimizing input prompts or adjusting a few additional parameters in the model. Nonetheless, both prompt engineering and efficient tuning studies have primarily focused on discovering suitable prompts or adaptation weights derived from the original task input text. In this study, we explore the potential impact of minor alterations to the original task input text on the ultimate performance of downstream tasks when combined with discrete and continuous prompt optimization or efficient tuning methods. Our experimentation on few-shot Natural Language Understanding (NLU) datasets reveals that enriching the training datasets with paraphrased versions of the input text significantly enhances the performance of different language model tuning techniques. To find the most effective paraphrases for enhancing the downstream language model, we apply a learning objective based on maximum-marginal likelihood (MML) estimation and off-policy sampling to tune the paraphrase model. Our findings indicate that MML combined with off-policy sampling surpasses the recently proposed proximal policy optimization method, considering different text decoding strategies such as beam search and top-p sampling.
 % [Further details on the results for NLU tasks]
 \end{abstract}
 
@@ -167,7 +167,7 @@ R^{n}(z_{j}) = \frac{R(z_{j}) - \mu_{j}}{\sigma_{j}}, \mu_{j} = \frac{1}{M} \sum
 \end{multline}
 
 \subsubsection{Decoding Techniques}
-To train the paraphrase generator, we employ both the MML and PG objectives as outlined in Equations \ref{mml-objective} and \ref{pg-objective}, which necessitates drawing $M$ samples from the paraphrase generator. We implement three decoding techniques for this purpose. Firstly, we utilize beam search decoding to gather these $M$ paraphrases. In order to thoroughly explore the paraphrase space, we alternatively collect the $M$ paraphrases using nucleus (top-p) sampling~\cite{holtzman2020curious}. For the top-p sampling, we establish a sampling threshold of $p=0.99$, at which we collect the minimal set of tokens from the vocabulary with a cumulative probability of at least $0.99$. We then re-sample tokens from this set. Prior to applying top-p sampling, we smooth the softmax logits for the tokens using a temperature value of $t=2$ according to the following function: $\frac{e^{score(v_i)/t}}{\sum_{v} e^{score(v)/t}}$. This smoothing helps incorporate more tokens into the sampling set~\footnote{Any further smoothing with $t>2$ results in degenerate paraphrases using the pre-trained paraphrase model!}. As a third option during the training phase, we blend beam search and top-p sampling. Here, we initially sample $M$ paraphrases using both methods, then combine the top $M/2$ samples from each output to construct our final $M$ samples. For data augmentation (i.e., during the test phase) in objective \ref{lmfp-augmentation-objective}, we solely use top-p sampling, and do not smooth the softmax logits (i.e., $t=1$). As indicated by previous research, top-p sampling has been found to generate more diverse paraphrases when using our pre-trained paraphrase generator~\cite{xu-etal-2020-autoqa}.
+To train the paraphrase generator, we employ both the MML and PG objectives as outlined in Equations \ref{mml-objective} and \ref{pg-objective}, which necessitates drawing $M$ samples from the paraphrase generator. We implement three decoding techniques for this purpose. Firstly, we utilize beam search decoding to gather these $M$ paraphrases. In order to thoroughly explore the paraphrase space, we alternatively collect the $M$ paraphrases using nucleus (top-p) sampling~\cite{holtzman2020curious}. For the top-p sampling, we establish a sampling threshold of $p=0.99$, at which we collect the minimal set of tokens from the vocabulary with a cumulative probability of at least $0.99$. We then re-sample tokens from this set. As a third option during the training phase, we blend beam search and top-p sampling. Here, we initially sample $M$ paraphrases using both methods, then combine the top $M/2$ samples from each output to construct our final $M$ samples. For data augmentation (i.e., during the test phase) in objective \ref{lmfp-augmentation-objective}, we solely use top-p sampling. As indicated by previous research, top-p sampling has been found to generate more diverse paraphrases when using our pre-trained paraphrase generator~\cite{xu-etal-2020-autoqa}.\footnote{Within our experiments, top-p sampling slightly outperformed diverse beam-search for data augmentation.}
 
 \subsubsection{Grammatical Integrity}
 In our final learning perspective, we examine if the paraphrase generator produces ungrammatical paraphrases. As we are sampling paraphrases from $P_{\theta_{\text{par}}}(z_{j}|x)$ and updating $\theta_{\text{par}}$ using these samples, the paraphrase generator may start generating ungrammatical text during this on-policy learning phase. Similar instances of degenerate generation have been reported in tasks like question generation~\cite{najafi-fyshe-2023-weakly} and program synthesis~\cite{NEURIPS2018_f4e369c0}.
@@ -198,13 +198,11 @@ z \sim P_{\theta_{\text{par}}}(.|x)
 
 It's important to note that the KL penalty can be interpreted as the sum of a grammar reward, denoted by $\log P_{\text{fixed}}(z|x)$, and an entropy regularization term over $P_{\theta_{\text{par}}} (z | x)$. The entropy regularization aids in the diverse exploration of the search space~\cite{DBLP:journals/corr/MnihBMGLHSK16}, while the grammar reward discourages the learning of ungrammatical samples.
 
-\begin{comment}
 \subsection{Ensemble Inference}
 \label{ensemble-inference}
-After optimizing Equation \ref{lmfp-main-objective} and fine-tuning our paraphrase generator, we generate weakly-supervised examples for inclusion in the objective \ref{lmfp-augmentation-objective} to train our downstream language model.
+After optimizing Equation \ref{lmfp-main-objective} and fine-tuning our paraphrase generator, we generate weakly-supervised examples for inclusion in the Equation \ref{lmfp-augmentation-objective} to train our downstream language model.
 
-To predict the label of a test example, we could either use our fine-tuned language model to predict the class based on the original input $x$, or adopt an ensembling approach. For the latter, for a given $x$, we generate $M$ paraphrases using our fine-tuned paraphrase generator. We then average the prediction scores for a potential class across the $M+1$ values to predict the class for that input example $x$. This aligns with our earlier assumption that some paraphrases could be easier for the language model to predict the correct label.
-\end{comment}
+To predict the label of a test example, we could either use our fine-tuned language model to predict the class based on the original input $x$, or adopt an ensembling approach. For the latter, for a given $x$, we generate $M$ paraphrases using our fine-tuned paraphrase generator. We then average the prediction scores for a potential class across the $M+1$ values according to the Equation~\ref{lmfp-augmentation-objective} to predict the class for that input example $x$. This aligns with our earlier assumption that some paraphrases could be easier for the language model to predict the correct label. During the data augmentation for the language model, we select the validation set's best model according to this ensemble prediction.
 
 \section{Experiments}
 
@@ -213,7 +211,7 @@ To predict the label of a test example, we could either use our fine-tuned langu
 We employ BART-large~\cite{lewis-etal-2020-bart}, fine-tuned on the ParaBank2 dataset over 5 million sentence-paraphrase pairs~\cite{hu-etal-2019-large}, as our pre-trained paraphrase model, $P_{\theta_{\text{par}}} (z_{i,j} | x_{i})$. These pairs were constructed by back-translating the Czech portion of an English-Czech parallel corpus~\cite{hu-etal-2019-large}. The model has been pre-trained with a token-level cross-entropy loss, calculated using the gold paraphrase output from the input sentence. We use the publicly available weights\footnote{\url{https://huggingface.co/stanford-oval/paraphraser-bart-large}} that were trained as part of the AutoQA system~\cite{xu-etal-2020-autoqa}.
 
 \begin{comment}
-It is worth noting that our goal is not to train a state-of-the-art paraphrase generator, but to study the impact of paraphrasing on prompt optimization techniques. Recent techniques for generating diverse paraphrases~\cite{zhou-bhat-2021-paraphrase} could enhance performance in all our experiments. Given that some of our classification experiments were conducted on the GLUE benchmark~\cite{DBLP:journals/corr/abs-1804-07461}, we opted for the BART-based model over the T5 pre-trained model. This decision was made because the GLUE dataset was part of the supervised corpora used for pre-training T5 models~\cite{DBLP:journals/corr/abs-1910-10683}. Moreover, the BART-large model, fine-tuned on the paraphrase corpus, has not encountered the input sentences and corresponding class labels of the GLUE datasets in its initial pre-training dataset.
+Given that some of our classification experiments were conducted on the GLUE benchmark~\cite{DBLP:journals/corr/abs-1804-07461}, we opted for the BART-based model over the T5 pre-trained model. This decision was made because the GLUE dataset was part of the supervised corpora used for pre-training T5 models~\cite{DBLP:journals/corr/abs-1910-10683}. Moreover, the BART-large model, fine-tuned on the paraphrase corpus, has not encountered the input sentences and corresponding class labels of the GLUE datasets in its initial pre-training dataset.
 \end{comment}
 
 For our main language model, we utilize the RoBERTa-large model, pre-trained with the Masked Language Modeling (MLM) objective~\cite{DBLP:journals/corr/abs-1907-11692}, which has demonstrated strong performance on Natural Language Understanding (NLU) tasks. Our proposed learning framework can be readily extended to other paraphrase generators or backbone language models.
@@ -221,8 +219,7 @@ For our main language model, we utilize the RoBERTa-large model, pre-trained wit
 \subsubsection{Datasets}
 Inspired by prior work~\cite{gao-etal-2021-making, deng-etal-2022-rlprompt}, we conduct several few-shot classification tasks as part of our experiments. These include sentiment classification tasks such as the binary sentiment dataset SST2~\cite{socher-etal-2013-recursive}, the 5-label sentiment dataset SST5~\cite{socher-etal-2013-recursive}, as well as the topic classification dataset AG's News~\cite{NIPS2015_250cf8b5}. Our experiments are carried out under the 128-shot setting, in which we randomly select 128 training examples for each unique label within the dataset. An equal number of examples are gathered to form an internal validation set. We report results on the standard development split for each dataset, with averages taken across five different models trained over five randomly generated train/validation splits. The model delivering the best performance on the validation data is used for prediction on the development set. The number of classes per dataset, as well as the instructions used for each, are outlined in Appendix~\ref{task-instruct-input-format:appendix}. Instructions and class verbalizers for the generative LM tuning techniques are based on the previous work~\cite{deng-etal-2022-rlprompt} in prompt optimization.
 \subsubsection{Training \& Testing Details}
-We conducted few-shot experiments using the seeds \{11, 42, 1993, 12321, 2023\}. The learning rate for each LM tuning technique was separately fine-tuned from the set \{0.5, 0.3, 0.1, 0.01, 0.001, 0.0001, 0.00001\} using the seed 11 on the SST2 dataset, and was then applied globally across other datasets and experiments. For paraphrase fine-tuning, we use the learning rate of 0.00001. Detailed information about the specific learning rates used for each LM technique, along with other hyperparameters we employed across all experiments and datasets, can be found in Appendix~\ref{training-details-extra:appendix}. For optimization, we utilized the AdamW~\cite{DBLP:journals/corr/abs-1711-05101}\footnote{\url{https://pytorch.org/docs/stable/generated/torch.optim.AdamW.html}} optimizer with the AMSGrad variant set to True~\cite{DBLP:journals/corr/abs-1904-09237}. We implemented the methods using the HuggingFace\footnote{\url{https://huggingface.co/}} library and the PyTorch\footnote{\url{https://pytorch.org/}} machine learning framework. We report the accuracy metric on the classification datasets.
-%The experiments were conducted using multiple NVIDIA's A40 and RTX6000 GPU cards (upto 60 GPU cards). This was facilitated by the GPU cluster provided by the Vector Institute\footnote{\url{https://vectorinstitute.ai/}}.
+We conducted few-shot experiments using the seeds \{11, 42, 1993, 12321, 2023\}. The learning rate for each LM tuning technique was separately fine-tuned from the set \{0.5, 0.3, 0.1, 0.01, 0.001, 0.0001, 0.00001\} using the seed 11 on the SST2 dataset, and was then applied globally across other datasets and experiments. For paraphrase fine-tuning, we use the learning rate of 0.00001. Detailed information about the specific learning rates used for each LM technique, along with other hyperparameters we employed across all experiments and datasets, can be found in Appendix~\ref{training-details-extra:appendix}. For optimization, we utilized the AdamW~\cite{DBLP:journals/corr/abs-1711-05101}\footnote{\url{https://pytorch.org/docs/stable/generated/torch.optim.AdamW.html}} optimizer with the AMSGrad variant set to True~\cite{DBLP:journals/corr/abs-1904-09237}. We implemented the methods using the HuggingFace\footnote{\url{https://huggingface.co/}} library and the PyTorch\footnote{\url{https://pytorch.org/}} machine learning framework. We report the accuracy metric on the classification datasets. The experiments were conducted using multiple NVIDIA's A40 and RTX6000 GPU cards (upto 60 GPU cards). This was facilitated by the GPU cluster provided by the Vector Institute\footnote{\url{https://vectorinstitute.ai/}}.
 
 \subsection{Paraphrase Training}
 \label{final-lmfps-result}
@@ -258,47 +255,72 @@ some generated paraphrases before tuning, some generated paraphrases after tunin
 
 \begin{table*}
 \centering
-\caption{Average accuracy scores on the standard development sets for the SST2, SST5, and AG's News datasets for the 128-shot classification. The scores are reported for eight different language model (LM) tuning techniques, namely, AllTune, InTune, HTune, ClsTune, GS, GrIPS, SpTune, and LoRA. We conducted a comparison between two methods of generating paraphrases for data augmentation: DAug and LMFPS. DAug utilizes a simple pre-trained paraphrase model, while LMFPS, our proposed algorithm, fine-tunes the paraphrase generator using the downstream classification model. The final three rows are the average performance across the datasets.}
+\caption{Average accuracy scores on the standard development sets for the SST2, SST5, and AG's News datasets for the 32-shot classification. The scores are reported for eight different language model (LM) tuning techniques, namely, AllTune, InTune, HTune, ClsTune, GS, GrIPS, SpTune, and LoRA. We conducted a comparison between two methods of generating paraphrases for data augmentation: DAug and LMFPS. DAug utilizes a simple pre-trained paraphrase model, while LMFPS, our proposed algorithm, fine-tunes the paraphrase generator using the downstream classification model. The final three rows are the average performance across the datasets. The `+ens' refers to ensemble prediction.}
 %`+Es' denotes the ensemble inference method, as discussed in section \ref{ensemble-inference}.
+
 \begin{tabular}{c | c | c | c | c | c | c | c | c}
 \hline
 (Dataset) & AllTune & InTune & HTune & ClsTune & GS & GrIPS & SpTune & LoRA \\
 \small+Method &  &  &  &  &  &  &  &  \\
 \hline
-(SST2) & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
-\small+DAug & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
-\small+LMFPS & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
+(SST2) & \small91.6 & \small85.4 & \small89.6 & \small72.7 & \small84.3 & \small85.9 & \small87.5 & \small91.7 \\
+\small+DAug & \small91.9 & \small90.3 & \small89.6 & \small72.8 & \small82.2 & \small86.6 & \small85.8 & \small91.8\\
+\small+LMFPS  & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0\\
+\small+DAug+ens & \small92.0 & \small90.7 & \small89.9 & \small70.1 & \small79.8 & \small86.9 & \small85.8 & \small92.0\\
+\small+LMFPS+ens  & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0\\
 \hline
-(SST5) & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
-\small+DAug & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
-\small+LMFPS & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
+(SST5) & \small46.6 & \small43.2 & \small38.1 & \small33.8 & \small33.6 & \small00.0 & \small41.6 & \small47.8\\
+\small+DAug & \small47.4 & \small42.5 & \small38.3 & \small00.0 & \small34.0 & \small00.0 & \small38.5 & \small46.4\\
+\small+LMFPS & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0\\
+\small+DAug+ens & \small47.8 & \small40.5 & \small38.3 & \small00.0 & \small34.2 & \small00.0 & \small38.5 & \small45.8\\
+\small+LMFPS+ens  & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0\\
 \hline
-(AG News) & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
-\small+DAug & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
-\small+LMFPS & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
+(AG News) & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0\\
+\small+DAug & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0\\
+\small+LMFPS & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0\\
+\small+DAug+ens & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0\\
+\small+LMFPS+ens  & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0\\
 \hline
 \hline
-(Average) & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
-\small+DAug & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
-\small+LMFPS & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
+(Average) & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0\\
+\small+DAug & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0\\
+\small+LMFPS & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0\\
+\small+DAug+ens & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0\\
+\small+LMFPS+ens  & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0 & \small00.0\\
 \hline
 \end{tabular}
-\label{lmfps-vs-dataaug-vs-main-128-shot}
+\label{lmfps-vs-dataaug-vs-main-32-shot}
 \end{table*}
 
 \section{Related Works}
 
 \noindent
-{\bf Prompt Engineering}:
-Describe P-tuning, P-Tuning V2, Prefix-Tuning, Blax-Box Tuning, Levenstian Tuning. Chain of Thought Prompting.
+{\bf Prompt Engineering \& Efficient Tuning}: Recent research proposes various techniques for prompt optimization and efficient tuning of language models. In our experiments, we have used successful techniques from each of these areas.
 
-The recent discrete optimization method RLPrompt \cite{deng-etal-2022-rlprompt} which uses the on-policy version of the soft Q-learning \cite{https://doi.org/10.48550/arxiv.2106.07704} to find the optimal discrete prompt tokens in a gradient-free setting.
+FluentPrompt~\cite{shi2022human} is a recent discrete prompting technique based on the projected gradient-descent and Langevin dynamics. FluentPrompt introduces a fluency constraint within Langevin dynamics to generate a sample of high-performing prompts for more interpretable analysis of these discrete prompts. The optimized prompts by FluentPrompt performs on-par to the AutoPrompt, however they have lower perplexity~\cite{shi2022human}.
+
+Building upon SpTune~\cite{lester-etal-2021-power} and P-tuning~\cite{li-liang-2021-prefix}, P-tuning V2~\cite{liu-etal-2022-p} introduced the concept of deep prompt tuning. This method involves injecting prompt vectors into the deeper layers of the transformer model to close the performance gap with AllTuning in medium-sized language models. We have experimented with LoRA~\cite{DBLP:journals/corr/abs-2106-09685}, a recent low-rank adaptation technique for tuning language models. Other potential methods include training bottleneck adapter modules~\cite{DBLP:journals/corr/abs-1902-00751, lin-etal-2020-exploring} added per sub-layer of the transformer model. LoRA outperforms adapter tuning and P-Tuning V2 techniques ~\cite{DBLP:journals/corr/abs-2106-09685}. The successors of LoRA include DyLoRA~\cite{valipour-etal-2023-dylora}  which dynamically learns a range of adaptation ranks, thus eliminating the need to search the rank of the adaptation matrices as a hyper-parameter. Similarly, AdaLoRA dynamically allocates the parameter budget among the weight matrices during adaptation, with matrices of higher priority (i.e., those with greater importance to the downstream task) receiving higher adaptation ranks than less important matrices~\cite{zhang2023adaptive}.
+
+In scenarios where gradients are absent, Black-Box Tuning~\cite{DBLP:journals/corr/abs-2201-03514} applies derivative-free algorithms for optimizing continuous prompts. For discrete prompt optimization, RLPrompt~\cite{deng-etal-2022-rlprompt} employs the on-policy version of soft Q-learning~\cite{https://doi.org/10.48550/arxiv.2106.07704} to find the optimal prompt tokens in a gradient-free setting. Decoder Tuning~\cite{cui-etal-2023-decoder} learns a decoder network over the language model, thus circumventing the need for gradient computation and input-side prompt tuning in few-shot classification. In a recent study, TEMPERA~\cite{zhang2022tempera} introduced a novel approach that involves test-time discrete prompt editing using a trained RL agent. This agent is capable of modifying the instruction, in-context examples, or the verbalizers based on the given task input. The use of Language Models (LLMs) in generating instructions for downstream tasks has involved a two-step process. Initially, LLMs generate a set of candidate instructions, and subsequently, the highest-scoring instruction is utilized to prompt another LLM to perform the downstream task. This approach, known as prompt-based generation-then-filtering, has been investigated in the recent APE method~\cite{zhou2023large}. APE demonstrates the ability to generate prompts that achieve performance comparable to human-designed prompts~\cite{zhou2023large}.
+
+To prompt language models for reasoning tasks, another line of research augment the input context with demonstration examples outlining the intermediate reasoning steps to form the answer. Providing manually or automatically generated chain-of-thoughts within these demonstrations strikingly improve LLMs performance in reasoning tasks~\cite{DBLP:journals/corr/abs-2201-11903, zhang2022automatic, NEURIPS2022_8bb0d291}.
+
+All of the aforementioned techniques for prompt engineering and efficient tuning of the language model use the original input task (or the original input context) provided within the dataset.
 
 \noindent
 {\bf Paraphrase Generation}:
-Our main goal in this study is not to provide a state-of-the-art system for diverse paraphrase generation. We investigate the effect of input paraphrasing on the prompt optimization techniques for efficiently querying large language models.
+Our objective is not to present a state-of-the-art paraphrase generator, but rather to examine the impact of incorporating input paraphrases on the efficient tuning of language models. Recent advancements in generating diverse paraphrases~\cite{zhou-bhat-2021-paraphrase} have provided improved pre-trained paraphrase models, thereby these techniques can enhance performance in all our experiments as our proposed LMFPS technique can be seen as an extra fine-tuning step for the paraphrase models. These recent techniques encompass various approaches, including the use of copy mechanisms, Variational Autoencoders (VAEs), Generative Adversarial Networks (GANs), and Reinforcement Learning (RL) techniques\footnote{For a comprehensive overview of neural paraphrase generation, please refer to the recent survey by Zhou and Bhat~\cite{zhou-bhat-2021-paraphrase}.}.
+
+In the following paragraphs, we provide a brief overview of similar reinforcement learning objectives employed for paraphrase generation. Li et al.~\cite{li-etal-2018-paraphrase} used a deep RL technique, training a pointer-generator network as the paraphrase generator and a decomposable attention model as the evaluator which assigns a paraphrase score to pairs of sentences. The generator was trained using the policy gradient objective, with reward shaping and scaling to stabilize the training process~\cite{li-etal-2018-paraphrase}. Another approach by Qian et al.~\cite{qian-etal-2019-exploring} focused on generating diverse paraphrases by training multiple generators, accompanied by a paraphrase discriminator and a generator discriminator. Policy gradient objective and self-critical learning~\cite{DBLP:journals/corr/RennieMMRG16} were employed for training the generators, with the baseline reward used in the policy gradient objective being the reward obtained from the greedy-decoded sequence. Liu et al.~\cite{liu-etal-2020-learning} also applied the policy gradient objective with self-critical learning, incorporating multiple reward functions such as Rouge score with the reference paraphrase, negative Rouge score with the input sentence to encourage lexical variations, and semantic similarity score between the paraphrase and the input sentence to ensure semantic fidelity.
+
+Another study by Du and Ji~\cite{du-ji-2019-empirical} compared the use of imitation learning algorithm DAGGER with policy gradient REINFORCE for paraphrase generation. The policy gradient objective has also been applied in generating paraphrases while considering multiple objectives for entailment relation-aware paraphrase generation~\cite{Sancheti_Srinivasan_Rudinger_2022}. In the context of chatbot responses, a recent work studies unsupervised paraphrase generation with proximal policy optimization, aiming to maximize a combination of rewards such as textual entailment, semantic similarity, language fluency, and lexical dissimilarity~\cite{DBLP:journals/corr/abs-2103-12777}. Similarly, the policy gradient objective has been employed to optimize multiple rewards, similar to previous work, for unsupervised paraphrase generation~\cite{10.1145/3394486.3403231}.
+
+While previous studies have applied RL techniques for paraphrase generation, we propose the use of Maximum-Marginal Likelihood (MML) gradients instead of policy gradients to train our paraphrase model. Additionally, we adopt an off-policy setting to ensure that the generated paraphrases stay grammatical.
+\noindent
+{\bf Data Augmentation}:
 
 \section{Conclusion}
+
 
 \section{Limitations}
 - We are not doing the best in paraphrasing, more can be done by deploying better paraphraser models.
@@ -375,20 +397,24 @@ In Tables~\ref{hyper-parameters} and~\ref{learning-rates}, we provide the hyper-
 \hline
 Hyper-parameter & Value\\
 \hline
-Top-$k$ candidates in GS & $k$=20 \\
-Top-$k$ in GrIPS & $k$=20 \\
+Top-$k$ candidates in GS & $k$=8 \\
+Top-$k$ in GrIPS & $k$=8 \\
 Chain edits in GrIPS & False \\
 Search level in GrIPS & Word level \\
-Train batch size & 2 in GS, 8 otherwise \\
-Weight decay & 0.01 \\
-Max epochs & 50 \\
+Train batch size & 4 \\
+Weight decay & 0.0001 \\
+SST2 Max epochs & 100 \\
+SST5 Max epochs & 50 \\
 Input length cutoff & 128 tokens \\
 Output length cutoff & 128 tokens \\
 Paraphrase sample size & $M$=8 \\
 Checkpointing steps & 8 \\
-$\beta$ in PPO & 0.6 \\
+$\beta$ in PPO & ? \\
 $D^{'}$ in ClsTune & 128 \\
-Prompt len in SpTune & $L$=25
+Prompt len in SpTune & $L$=25 \\
+Lora $\alpha$ & 32 \\
+Lora $r$ & 8 \\
+Lora dropout & 0.1 \\
 \end{tabular}
 \label{hyper-parameters}
 \end{table}
@@ -404,10 +430,10 @@ GS & No rate \\
 GrIPS & No rate \\
 AllTune & 0.00001 \\
 InTune &  0.001 \\
-HTune & 0.001 \\
-ClsTune & 0.01 \\
+HTune & 0.00001 \\
+ClsTune & 0.001 \\
 SpTune & 0.001 \\
-LoRA & ?
+LoRA & 0.0001
 \end{tabular}
 \label{learning-rates}
 \end{table}
@@ -470,36 +496,5 @@ Interestingly, when employing off-policy sampling, we don't observe a significan
 \section{LMFPS vs. Simple Augmentation}
 \label{lmfps-simple-augmentation:appendix}
 The proposed LMFPS objective in Section~\ref{final-lmfps-result} fine-tunes the paraphrase generator using the downstream classification model. In this section, we aim to juxtapose our LMFPS algorithm with a basic data augmentation method that leverages the pre-trained paraphrase generator without any fine-tuning based on the objective~\ref{lmfp-main-objective}. The settings used to predict classes on the final development sets are identical for both LMFPS and the simple data augmentation method, which we refer to as DAug. These settings include ensemble inference and the application of top-p sampling without logit smoothing for generating the paraphrases. Both LMPFS and DAug use the same objective to train the language model, as detailed in Objective~\ref{lmfp-augmentation-objective}.
-
-
-\begin{table*}
-\centering
-\caption{Average accuracy scores on the standard development sets for the SST2, SST5, and AG's News datasets for the 16-shot classification. The scores are reported for eight different language model (LM) tuning techniques, namely, AllTune, InTune, HTune, ClsTune, GS, GrIPS, SpTune, and LoRA. We conducted a comparison between two methods of generating paraphrases for data augmentation: DAug and LMFPS. DAug utilizes a simple pre-trained paraphrase model, while LMFPS, our proposed algorithm, fine-tunes the paraphrase generator using the downstream classification model. The final three rows are the average performance across the datasets.}
-%`+Es' denotes the ensemble inference method, as discussed in section \ref{ensemble-inference}.
-\begin{tabular}{c | c | c | c | c | c | c | c | c}
-\hline
-(Dataset) & AllTune & InTune & HTune & ClsTune & GS & GrIPS & SpTune & LoRA \\
-\small+Method &  &  &  &  &  &  &  &  \\
-\hline
-(SST2) & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
-\small+DAug & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
-\small+LMFPS & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
-\hline
-(SST5) & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
-\small+DAug & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
-\small+LMFPS & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
-\hline
-(AG News) & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
-\small+DAug & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
-\small+LMFPS & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
-\hline
-\hline
-(Average) & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
-\small+DAug & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
-\small+LMFPS & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0 & \small00.0 \small$\pm$\small0.0\\
-\hline
-\end{tabular}
-\label{lmfps-vs-dataaug-vs-main-16-shot}
-\end{table*}
 
 \end{document}
