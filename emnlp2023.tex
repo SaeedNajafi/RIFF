@@ -245,12 +245,14 @@ In our initial comparison, we evaluate various decoding methods, such as beam se
 \label{mml-vs-pg}
 \end{figure}
 
-Our subsequent comparison involves the MML and PG gradient approximations utilizing their best decoding technique without reward normalization. As depicted in Figure~\ref{mml-vs-pg}, we observe that the MML gradient approximation outperforms the PG gradients in both off-policy and on-policy learning settings. One possible reason for this superiority could be the appropriate posterior coefficient assigned to the samples within the MML gradients (refer to Objective~\ref{mml-objective}). Furthermore, the use of off-policy sampling contributes to the improved performance of MML gradient approximations and enhances the model's robustness towards degenerate generation when utilizing PG gradient approximation.
+Our subsequent comparison involves the MML and PG gradient approximations utilizing their best decoding technique without reward normalization. As depicted in Figure~\ref{mml-vs-pg}, we observe that the MML gradient approximation outperforms the PG gradients in both off-policy and on-policy learning settings. One possible reason for this superiority could be the appropriate posterior coefficient assigned to the samples within the MML gradients (refer to Objective~\ref{mml-objective}). Furthermore, the use of off-policy sampling contributes to the improved performance of MML gradient approximations and enhances the model's robustness towards degenerate generation when utilizing PG gradient approximation. In our comparison, we found that reward normalization did not lead to improved performance with MML gradient estimations. This observation is presented in Figures~\ref{zscore_mml} \& \ref{zscore_pg} of Appendix~\ref{training-paraphrase-extra:appendix}.
 
 
+\begin{comment}
 Additionally, Figure~\ref{mml-vs-ppo} compares off-policy sampling with the KL penalty introduced by the PPO regularization. We initially observe that on-policy learning, after a few training steps, tends to generate degenerate paraphrases which lead to random guessing when using the binary classifier. In contrast, the KL penalty incorporated with PPO shows a higher resistance to these degenerate paraphrases. Furthermore, the MML approximation with off-policy sampling outperforms the PPO penalty as well. Off-policy sampling outperforms on-policy sampling when averaged over three decoding techniques used for drawing training samples. This holds true for both MML and PG gradient approximations (See Figure~\ref{off-policy-vs-on-policy} in Appendix~\ref{training-paraphrase-extra:appendix}). We also examined the impact of reward normalization in contrast to using the standard reward, i.e., the log-likelihood of the classifier. The corresponding validation curves for these experiments can be found in Appendix~\ref{training-paraphrase-extra:appendix}.
+\end{comment}
 
-Upon investigating various elements of our learning objectives for fine-tuning the paraphrase generator, we find that the combination that delivers the best average performance across the validation splits includes: using MML gradient approximation, off-policy sampling, beam search for sample generation during training, without reward normalization. We name this combined approach our novel Language Model-Friendly Paraphrase Search (LMFPS) algorithm. In the subsequent experiments, we utilize LMFPS to generate paraphrases that augment the training splits while tuning the downstream language model.
+Upon investigating various elements of our learning objectives for fine-tuning the paraphrase generator, we find that the combination that delivers the best average performance across the validation splits includes: using MML gradient approximation, off-policy sampling, beam search for sample generation during training without reward normalization. We name this combined approach our novel Language Model-Friendly Paraphrase Search (LMFPS) algorithm. In the subsequent experiments, we utilize LMFPS to generate paraphrases that augment the training splits while tuning the downstream language model.
 
 \subsection{Data Augmentation with LMFPS}
 some generated paraphrases before tuning, some generated paraphrases after tuning.
@@ -443,56 +445,25 @@ LoRA & 0.0001
 \section{Paraphrase Training (Further Results)}
 \label{training-paraphrase-extra:appendix}
 
-This section provides additional results that compare our training objectives for the fine-tuning of the paraphrase generator using the downstream language model. The supplementary experiment shown in Figure~\ref{pg-vs-mml-on-policy} confirms that the MML gradient approximation surpasses the PG estimation within the on-policy samplings.
+This section presents supplementary results that compare our training objectives for fine-tuning the paraphrase generator using the downstream language model.
+
+Figure~\ref{zscore_mml} illustrates that z-scoring the rewards leads to a slight decrease in performance with MML gradient approximations. On the other hand, with PG gradient approximation and on-policy learning, as shown in Figure~\ref{zscore_pg}, z-scoring of the rewards contributes to improved performance in later stages of training and enhances the model's robustness towards degenerate paraphrase generation.
 
 \begin{figure}[h]
 \begin{center}
-\includesvg[width=0.5\textwidth]{images/mml_vs_pg_on_policy.svg}
+\includesvg[width=0.5\textwidth]{images/zscoring_in_mml.svg}
 \end{center}
-\caption{Average accuracy over five internal validation splits for the 128-shot classification on the SST2 dataset using on-policy sampling with MML and PG gradient approximations.}
-\label{pg-vs-mml-on-policy}
+\caption{Average accuracy over five internal validation splits for the 128-shot classification on the SST2 dataset. Z-scoring of rewards is not helpful with MML gradients.}
+\label{zscore_mml}
 \end{figure}
 
-Additionally, Figure~\ref{off-policy-vs-on-policy} demonstrates that off-policy sampling outperforms on-policy sampling when averaged over three decoding techniques used during training phase: beam search, top-p, and mixed sampling. This trend holds true for both MML and PG gradient approximations. In the case of on-policy sampling, it tends to generate degenerate, ungrammatical paraphrases after a few training steps.
 
 \begin{figure}[h]
 \begin{center}
-\includesvg[width=0.5\textwidth]{images/on_policy_vs_off_policy.svg}
+\includesvg[width=0.5\textwidth]{images/zscoring_in_pg.svg}
 \end{center}
-\caption{Average accuracy over five internal validation splits for the 128-shot classification on the SST2 dataset. Performance is further averaged across three text decoding techniques used during training phase for both MML and PG gradient approximations.}
-\label{off-policy-vs-on-policy}
-\end{figure}
-
-Our training phase utilizes three decoding techniques for generating paraphrase samples: beam-search, top-p sampling, and mixed sampling. The average accuracy across the validation splits for each of these decoding techniques is plotted in Figure~\ref{beam-search-top-mixed}. These curves represent further averages across four combinations from both MML and PG gradient approximations, as well as on-policy and off-policy sampling. Our results indicate that mixed sampling tends to exhibit greater robustness to degenerate paraphrases than beam-search decoding during the later stages of training.
-
-\begin{figure}[h]
-\begin{center}
-\includesvg[width=0.5\textwidth]{images/topp_vs_beam_mixed.svg}
-\end{center}
-\caption{Average accuracy over five internal validation splits for the 128-shot classification on the SST2 dataset. Performance is further averaged across MML and PG gradient approximations as well as on-policy and off-policy sampling.}
-\label{beam-search-top-mixed}
-\end{figure}
-
-In a final attempt to gauge the influence of reward normalization, we deploy this technique for both MML and PG gradient approximations, utilizing beam-search decoding during the generation of samples. The resultant average accuracy on the SST2 validation splits is then plotted.
-
-In the case of on-policy learning, as illustrated in Figure~\ref{zscore-on-policy}, reward normalization leads to enhanced robustness against degenerate paraphrase generation, irrespective of whether MML or PG gradient estimation is employed.
-
-Interestingly, when employing off-policy sampling, we don't observe a significant disparity between the usage of basic rewards or reward normalization. This observation is visually represented in Figure~\ref{zscore-off-policy}.
-
-\begin{figure}[h]
-\begin{center}
-\includesvg[width=0.5\textwidth]{images/zscore_on_policy.svg}
-\end{center}
-\caption{The average accuracy over five internal validation splits for the 128-shot classification on the SST2 dataset is plotted. Reward normalization (z\_score) assists in mitigating the generation of degenerate paraphrases in both MML and PG gradient estimations.}
-\label{zscore-on-policy}
-\end{figure}
-
-\begin{figure}[h]
-\begin{center}
-\includesvg[width=0.5\textwidth]{images/zscore_off_policy.svg}
-\end{center}
-\caption{The average accuracy over five internal validation splits for the 128-shot classification on the SST2 dataset is plotted. Reward normalization (z\_score) does not result in significant variations with both MML and PG gradient estimations.}
-\label{zscore-off-policy}
+\caption{Average accuracy over five internal validation splits for the 128-shot classification on the SST2 dataset. Z-scoring of rewards is helpful with PG gradients and on-policy learning.}
+\label{zscore_pg}
 \end{figure}
 
 \section{LMFPS vs. Simple Augmentation}
