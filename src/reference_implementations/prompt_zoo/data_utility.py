@@ -53,6 +53,11 @@ def return_instruction() -> str:
         instruction = "In this task, you are given sentences from movie reviews. \
             Based on the given review, classify it to one of the five classes: \
                 (1) terrible, (2) bad, (3) okay, (4) good, and (5) great."
+    elif FLAGS.instruction_type == "manual_template_research_agn_with_instruction":
+        instruction = "In this task, you are given a news article. Your task is to classify \
+            the article to one out of the four topics 'World', 'Sports', 'Business', 'Tech' \
+            if the article's main topic is relevant to the world, sports, business, \
+            and technology, correspondingly. If you are not sure about the topic, choose the closest option."
     return instruction
 
 
@@ -92,11 +97,19 @@ def augment_batch(
             paraphrase = paraphrases[par_base_index + par_index : par_base_index + par_index + 1][0]
             if for_gradient_search:
                 # for gradient_search.
-                inputs.append(white_space_fix(f"<s> {paraphrase} It was <mask> . </s>"))
-                input_outputs.append(white_space_fix(f"<s> {paraphrase} It was {label} . </s>"))
+                if FLAGS.instruction_type == "manual_template_research_agn_with_instruction":
+                    inputs.append(white_space_fix(f"<s> <mask> News: {paraphrase} </s>"))
+                    input_outputs.append(white_space_fix(f"<s> {label} News: {paraphrase} </s>"))
+                else:
+                    inputs.append(white_space_fix(f"<s> {paraphrase} It was <mask> . </s>"))
+                    input_outputs.append(white_space_fix(f"<s> {paraphrase} It was {label} . </s>"))
             else:
-                inputs.append(white_space_fix(f"<s> {instruction} {paraphrase} It was <mask> . </s>"))
-                input_outputs.append(white_space_fix(f"<s> {instruction} {paraphrase} It was {label} . </s>"))
+                if FLAGS.instruction_type == "manual_template_research_agn_with_instruction":
+                    inputs.append(white_space_fix(f"<s> {instruction} <mask> News: {paraphrase} </s>"))
+                    input_outputs.append(white_space_fix(f"<s> {instruction} {label} News: {paraphrase} </s>"))
+                else:
+                    inputs.append(white_space_fix(f"<s> {instruction} {paraphrase} It was <mask> . </s>"))
+                    input_outputs.append(white_space_fix(f"<s> {instruction} {paraphrase} It was {label} . </s>"))
 
     input_encodings = tokenizer(
         inputs,
@@ -152,19 +165,19 @@ def template_data(
     elif FLAGS.instruction_type == "instruction_at_end":
         instruction = "Generate the sentiment of the previous sentence."
         sentences = [f"{sent} {instruction}" for sent in sentences]
-    elif FLAGS.instruction_type == "manual_template_research_sst2_with_instruction":
-        instruction = "In this task, you are given sentences from movie reviews. \
-            The task is to classify a sentence as 'great' if the sentiment of the \
-                sentence is positive or as 'terrible' if the sentiment of the sentence is negative."
+    elif FLAGS.instruction_type in {
+        "manual_template_research_sst2_with_instruction",
+        "manual_template_research_sst5_with_instruction",
+    }:
+        instruction = return_instruction()
         sentences = [f"{instruction} {sent} It was <mask> ." for sent in sentences]
-    elif FLAGS.instruction_type == "manual_template_research_sst5_with_instruction":
-        instruction = "In this task, you are given sentences from movie reviews. \
-            Based on the given review, classify it to one of the five classes: \
-                (1) terrible, (2) bad, (3) okay, (4) good, and (5) great."
-        sentences = [f"{instruction} {sent} It was <mask> ." for sent in sentences]
+    elif FLAGS.instruction_type == "manual_template_research_agn_with_instruction":
+        instruction = return_instruction()
+        sentences = [f"{instruction} <mask> News: {sent}" for sent in sentences]
     elif FLAGS.instruction_type in [
         "manual_template_research_sst2_no_instruction",
         "manual_template_research_sst5_no_instruction",
+        "manual_template_research_agn_no_instruction",
     ]:
         sentences = [f"{sent} It was <mask> ." for sent in sentences]
 
@@ -226,12 +239,16 @@ def read_sst_sentiment_file(
         dataset = load_dataset(task_name, split=split_name)
     sst5_mapping = {"0": "terrible", "1": "bad", "2": "okay", "3": "good", "4": "great"}
     sst2_mapping = {"0": "terrible", "1": "great"}
+    agn_mapping = {"0": "world", "1": "sports", "2": "business", "3": "sci/tech"}
     sst5_class_to_id_mapping = {val: int(key) for key, val in sst5_mapping.items()}
     sst2_class_to_id_mapping = {val: int(key) for key, val in sst2_mapping.items()}
+    agn_class_to_id_mapping = {val: int(key) for key, val in agn_mapping.items()}
     if task_name == "sst2":
         class_to_id = sst2_class_to_id_mapping
     elif task_name == "SetFit_sst5":
         class_to_id = sst5_class_to_id_mapping
+    elif task_name == "ag_news":
+        class_to_id = agn_class_to_id_mapping
 
     def process_row(row: Dict[str, str]) -> Dict[str, str]:
         """Helper function to process each row of the dataset."""
@@ -242,6 +259,9 @@ def read_sst_sentiment_file(
             return {"sentence": white_space_fix(row["sentence"]), "sentiment": label}
         elif task_name == "SetFit_sst5":
             label = sst5_mapping[str(row["label"])]
+            return {"sentence": white_space_fix(row["text"]), "sentiment": label}
+        elif task_name == "ag_news":
+            label = agn_mapping[str(row["label"])]
             return {"sentence": white_space_fix(row["text"]), "sentiment": label}
         return {"sentence": "none"}
 
