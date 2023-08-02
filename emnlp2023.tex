@@ -245,14 +245,14 @@ In our initial comparison, we evaluate various decoding methods, such as beam se
 \label{mml-vs-pg}
 \end{figure}
 
-Our subsequent comparison involves the MML and PG gradient approximations utilizing their best decoding technique without reward normalization. As depicted in Figure~\ref{mml-vs-pg}, we observe that the MML gradient approximation outperforms the PG gradients in both off-policy and on-policy learning settings. One possible reason for this superiority could be the appropriate posterior coefficient assigned to the samples within the MML gradients (refer to Objective~\ref{mml-objective}). Furthermore, the use of off-policy sampling contributes to the improved performance of MML gradient approximations and enhances the model's robustness towards degenerate generation when utilizing PG gradient approximation. In our comparison, we found that reward normalization did not lead to improved performance with MML gradient estimations. This observation is presented in Figures~\ref{zscore_mml} \& \ref{zscore_pg} of Appendix~\ref{training-paraphrase-extra:appendix}.
+Our subsequent comparison involves the MML and PG gradient approximations utilizing their best decoding technique without reward normalization. As depicted in Figure~\ref{mml-vs-pg}, we observe that the MML gradient approximation outperforms the PG gradients in both off-policy and on-policy learning settings. One possible reason for this superiority could be the appropriate posterior coefficient assigned to the samples within the MML gradients (refer to Objective~\ref{mml-objective}). Furthermore, the use of off-policy sampling contributes to the improved performance of MML gradient approximations and enhances the model's robustness towards degenerate generation when utilizing PG gradient approximation. In our comparison, we found that reward normalization did not lead to improved performance with MML gradient estimations. This observation is presented in Figures~\ref{zscore_mml} \& \ref{zscore_pg} of Appendix~\ref{training-paraphrase-extra:appendix}. Figure~\ref{mml-vs-pg} also demonstrates an improvement from the use of KL penalty (PPO) with policy gradient approximations, similar to improvements from off-policy learning. The tuned KL penalty term $\beta$ was set to $0.7$, resulting in this boost.
 
 
 \begin{comment}
 Additionally, Figure~\ref{mml-vs-ppo} compares off-policy sampling with the KL penalty introduced by the PPO regularization. We initially observe that on-policy learning, after a few training steps, tends to generate degenerate paraphrases which lead to random guessing when using the binary classifier. In contrast, the KL penalty incorporated with PPO shows a higher resistance to these degenerate paraphrases. Furthermore, the MML approximation with off-policy sampling outperforms the PPO penalty as well. Off-policy sampling outperforms on-policy sampling when averaged over three decoding techniques used for drawing training samples. This holds true for both MML and PG gradient approximations (See Figure~\ref{off-policy-vs-on-policy} in Appendix~\ref{training-paraphrase-extra:appendix}). We also examined the impact of reward normalization in contrast to using the standard reward, i.e., the log-likelihood of the classifier. The corresponding validation curves for these experiments can be found in Appendix~\ref{training-paraphrase-extra:appendix}.
 \end{comment}
 
-Upon investigating various elements of our learning objectives for fine-tuning the paraphrase generator, we find that the combination that delivers the best average performance across the validation splits includes: using MML gradient approximation, off-policy sampling, beam search for sample generation during training without reward normalization. We name this combined approach our novel Language Model-Friendly Paraphrase Search (LMFPS) algorithm. In the subsequent experiments, we utilize LMFPS to generate paraphrases that augment the training splits while tuning the downstream language model.
+Upon investigating various elements of our learning objectives for fine-tuning the paraphrase generator, we find that the combination that delivers the best average performance across the validation splits includes: using MML gradient approximation, off-policy sampling, beam search for sample generation during training without reward normalization. We name this combined approach our proposed Language Model-Friendly Paraphrase Search (LMFPS) algorithm. In the subsequent experiments, we utilize LMFPS to generate paraphrases that augment the training splits while tuning the downstream language model.
 
 \subsection{Data Augmentation with LMFPS}
 some generated paraphrases before tuning, some generated paraphrases after tuning.
@@ -401,11 +401,11 @@ In Tables~\ref{hyper-parameters} and~\ref{learning-rates}, we provide the hyper-
 \hline
 Hyper-parameter & Value\\
 \hline
-Top-$k$ candidates in GS & $k$=8 \\
-Top-$k$ in GrIPS & $k$=8 \\
+Top-$k$ candidates in GS & $k$=4 \\
+Top-$k$ in GrIPS & $k$=4 \\
 Chain edits in GrIPS & False \\
 Search level in GrIPS & Word level \\
-Train batch size & 4 \\
+Train batch size & 8 \\
 Weight decay & 0.0001 \\
 SST2 Max epochs & 100 \\
 SST5 Max epochs & 50 \\
@@ -413,7 +413,7 @@ Input length cutoff & 128 tokens \\
 Output length cutoff & 128 tokens \\
 Paraphrase sample size & $M$=8 \\
 Checkpointing steps & 8 \\
-$\beta$ in PPO & ? \\
+$\beta$ in PPO & 0.7 \\
 $D^{'}$ in ClsTune & 128 \\
 Prompt len in SpTune & $L$=25 \\
 Lora $\alpha$ & 32 \\
