@@ -205,7 +205,6 @@ class GRIPSSearch(RobertaPrompted):
         new_batch = batch
         if self.enable_data_augmentation == 1:
             new_batch = copy.deepcopy(batch)
-        if self.enable_data_augmentation == 1:
             paraphrases = self.draw_samples_for_augmentation(new_batch)
             augment_batch(
                 new_batch,  # send a copy of the original batch that will be modified.

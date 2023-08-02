@@ -2,13 +2,12 @@
 
 rates=(0.00001)
 exps=(all_finetune)
-#seeds=(11 42 1993 2023 12321)
-seeds=(42)
+seeds=(11 42 1993 2023 12321)
 tasks=(sst2)
 #losses=(pg_basic mml_basic pg_zscore mml_zscore)
-losses=(pg_basic)
+losses=(mml_basic)
 #sampling_methods=(on_policy off_policy)
-sampling_methods=(on_policy)
+sampling_methods=(ppo)
 #sampling_algs=(top_p beam_search mixed)
 sampling_algs=(beam_search)
 
@@ -50,7 +49,7 @@ do
                                 SAMPLING_METHOD=${sampling_method} \
                                 SAMPLING_ALG=${sampling_alg} \
                                 METRIC_TO_SAVE=accuracy \
-                                KL_COEFFICIENT=0.6 \
+                                KL_COEFFICIENT=0.7 \
                                 CLUSTER_NAME=vcluster
                         done
                     done

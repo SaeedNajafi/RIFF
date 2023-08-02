@@ -4,9 +4,9 @@
 #exps=(lora_finetune all_finetune input_finetune output_finetune soft_prompt_finetune classifier_finetune)
 #augs=(0 1)
 
-rates=(0.00001)
-exps=(all_finetune)
-augs=(1)
+rates=(0.001 0.001)
+exps=(gradient_search grips)
+augs=(0 1)
 
 for i in ${!rates[@]};
 do

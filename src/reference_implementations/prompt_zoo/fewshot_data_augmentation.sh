@@ -60,7 +60,7 @@ if [ "${TASK_NAME}" = "sst2" ]; then
     train_batch_size=8
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
         instruction_type="manual_template_research_sst2_no_instruction"
-        train_batch_size=4
+        train_batch_size=8
     fi
 
 elif [ "${TASK_NAME}" = "SetFit_sst5" ]; then
@@ -68,7 +68,7 @@ elif [ "${TASK_NAME}" = "SetFit_sst5" ]; then
     train_batch_size=8
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
         instruction_type="manual_template_research_sst5_no_instruction"
-        train_batch_size=4
+        train_batch_size=8
     fi
 fi
 
@@ -96,7 +96,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --model_path ${model_path} \
     --para_model_path ${model_path} \
     --checkpoint best_step \
-    --max_epochs 100 \
+    --max_epochs 50 \
     --learning_rate ${LEARN_RATE} \
     --training_steps 1000000 \
     --steps_per_checkpoint 8 \
@@ -113,12 +113,12 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --test_sample_size 8 \
     --metric_to_save ${METRIC_TO_SAVE} \
     --g_beam_size 1 \
-    --top_k 8 \
-    --num_candidates 8 \
+    --top_k 4 \
+    --num_candidates 4 \
     --num_compose 1 \
     --meta_dir . \
     --meta_name search.txt \
-    --level word \
+    --level phrase \
     --test_sampling_algorithm "top_p" \
     --use_cache 1
 
@@ -148,11 +148,11 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --test_temperature 1.0 \
     --test_sample_size 8 \
     --g_beam_size 1 \
-    --top_k 8 \
-    --num_candidates 8 \
+    --top_k 4 \
+    --num_candidates 4 \
     --num_compose 1 \
     --meta_dir . \
     --meta_name search.txt \
-    --level word \
+    --level phrase \
     --test_sampling_algorithm "top_p" \
     --use_cache 1
