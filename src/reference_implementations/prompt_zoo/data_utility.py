@@ -275,6 +275,11 @@ def read_sst_sentiment_file(
             process_row,
             remove_columns=["text", "label", "label_text"],
         )
+    elif task_name == "ag_news":
+        new_dataset = dataset.map(
+            process_row,
+            remove_columns=["text", "label"],
+        )
 
     if split_name in ["validation", "test"]:
         sentences = []
@@ -291,6 +296,8 @@ def read_sst_sentiment_file(
             label_counter = {val: 0 for val in sst2_mapping.values()}
         elif task_name == "SetFit_sst5":
             label_counter = {val: 0 for val in sst5_mapping.values()}
+        elif task_name == "ag_news":
+            label_counter = {val: 0 for val in agn_mapping.values()}
 
         train_sentences = []
         train_labels = []
@@ -411,7 +418,7 @@ def create_sentiment_dataset(
     """Function to create the required huggingface dataset to train the T5
     models on the sentiment analysis task."""
 
-    if task_name in ["sst2", "SetFit_sst5"]:
+    if task_name in ["sst2", "SetFit_sst5", "ag_news"]:
         train_rawdata, eval_rawdata = read_sst_sentiment_file(
             file_name, task_name, eval_repeat_input, train_repeat_input
         )
@@ -423,10 +430,12 @@ def create_sentiment_dataset(
     if train_rawdata is not None:
         train_dataset = tokenize_data(train_rawdata, tokenizer, para_tokenizer)
         # with train_repeat_input True, we like to do inference on the train mini-batch as used in the grips method.
-        shuffle = not train_repeat_input
         if train_repeat_input:
             # we like to read all the repeated rows in the same batch.
             FLAGS.train_batch_size *= FLAGS.num_classes
+            shuffle = False
+        else:
+            shuffle = True
 
         # this is training phase.
         train_dataloader = DataLoader(

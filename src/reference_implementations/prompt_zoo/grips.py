@@ -77,6 +77,11 @@ class GRIPSSearch(RobertaPrompted):
             initial_template = "In this task, you are given sentences from movie reviews. \
             Based on the given review, classify it to one of the five classes: \
                 (1) terrible, (2) bad, (3) okay, (4) good, and (5) great."
+        elif task_name == "ag_news":
+            initial_template = "In this task, you are given a news article. Your task is to classify \
+            the article to one out of the four topics 'World', 'Sports', 'Business', 'Tech' \
+            if the article's main topic is relevant to the world, sports, business, \
+            and technology, correspondingly. If you are not sure about the topic, choose the closest option."
 
         # space of edit ops to be considered
         self.edit_operations = edit_operations

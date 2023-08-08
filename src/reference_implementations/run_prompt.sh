@@ -61,7 +61,7 @@ if [ "${CLUSTER_NAME}" = "narval" ]; then
 elif [ "${CLUSTER_NAME}" = "vcluster" ]; then
     sbatch \
         --gres=gpu:1 \
-        --partition=rtx6000 \
+        --partition=a40 \
         --qos=normal \
         src/reference_implementations/run_prompt.slrm \
             ${SCRIPT} \

@@ -3,7 +3,7 @@
 rates=(0.00001)
 exps=(all_finetune)
 seeds=(11 42 1993 2023 12321)
-tasks=(sst2)
+tasks=(SetFit_sst5)
 #losses=(pg_basic mml_basic pg_zscore mml_zscore)
 losses=(mml_basic)
 #sampling_methods=(on_policy off_policy)
@@ -39,7 +39,7 @@ do
                                 EXP_TYPE=${exp} \
                                 TASK=${task} \
                                 SEED=${seed} \
-                                NUM_CLASSES=2 \
+                                NUM_CLASSES=5 \
                                 FEWSHOT_SIZE=16 \
                                 LR=${rate} \
                                 AUG=0 \

@@ -59,12 +59,15 @@ if [ "${TASK_NAME}" = "sst2" ]; then
 elif [ "${TASK_NAME}" = "SetFit_sst5" ]; then
     instruction_type="manual_template_research_sst5_with_instruction"
 
+elif [ "${TASK_NAME}" = "ag_news" ]; then
+    instruction_type="manual_template_research_agn_with_instruction"
+
 fi
 
 # train phase
 python -m src.reference_implementations.prompt_zoo.trainer \
     --train_batch_size 8 \
-    --eval_batch_size 16 \
+    --eval_batch_size 8 \
     --mode train \
     --seed ${RANDOM_SEED} \
     --task_name ${TASK_NAME} \
@@ -77,7 +80,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --model_path ${model_path} \
     --para_model_path ${model_path} \
     --checkpoint best_step \
-    --max_epochs 25 \
+    --max_epochs 100 \
     --learning_rate ${LEARN_RATE} \
     --training_steps 1000000 \
     --steps_per_checkpoint 8 \
@@ -104,7 +107,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
 
 # test phase
 python -m src.reference_implementations.prompt_zoo.trainer \
-    --eval_batch_size 16 \
+    --eval_batch_size 8 \
     --mode test \
     --seed ${RANDOM_SEED} \
     --task_name ${TASK_NAME} \
