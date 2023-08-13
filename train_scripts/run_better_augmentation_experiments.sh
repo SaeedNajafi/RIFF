@@ -13,13 +13,12 @@ TIME=${TIME}
 LR=${LR}
 EXP_TYPE=${EXP_TYPE}
 TASK=${TASK}
-AUG=${AUG}
 FEWSHOT_SIZE=${FEWSHOT_SIZE}
 CLUSTER_NAME=${CLUSTER_NAME}
 NUM_CLASSES=${NUM_CLASSES}
+PARA_MODEL_PATH=${PARA_MODEL_PATH}
 
-# seeds=(11 42 1993 2023 12321)
-seeds=(11 42 1993)
+seeds=(11 42 1993 2023 12321)
 
 for s in ${!seeds[@]};
 do
@@ -34,15 +33,16 @@ do
         NUM_CLASSES=${NUM_CLASSES} \
         FEWSHOT_SIZE=${FEWSHOT_SIZE} \
         LR=${LR} \
-        AUG=${AUG} \
+        AUG=1 \
         TRAIN_PARA=0 \
-        LOAD_PARA=0 \
+        LOAD_PARA=1 \
         LEN=25 \
         PARA_LOSS="dummy" \
         SAMPLING_METHOD="dummy" \
         SAMPLING_ALG="dummy" \
         METRIC_TO_SAVE=original_accuracy \
         KL_COEFFICIENT=0.0 \
-        CLUSTER_NAME=${CLUSTER_NAME}
+        CLUSTER_NAME=${CLUSTER_NAME} \
+        PARA_MODEL_PATH=${PARA_MODEL_PATH}/${seed}
 
 done

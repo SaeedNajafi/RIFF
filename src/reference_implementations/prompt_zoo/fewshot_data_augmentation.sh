@@ -57,26 +57,26 @@ fi
 
 if [ "${TASK_NAME}" = "sst2" ]; then
     instruction_type="manual_template_research_sst2_with_instruction"
-    train_batch_size=8
+    train_batch_size=16
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
         instruction_type="manual_template_research_sst2_no_instruction"
-        train_batch_size=4
+        train_batch_size=16
     fi
 
 elif [ "${TASK_NAME}" = "SetFit_sst5" ]; then
     instruction_type="manual_template_research_sst5_with_instruction"
-    train_batch_size=8
+    train_batch_size=16
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
         instruction_type="manual_template_research_sst5_no_instruction"
-        train_batch_size=4
+        train_batch_size=16
     fi
 
 elif [ "${TASK_NAME}" = "ag_news" ]; then
     instruction_type="manual_template_research_agn_with_instruction"
-    train_batch_size=8
+    train_batch_size=16
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
         instruction_type="manual_template_research_agn_no_instruction"
-        train_batch_size=4
+        train_batch_size=16
     fi
 
 fi
@@ -98,14 +98,14 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --task_name ${TASK_NAME} \
     --train_file train \
     --dev_file validation \
-    --classification_type fewshot \
+    --classification_type fullshot \
     --num_classes ${NUM_CLASSES} \
     --fewshot_sample_size ${FEWSHOT_SIZE} \
     --exp_type ${EXPERIMENT_TYPE} \
     --model_path ${model_path} \
     --para_model_path ${model_path} \
     --checkpoint best_step \
-    --max_epochs 100 \
+    --max_epochs 5 \
     --learning_rate ${LEARN_RATE} \
     --training_steps 1000000 \
     --steps_per_checkpoint 8 \
@@ -134,7 +134,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
 
 # test phase
 python -m src.reference_implementations.prompt_zoo.trainer \
-    --eval_batch_size 4 \
+    --eval_batch_size 8 \
     --mode test \
     --seed ${RANDOM_SEED} \
     --task_name ${TASK_NAME} \
