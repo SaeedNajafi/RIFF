@@ -36,11 +36,11 @@ function install_env () {
 		pip install --upgrade pip
 
 	elif [ "$OS" = "cirrus" ]; then
-		python -m venv $ENV_NAME-env
+		python3.9 -m venv $ENV_NAME-env
 		source $ENV_NAME-env/bin/activate
 		mkdir -p $HOME/tmp
 		export TMPDIR=$HOME/tmp
-		python -m pip install --upgrade pip
+		python3.9 -m pip install --upgrade pip
 
 	fi
 }
@@ -59,13 +59,13 @@ function install_ml_libraries () {
 		pip install --upgrade "jax[cpu]"
 
 	elif [ "$OS" = "vcluster" ]; then
-		python -m pip install tensorflow-gpu==2.11.0
+		python -m pip install tensorflow
 		python -m pip install torch torchvision torchaudio
 
 	elif [ "$OS" = "cirrus" ]; then
-		python -m pip install tensorflow-gpu==2.11.0
+		python3.9 -m pip install tensorflow
 
-		python -m pip install torch==1.12.1+cu113 torchvision==0.13.1+cu113 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu113
+		python3.9 -m pip install torch torchvision torchtext torchaudio
 
 	elif [ "$OS" = "narval" ]; then
 		python -m pip install --no-index tensorflow==2.11.0
@@ -79,7 +79,7 @@ function install_ml_libraries () {
 function install_prompt_package () {
 	if [ "$DEV" = "true" ]; then
 		# Installs pre-commit tools as well.
-		python -m pip install -e .'[dev]'
+		python3.9 -m pip install -e .'[dev]'
 
 	elif [ "$DEV" = "false" ]; then
 		pip install .
@@ -90,8 +90,8 @@ function install_prompt_package () {
 
 function install_reference_methods () {
 	if [ "$ENV_NAME" = "prompt_torch" ]; then
-		python -m pip install transformers datasets sentencepiece nltk
-		python -m pip install evaluate bert-score supar pandas scikit-learn tensorboard absl-py peft
+		python3.9 -m pip install transformers datasets sentencepiece nltk
+		python3.9 -m pip install evaluate bert-score supar pandas scikit-learn tensorboard absl-py peft
 
 	fi
 

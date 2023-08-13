@@ -407,8 +407,6 @@ class Paraphraser(MyBaseLM):
             attention_mask=loaded_batch["para_attention_mask"],
             no_repeat_ngram_size=FLAGS.no_repeat_ngram_size,
             num_beams=sample_list_size,
-            # num_beam_groups=sample_list_size,
-            # diversity_penalty=2.0,
             early_stopping=True,
             max_length=128,
             num_return_sequences=sample_list_size,
@@ -519,8 +517,6 @@ class RobertaPrompted(MyBaseLM):
                 self.para_model = Paraphraser(seed, device=0, mode=FLAGS.mode, fixed=True)
                 self.para_tokenizer = self.para_model.tokenizer
 
-            self.sample_memory: Dict[str, List[str]] = {}
-
         elif self.enable_paraphrase_training == 1:
             if FLAGS.sampling_method in ["off_policy", "ppo"]:
                 # two bart models, move to another gpu.
@@ -531,6 +527,8 @@ class RobertaPrompted(MyBaseLM):
             self.para_tokenizer = self.para_model.tokenizer
 
         self.setup_models()
+        self.train_sample_memory: Dict[str, List[str]] = {}
+        self.eval_sample_memory: Dict[str, List[str]] = {}
 
         if FLAGS.mode == "train" and FLAGS.exp_type not in ["gradient_search", "grips"]:
             # create optimizer only for training.
@@ -548,22 +546,23 @@ class RobertaPrompted(MyBaseLM):
 
         self.grad_scalar = torch.cuda.amp.GradScaler()
 
-    def draw_samples_for_augmentation(self, batch: torch.utils.data.Dataset) -> List[str]:
+    def draw_samples_for_augmentation(self, batch: torch.utils.data.Dataset, for_train: bool = True) -> List[str]:
         """Draw new samples if they are not in the sample memory.
 
         Keep using the previous samples drawn for the previous epochs
         during the data augmentation phase.
         """
-        if FLAGS.use_cache == 1:
+        if FLAGS.use_cache == 1 and self.enable_data_augmentation == 1:
             paraphrases_input_text = self.para_tokenizer.batch_decode(
                 batch["para_input_ids"], skip_special_tokens=True
             )
             batch_size = len(paraphrases_input_text)
             paraphrases_indices: Dict[int, List[str]] = {}
             missed_indices = []
+            sample_memory = self.train_sample_memory if for_train else self.eval_sample_memory
             for idx, para_input_text in enumerate(paraphrases_input_text):
-                if para_input_text in self.sample_memory:
-                    paraphrases_indices[idx] = self.sample_memory[para_input_text]
+                if para_input_text in sample_memory:
+                    paraphrases_indices[idx] = sample_memory[para_input_text]
                 else:
                     missed_indices.append(idx)
             if len(missed_indices) > 0:
@@ -583,7 +582,7 @@ class RobertaPrompted(MyBaseLM):
                         missed_idx * FLAGS.test_sample_size : (missed_idx + 1) * FLAGS.test_sample_size
                     ]
                     paraphrases_indices[missed_idx] = new_samples
-                    self.sample_memory[paraphrases_input_text[missed_idx]] = new_samples
+                    sample_memory[paraphrases_input_text[missed_idx]] = new_samples
 
             paraphrases = []
             for idx in range(batch_size):
@@ -807,14 +806,7 @@ class RobertaPrompted(MyBaseLM):
 
         potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
-        if FLAGS.test_sampling_algorithm == "beam_search":
-            paraphrases = self.para_model.generate_beam_paraphrases(
-                batch, num_return_seq=FLAGS.test_sample_size, train_mode=False
-            )
-        elif FLAGS.test_sampling_algorithm == "top_p":
-            paraphrases = self.para_model.generate_top_p_paraphrases(
-                batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature, train_mode=False
-            )
+        paraphrases = self.draw_samples_for_augmentation(batch, for_train=False)
         augment_batch(batch, paraphrases, self.tokenizer, potentials_str, num_return_seq=FLAGS.test_sample_size)
 
         if FLAGS.exp_type == "soft_prompt_finetune":
