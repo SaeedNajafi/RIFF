@@ -6,7 +6,7 @@
 
 rates=(0.0001)
 exps=(all_finetune)
-augs=(1)
+augs=(0 1)
 
 
 for i in ${!rates[@]};
@@ -19,6 +19,6 @@ do
         TOKENIZERS_PARALLELISM=false bash train_scripts/run_augmentation_experiments.sh \
             AUG=${aug} LR=${rate} \
             EXP_TYPE=${exp} TASK=sst2 \
-            FEWSHOT_SIZE=1 CLUSTER_NAME=linux NUM_CLASSES=2
+            FEWSHOT_SIZE=1 CLUSTER_NAME=vcluster NUM_CLASSES=2
     done
 done
