@@ -60,15 +60,7 @@ class ClassifierLM(RobertaPrompted):
         # for classifier_finetuning, the dummy labels doesn't have any effect.
         dummy_labels = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
-
-        if FLAGS.test_sampling_algorithm == "beam_search":
-            paraphrases = self.para_model.generate_beam_paraphrases(
-                batch, num_return_seq=FLAGS.test_sample_size, train_mode=False
-            )
-        elif FLAGS.test_sampling_algorithm == "top_p":
-            paraphrases = self.para_model.generate_top_p_paraphrases(
-                batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature, train_mode=False
-            )
+        paraphrases = self.draw_samples_for_augmentation(batch, for_train=False)
         augment_batch(
             batch,
             paraphrases,
