@@ -19,7 +19,7 @@ CLUSTER_NAME=${CLUSTER_NAME}
 NUM_CLASSES=${NUM_CLASSES}
 
 # seeds=(11 42 1993 2023 12321)
-seeds=(11)
+seeds=(11 42)
 
 for s in ${!seeds[@]};
 do
