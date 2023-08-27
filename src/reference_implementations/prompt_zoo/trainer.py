@@ -180,8 +180,6 @@ def launch_test_or_train() -> None:
             FLAGS.enable_paraphrase_training,
             FLAGS.load_paraphraser,
         )
-        eval_repeat_input = True
-        train_repeat_input = False
 
     elif FLAGS.exp_type == "grips":
         model = GRIPSSearch(
@@ -191,32 +189,20 @@ def launch_test_or_train() -> None:
             FLAGS.enable_paraphrase_training,
             FLAGS.load_paraphraser,
         )
-        eval_repeat_input = True
-        train_repeat_input = True
-        # For grips, we use train dataset as the search set and compute the balanced accuracy on it.
-        # we should repeat the input for prediction and with set shuffle false to
-        # keep the repeated inputs next to each other.
     elif FLAGS.exp_type == "classifier_finetune":
         model = ClassifierLM(
             FLAGS.seed, FLAGS.enable_data_augmentation, FLAGS.enable_paraphrase_training, FLAGS.load_paraphraser
         )
-        eval_repeat_input = False
-        train_repeat_input = False
 
     elif FLAGS.exp_type == "no_finetune":
         FLAGS.mode = "no_finetune_test"
         model = RobertaPrompted(
             FLAGS.seed, FLAGS.enable_data_augmentation, FLAGS.enable_paraphrase_training, FLAGS.load_paraphraser
         )
-        eval_repeat_input = True
-        train_repeat_input = False
-        # change the flag to use the pre-trained weights only.
     else:
         model = RobertaPrompted(
             FLAGS.seed, FLAGS.enable_data_augmentation, FLAGS.enable_paraphrase_training, FLAGS.load_paraphraser
         )
-        eval_repeat_input = True
-        train_repeat_input = False
 
     para_tokenizer = None
     if FLAGS.enable_data_augmentation == 1 or FLAGS.enable_paraphrase_training == 1:
@@ -228,8 +214,6 @@ def launch_test_or_train() -> None:
                 tokenizer=model.tokenizer,
                 file_name=FLAGS.train_file,
                 task_name=FLAGS.task_name,
-                eval_repeat_input=eval_repeat_input,
-                train_repeat_input=train_repeat_input,
                 para_tokenizer=para_tokenizer,
             )
         else:
@@ -237,14 +221,12 @@ def launch_test_or_train() -> None:
                 tokenizer=model.tokenizer,
                 file_name=FLAGS.train_file,
                 task_name=FLAGS.task_name,
-                train_repeat_input=train_repeat_input,
                 para_tokenizer=para_tokenizer,
             )
             _, eval_dataloader = create_sentiment_dataset(
                 tokenizer=model.tokenizer,
                 file_name=FLAGS.dev_file,
                 task_name=FLAGS.task_name,
-                eval_repeat_input=eval_repeat_input,
                 para_tokenizer=para_tokenizer,
             )
         train_model(
@@ -259,7 +241,6 @@ def launch_test_or_train() -> None:
             tokenizer=model.tokenizer,
             file_name=FLAGS.test_file,
             task_name=FLAGS.task_name,
-            eval_repeat_input=eval_repeat_input,
             para_tokenizer=para_tokenizer,
         )
         test_model(model=model, metric=sentiment_metric, test_dataloader=test_dataloader)

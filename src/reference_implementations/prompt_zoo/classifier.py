@@ -43,10 +43,10 @@ class ClassifierLM(RobertaPrompted):
         for index, input_str in enumerate(inputs_str):
             for class_idx in range(FLAGS.num_classes):
                 output_row = {
-                    "potential_class": str(class_idx),
+                    "potential_class": self.tokenizer.class_to_id[class_idx],
                     "original_prediction_score": prediction_logits[index][class_idx],
                     "original_inputs": input_str.strip(),
-                    "gold_class": str(batch["class_indices"][index].item()),
+                    "gold_class": batch["gold_outputs"][index],
                 }
                 yield output_row
 
@@ -58,25 +58,13 @@ class ClassifierLM(RobertaPrompted):
         """
         self.predict_mode_on()
         # for classifier_finetuning, the dummy labels doesn't have any effect.
-        dummy_labels = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
         paraphrases = self.draw_samples_for_augmentation(batch, for_train=False)
         augment_batch(
             batch,
             paraphrases,
             self.tokenizer,
-            dummy_labels,
             num_return_seq=FLAGS.test_sample_size,
-        )
-
-        batch_size = batch["class_indices"].size()[0]
-        batch["class_indices"] = (
-            batch.pop("class_indices")
-            .reshape(batch_size, 1)
-            .expand(batch_size, 1 + FLAGS.test_sample_size)
-            .reshape(
-                -1,
-            )
         )
 
         loaded_batch = self.move_to_gpu(batch, keys=["input_ids", "attention_mask"])
@@ -102,11 +90,11 @@ class ClassifierLM(RobertaPrompted):
             for class_idx in range(FLAGS.num_classes):
                 avg_score = numpy.mean(scores[1:, class_idx])
                 output_row = {
-                    "potential_class": str(class_idx),
+                    "potential_class": self.tokenizer.class_to_id[class_idx],
                     "prediction_score": avg_score,
                     "all_prediction_score": 0.5 * avg_score + 0.5 * scores[0, class_idx],
                     "original_prediction_score": scores[0, class_idx],
-                    "gold_class": str(batch["class_indices"][index * (FLAGS.test_sample_size + 1)].item()),
+                    "gold_class": batch["gold_outputs"][index],
                     "paraphrases": paraphrases[index * FLAGS.test_sample_size : (index + 1) * FLAGS.test_sample_size],
                     "original_inputs": input_str.strip(),
                 }
@@ -116,11 +104,12 @@ class ClassifierLM(RobertaPrompted):
         """The classifier training step."""
         with torch.autocast(device_type="cuda"):
             self.train_mode_on()
+            batch["class_indices"] = torch.tensor(
+                [self.tokenizer.class_to_id[label] for label in batch["gold_outputs"]]
+            )
             if self.enable_data_augmentation == 1:
-                # dummy_labels doesn't have any effect for classifier_finetuning.
-                dummy_labels = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
                 paraphrases = self.draw_samples_for_augmentation(batch)
-                augment_batch(batch, paraphrases, self.tokenizer, dummy_labels, num_return_seq=FLAGS.test_sample_size)
+                augment_batch(batch, paraphrases, self.tokenizer, num_return_seq=FLAGS.test_sample_size)
 
                 batch_size = batch["class_indices"].size()[0]
                 batch["class_indices"] = (

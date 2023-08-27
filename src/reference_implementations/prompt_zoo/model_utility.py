@@ -18,8 +18,7 @@ def prepend_prompt(
     input_ids: torch.LongTensor,
     mask: torch.LongTensor,
     prompt_tokens: List[int],
-    masked_labels: Optional[torch.LongTensor] = None,
-) -> Tuple[torch.LongTensor, torch.LongTensor, torch.LongTensor]:
+) -> Tuple[torch.LongTensor, torch.LongTensor]:
     """Prepend the input_ids with the prompt token ids after the first BOS
     token.
 
@@ -38,15 +37,10 @@ def prepend_prompt(
     prompted_input_ids = torch.cat((input_ids[:, 0].view(batch_size, 1), prompt_tensor, input_ids[:, 1:]), dim=1)
     # the mask on the BOS token is always 1.
     prompted_mask = torch.cat((prompt_mask, mask), dim=1)
-
-    prompted_masked_labels = None
-    if masked_labels is not None:
-        # prompt tokens for masked_labels are always -100.
-        prompted_masked_labels = torch.cat((prompt_mask * -100, masked_labels), dim=1).long()
-    return prompted_input_ids, prompted_mask, prompted_masked_labels
+    return prompted_input_ids, prompted_mask
 
 
-def modify_inputs_outputs(batch: torch.utils.data.Dataset, prompt_lists: Optional[List[List[int]]] = None) -> None:
+def modify_inputs(batch: torch.utils.data.Dataset, prompt_lists: Optional[List[List[int]]] = None) -> None:
     """This function will modify the input_ids and mask in the batch to include
     prompt tokens if needed.
 
@@ -54,38 +48,28 @@ def modify_inputs_outputs(batch: torch.utils.data.Dataset, prompt_lists: Optiona
     repeat the outputs per prompt template.
     """
     batch_size, sequence_length = batch["input_ids"].size()
+    batch["modified_input_ids"] = batch["input_ids"]
+    batch["modified_attention_mask"] = batch["attention_mask"]
     if FLAGS.exp_type == "soft_prompt_finetune":
         # This is used for soft prompt tuning! Then for a prompt with length |P|,
         # we add dummy prompt token ids from [0, |P|-1] to map
         # those into |P| vectors from the prompt embedder.
-        (
-            batch["modified_input_ids"],
-            batch["modified_attention_mask"],
-            batch["modified_masked_labels"],
-        ) = prepend_prompt(
-            batch["input_ids"],
-            batch["attention_mask"],
-            prompt_tokens=list(range(FLAGS.prompt_length)),
-            masked_labels=batch["masked_labels"],
+        (batch["modified_input_ids"], batch["modified_attention_mask"]) = prepend_prompt(
+            batch["input_ids"], batch["attention_mask"], prompt_tokens=list(range(FLAGS.prompt_length))
         )
 
     elif FLAGS.exp_type in ["gradient_search", "grips"] and prompt_lists:
         input_ids_stack = []
         input_mask_stack = []
-        masked_labels_stack = []
         num_prompts = 0
         for prompt_tokens in prompt_lists:
-            input_ids, mask, masked_labels = prepend_prompt(
-                batch["input_ids"], batch["attention_mask"], prompt_tokens, masked_labels=batch["masked_labels"]
-            )
+            input_ids, mask, masked_labels = prepend_prompt(batch["input_ids"], batch["attention_mask"], prompt_tokens)
             input_ids_stack.append(input_ids)
             input_mask_stack.append(mask)
-            masked_labels_stack.append(masked_labels)
             num_prompts += 1
 
         batch["modified_input_ids"] = torch.stack(input_ids_stack, dim=1).view(num_prompts * batch_size, -1)
         batch["modified_attention_mask"] = torch.stack(input_mask_stack, dim=1).view(num_prompts * batch_size, -1)
-        batch["modified_masked_labels"] = torch.stack(masked_labels_stack, dim=1).view(num_prompts * batch_size, -1)
 
 
 def log_of_labels(
@@ -129,28 +113,33 @@ def log_of_labels(
     return torch.sum(good_log_p, dim=1).squeeze()
 
 
-def mlm_log_of_labels(
+def mlm_logits(
     model: torch.nn.Module,
     input_ids: torch.Tensor,
     input_mask: torch.Tensor,
-    labels: torch.Tensor,
-    loss_func: torch.nn.CrossEntropyLoss,
 ) -> torch.Tensor:
-    """Do a forward computation and compute the log probability for the given
-    labels for a masked language model such as roberta!"""
+    """Do a forward computation and compute the logits for the given
+    input_ids for a masked language model such as roberta!"""
 
     output = model(
         input_ids=input_ids,
         attention_mask=input_mask,
         labels=None,
     )
+    return output.logits
+
+
+def mlm_log_of_labels(
+    logits: torch.Tensor, labels: torch.Tensor, loss_func: torch.nn.CrossEntropyLoss
+) -> torch.Tensor:
+    """Compute the actual log of labels given pre-computed logits."""
 
     log_p = -loss_func(
-        output.logits.view(-1, output.logits.size(-1)),
+        logits.view(-1, logits.size(-1)),
         labels.view(-1),
     )
 
-    batch_size, sequence_length, vocab_size = output.logits.size()
+    batch_size, sequence_length, vocab_size = logits.size()
 
     # compute per-token log probability in a sequence.
     log_p = log_p.view(batch_size, sequence_length)

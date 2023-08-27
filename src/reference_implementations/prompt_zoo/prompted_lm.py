@@ -16,7 +16,8 @@ from src.reference_implementations.prompt_zoo.model_utility import (
     clear_cache,
     log_of_labels,
     mlm_log_of_labels,
-    modify_inputs_outputs,
+    mlm_logits,
+    modify_inputs,
     set_random_seed,
     z_scoring,
 )
@@ -113,7 +114,6 @@ class MyBaseLM(torch.nn.Module):
         # put model on gpu.
         for model_name, model in self.model_pool.items():
             model.to(self.device)
-
             # compile the pytorch model for speedup.
             # compile is slow in my code!!!
             # self.model_pool[model_name] = torch.compile(model, mode="max-autotune")
@@ -233,7 +233,9 @@ class MyBaseLM(torch.nn.Module):
 
         return class_log_p
 
-    def roberta_forward_pass(self, batch: torch.utils.data.Dataset, train: bool = False) -> torch.Tensor:
+    def roberta_forward_pass(
+        self, batch: torch.utils.data.Dataset, train: bool = False, prompt_lists: Optional[List[List[int]]] = None
+    ) -> torch.Tensor:
         """Using the Roberta Model, run a forward computation over the batch,
         compute the log probability over the batch.
 
@@ -246,62 +248,56 @@ class MyBaseLM(torch.nn.Module):
         else:
             self.predict_mode_on()
 
-        loaded_batch = self.move_to_gpu(batch, keys=["input_ids", "attention_mask", "input_output_ids"])
+        loaded_batch = self.move_to_gpu(batch, keys=["input_ids", "attention_mask"])
 
         # keep an internal link to the loaded batch on gpu or cpu.
         self.loaded_batch = loaded_batch
 
-        # mask labels of non-<mask> tokens
-        masked_labels = torch.where(
-            loaded_batch["input_ids"] == self.tokenizer.mask_token_id, loaded_batch["input_output_ids"], -100
-        )
-
-        with torch.set_grad_enabled(train):
-            class_log_ps = mlm_log_of_labels(
-                model=self.model_pool["roberta_model"],
-                input_ids=loaded_batch["input_ids"],
-                input_mask=loaded_batch["attention_mask"],
-                labels=masked_labels,
-                loss_func=self.loss_func,
-            )
-
-        return class_log_ps
-
-    def gradient_search_forward_pass(
-        self, batch: torch.utils.data.Dataset, train: bool = False, prompt_lists: Optional[List[List[int]]] = None
-    ) -> torch.Tensor:
-        """Run a forward computation over the batch compute the log probability
-        over the batch This function can be called multiple times for training
-        or inference."""
-
-        loaded_batch = self.move_to_gpu(batch, keys=["input_ids", "attention_mask", "input_output_ids"])
-        # keep an internal link to the loaded batch on gpu or cpu.
-        self.loaded_batch = loaded_batch
-
-        # mask labels of non-<mask> tokens
-        masked_labels = torch.where(
-            loaded_batch["input_ids"] == self.tokenizer.mask_token_id,
-            loaded_batch["input_output_ids"],
-            -100,
-        )
-        loaded_batch["masked_labels"] = masked_labels
+        modify_inputs(loaded_batch, prompt_lists)
 
         if train:
-            self.train_mode_on()
-        else:
-            self.predict_mode_on()
+            labels = batch["gold_outputs"]
+            # pick the first label token!
+            labels_ids = self.tokenizer(
+                labels, add_special_tokens=False, truncation=True, padding="max_length", max_length=16
+            ).input_ids[:, 0]
 
-        modify_inputs_outputs(loaded_batch, prompt_lists)
+            original_batch_size = len(labels)
+            new_batch_size, seq_len = batch["input_ids"].size()
+            if new_batch_size > original_batch_size:
+                # augment the gold outputs for training.
+                labels_ids = (
+                    labels_ids.reshape(original_batch_size, 1, 1)
+                    .expand(original_batch_size, new_batch_size // original_batch_size, 1)
+                    .reshape(-1, 1)
+                )
+        else:
+            unique_labels = list(self.tokenizer.class_to_id.keys())
+            # pick the first label token!
+            unique_labels_ids = self.tokenizer(
+                unique_labels, add_special_tokens=False, truncation=True, padding="max_length", max_length=16
+            ).input_ids[:, 0]
 
         with torch.set_grad_enabled(train):
-            class_log_ps = mlm_log_of_labels(
+            class_log_ps = []
+            logits = mlm_logits(
                 model=self.model_pool["roberta_model"],
                 input_ids=loaded_batch["modified_input_ids"],
                 input_mask=loaded_batch["modified_attention_mask"],
-                labels=loaded_batch["modified_masked_labels"],
-                loss_func=self.loss_func,
             )
-        return class_log_ps
+            mask_flags = loaded_batch["modified_input_ids"] == self.tokenizer.mask_token_id
+            if train:
+                labels_seq = mask_flags * labels_ids
+                masked_labels = torch.where(mask_flags, labels_seq, -100)
+                return mlm_log_of_labels(labels=masked_labels, loss_func=self.loss_func)
+            else:
+                num_labels = len(unique_labels)
+                for label_idx in range(num_labels):
+                    labels_seq = mask_flags * unique_labels_ids[label_idx]
+                    masked_labels = torch.where(mask_flags, labels_seq, -100)
+                    class_log_ps_per_label = mlm_log_of_labels(labels=masked_labels, loss_func=self.loss_func)
+                    class_log_ps.append(class_log_ps_per_label)
+        return torch.stack(class_log_ps, dim=1).squeeze()
 
 
 class FFClassifier(torch.nn.Module):
@@ -607,16 +603,11 @@ class RobertaPrompted(MyBaseLM):
         with torch.autocast(device_type="cuda"):
             to_train_lm = True
             if self.enable_data_augmentation == 1:
-                potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
                 paraphrases = self.draw_samples_for_augmentation(batch)
-                augment_batch(
-                    batch, paraphrases, self.tokenizer, potentials_str, num_return_seq=FLAGS.test_sample_size
-                )
+                augment_batch(batch, paraphrases, self.tokenizer, num_return_seq=FLAGS.test_sample_size)
                 to_train_lm = True
 
             elif self.enable_paraphrase_training == 1:
-                potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
-
                 if FLAGS.sampling_method in ["on_policy", "ppo"]:
                     sampling_model = self.para_model
 
@@ -681,13 +672,10 @@ class RobertaPrompted(MyBaseLM):
                     # we also need this for off-policy sampling.
                     fixed_para_log_ps = self.fixed_para_model.bart_forward_pass(batch, train=False)
 
-                augment_batch(batch, samples, self.tokenizer, potentials_str, num_return_seq=FLAGS.train_sample_size)
+                augment_batch(batch, samples, self.tokenizer, num_return_seq=FLAGS.train_sample_size)
                 to_train_lm = False
 
-            if FLAGS.exp_type == "soft_prompt_finetune":
-                class_log_ps = self.gradient_search_forward_pass(batch, train=to_train_lm, prompt_lists=None)
-            else:
-                class_log_ps = self.roberta_forward_pass(batch, train=to_train_lm)
+            class_log_ps = self.roberta_forward_pass(batch, train=to_train_lm, prompt_lists=None)
 
             if self.enable_paraphrase_training == 1:
                 class_log_ps = class_log_ps.reshape(batch_size, FLAGS.train_sample_size + 1)
@@ -779,22 +767,17 @@ class RobertaPrompted(MyBaseLM):
         """The main prediction loop for a given potential class verbalizer."""
 
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
-        potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
-
-        if FLAGS.exp_type == "soft_prompt_finetune":
-            class_log_ps = self.gradient_search_forward_pass(batch, train=False, prompt_lists=None)
-        else:
-            class_log_ps = self.roberta_forward_pass(batch, train=False)
-
+        class_log_ps = self.roberta_forward_pass(batch, train=False, prompt_lists=None)
         class_log_ps = class_log_ps.cpu().detach().numpy()
-        for index, potential_str in enumerate(potentials_str):
-            output_row = {
-                "potential_class": potential_str.strip(),
-                "original_prediction_score": class_log_ps[index],
-                "original_inputs": inputs_str[index].strip(),
-                "gold_class": batch["gold_classes"][index],
-            }
-            yield output_row
+        for index, input_str in enumerate(inputs_str):
+            for class_idx in range(FLAGS.num_classes):
+                output_row = {
+                    "potential_class": self.tokenizer.class_to_id[class_idx],
+                    "original_prediction_score": class_log_ps[index, class_idx],
+                    "original_inputs": input_str.strip(),
+                    "gold_class": batch["gold_outputs"][index],
+                }
+                yield output_row
 
     def paraphrase_and_predict(self, batch: torch.utils.data.Dataset) -> Iterator[Dict[str, str]]:
         """The main prediction loop for a given potential class verbalizer
@@ -804,31 +787,23 @@ class RobertaPrompted(MyBaseLM):
         For each example, the first score belongs to the original input.
         """
 
-        potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
         paraphrases = self.draw_samples_for_augmentation(batch, for_train=False)
-        augment_batch(batch, paraphrases, self.tokenizer, potentials_str, num_return_seq=FLAGS.test_sample_size)
+        augment_batch(batch, paraphrases, self.tokenizer, num_return_seq=FLAGS.test_sample_size)
 
-        if FLAGS.exp_type == "soft_prompt_finetune":
-            class_log_ps = self.gradient_search_forward_pass(batch, train=False, prompt_lists=None)
-        else:
-            class_log_ps = self.roberta_forward_pass(batch, train=False)
-
+        class_log_ps = self.roberta_forward_pass(batch, train=False, prompt_lists=None)
         class_log_ps = class_log_ps.cpu().detach().numpy()
-
-        for index, potential_str in enumerate(potentials_str):
-            scores = class_log_ps[index * (FLAGS.test_sample_size + 1) : (index + 1) * (FLAGS.test_sample_size + 1)]
-            avg_score = numpy.mean(scores[1:])
-            para_index = (index // FLAGS.num_classes) * FLAGS.num_classes
-            output_row = {
-                "potential_class": potential_str.strip(),
-                "prediction_score": avg_score,
-                "all_prediction_score": 0.5 * scores[0] + 0.5 * avg_score,
-                "original_prediction_score": scores[0],
-                "gold_class": batch["gold_classes"][index],
-                "paraphrases": paraphrases[
-                    para_index * FLAGS.test_sample_size : (para_index + 1) * FLAGS.test_sample_size
-                ],
-                "original_inputs": inputs_str[index].strip(),
-            }
-            yield output_row
+        for index, input_str in enumerate(inputs_str):
+            scores = class_log_ps[index * (FLAGS.test_sample_size + 1) : (index + 1) * (FLAGS.test_sample_size + 1), :]
+            for class_idx in range(FLAGS.num_classes):
+                avg_score = numpy.mean(scores[1:, class_idx])
+                output_row = {
+                    "potential_class": self.tokenizer.class_to_id[class_idx],
+                    "prediction_score": avg_score,
+                    "all_prediction_score": 0.5 * avg_score + 0.5 * scores[0, class_idx],
+                    "original_prediction_score": scores[0, class_idx],
+                    "gold_class": batch["gold_outputs"][index],
+                    "paraphrases": paraphrases[index * FLAGS.test_sample_size : (index + 1) * FLAGS.test_sample_size],
+                    "original_inputs": input_str.strip(),
+                }
+                yield output_row

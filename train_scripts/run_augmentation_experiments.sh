@@ -17,8 +17,8 @@ AUG=${AUG}
 FEWSHOT_SIZE=${FEWSHOT_SIZE}
 CLUSTER_NAME=${CLUSTER_NAME}
 NUM_CLASSES=${NUM_CLASSES}
+GPU_TYPE=${GPU_TYPE}
 
-# seeds=(11 42 1993 2023 12321)
 seeds=(11 42)
 
 for s in ${!seeds[@]};
@@ -43,6 +43,7 @@ do
         SAMPLING_ALG="dummy" \
         METRIC_TO_SAVE=original_accuracy \
         KL_COEFFICIENT=0.0 \
-        CLUSTER_NAME=${CLUSTER_NAME}
+        CLUSTER_NAME=${CLUSTER_NAME} \
+        GPU_TYPE=${GPU_TYPE}
 
 done
