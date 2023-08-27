@@ -260,7 +260,9 @@ class MyBaseLM(torch.nn.Module):
             # pick the first label token!
             labels_ids = self.tokenizer(
                 labels, add_special_tokens=False, truncation=True, padding="max_length", max_length=16
-            ).input_ids[:, 0]
+            ).input_ids
+
+            labels_ids = torch.tensor(labels_ids, device=loaded_batch["input_ids"].device)[:, 0]
 
             original_batch_size = len(labels)
             new_batch_size, seq_len = batch["input_ids"].size()
@@ -271,12 +273,15 @@ class MyBaseLM(torch.nn.Module):
                     .expand(original_batch_size, new_batch_size // original_batch_size, 1)
                     .reshape(-1, 1)
                 )
+
         else:
             unique_labels = list(self.tokenizer.class_to_id.keys())
             # pick the first label token!
             unique_labels_ids = self.tokenizer(
                 unique_labels, add_special_tokens=False, truncation=True, padding="max_length", max_length=16
-            ).input_ids[:, 0]
+            ).input_ids
+
+            unique_labels_ids = torch.tensor(unique_labels_ids)[:, 0]
 
         with torch.set_grad_enabled(train):
             class_log_ps = []
@@ -287,16 +292,19 @@ class MyBaseLM(torch.nn.Module):
             )
             mask_flags = loaded_batch["modified_input_ids"] == self.tokenizer.mask_token_id
             if train:
-                labels_seq = mask_flags * labels_ids
+                labels_seq = mask_flags * labels_ids.view(-1, 1)
                 masked_labels = torch.where(mask_flags, labels_seq, -100)
-                return mlm_log_of_labels(labels=masked_labels, loss_func=self.loss_func)
+                return mlm_log_of_labels(logits=logits, labels=masked_labels, loss_func=self.loss_func)
             else:
                 num_labels = len(unique_labels)
                 for label_idx in range(num_labels):
                     labels_seq = mask_flags * unique_labels_ids[label_idx]
                     masked_labels = torch.where(mask_flags, labels_seq, -100)
-                    class_log_ps_per_label = mlm_log_of_labels(labels=masked_labels, loss_func=self.loss_func)
+                    class_log_ps_per_label = mlm_log_of_labels(
+                        logits=logits, labels=masked_labels, loss_func=self.loss_func
+                    )
                     class_log_ps.append(class_log_ps_per_label)
+
         return torch.stack(class_log_ps, dim=1).squeeze()
 
 
@@ -772,9 +780,9 @@ class RobertaPrompted(MyBaseLM):
         for index, input_str in enumerate(inputs_str):
             for class_idx in range(FLAGS.num_classes):
                 output_row = {
-                    "potential_class": self.tokenizer.class_to_id[class_idx],
+                    "potential_class": self.tokenizer.id_to_class[str(class_idx)],
                     "original_prediction_score": class_log_ps[index, class_idx],
-                    "original_inputs": input_str.strip(),
+                    "original_inputs": input_str,
                     "gold_class": batch["gold_outputs"][index],
                 }
                 yield output_row
@@ -798,12 +806,12 @@ class RobertaPrompted(MyBaseLM):
             for class_idx in range(FLAGS.num_classes):
                 avg_score = numpy.mean(scores[1:, class_idx])
                 output_row = {
-                    "potential_class": self.tokenizer.class_to_id[class_idx],
+                    "potential_class": self.tokenizer.id_to_class[str(class_idx)],
                     "prediction_score": avg_score,
                     "all_prediction_score": 0.5 * avg_score + 0.5 * scores[0, class_idx],
                     "original_prediction_score": scores[0, class_idx],
                     "gold_class": batch["gold_outputs"][index],
                     "paraphrases": paraphrases[index * FLAGS.test_sample_size : (index + 1) * FLAGS.test_sample_size],
-                    "original_inputs": input_str.strip(),
+                    "original_inputs": input_str,
                 }
                 yield output_row

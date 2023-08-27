@@ -47,6 +47,8 @@ def return_class_to_id() -> Dict[str, str]:
     elif "agn" in FLAGS.instruction_type:
         return {"world": "0", "sports": "1", "business": "2", "sci/tech": "3"}
 
+    return {}
+
 
 def return_instruction() -> str:
     """Return the instruction type."""
@@ -304,6 +306,7 @@ def create_sentiment_dataset(
     # create a class to id in the tokenizer.
     class_to_id = return_class_to_id()
     tokenizer.class_to_id = class_to_id
+    tokenizer.id_to_class = {id: label for label, id in class_to_id.items()}
 
     if task_name in ["sst2", "SetFit_sst5", "ag_news"]:
         train_rawdata, eval_rawdata = read_sst_sentiment_file(class_to_id, file_name, task_name)

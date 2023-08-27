@@ -98,7 +98,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --task_name ${TASK_NAME} \
     --train_file train \
     --dev_file validation \
-    --classification_type fullshot \
+    --classification_type fewshot \
     --num_classes ${NUM_CLASSES} \
     --fewshot_sample_size ${FEWSHOT_SIZE} \
     --exp_type ${EXPERIMENT_TYPE} \

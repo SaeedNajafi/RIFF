@@ -63,7 +63,7 @@ def modify_inputs(batch: torch.utils.data.Dataset, prompt_lists: Optional[List[L
         input_mask_stack = []
         num_prompts = 0
         for prompt_tokens in prompt_lists:
-            input_ids, mask, masked_labels = prepend_prompt(batch["input_ids"], batch["attention_mask"], prompt_tokens)
+            input_ids, mask = prepend_prompt(batch["input_ids"], batch["attention_mask"], prompt_tokens)
             input_ids_stack.append(input_ids)
             input_mask_stack.append(mask)
             num_prompts += 1
