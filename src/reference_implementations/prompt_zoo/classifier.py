@@ -43,9 +43,9 @@ class ClassifierLM(RobertaPrompted):
         for index, input_str in enumerate(inputs_str):
             for class_idx in range(FLAGS.num_classes):
                 output_row = {
-                    "potential_class": self.tokenizer.class_to_id[class_idx],
+                    "potential_class": self.tokenizer.id_to_class[str(class_idx)],
                     "original_prediction_score": prediction_logits[index][class_idx],
-                    "original_inputs": input_str.strip(),
+                    "original_inputs": input_str,
                     "gold_class": batch["gold_outputs"][index],
                 }
                 yield output_row
@@ -90,13 +90,13 @@ class ClassifierLM(RobertaPrompted):
             for class_idx in range(FLAGS.num_classes):
                 avg_score = numpy.mean(scores[1:, class_idx])
                 output_row = {
-                    "potential_class": self.tokenizer.class_to_id[class_idx],
+                    "potential_class": self.tokenizer.id_to_class[str(class_idx)],
                     "prediction_score": avg_score,
                     "all_prediction_score": 0.5 * avg_score + 0.5 * scores[0, class_idx],
                     "original_prediction_score": scores[0, class_idx],
                     "gold_class": batch["gold_outputs"][index],
                     "paraphrases": paraphrases[index * FLAGS.test_sample_size : (index + 1) * FLAGS.test_sample_size],
-                    "original_inputs": input_str.strip(),
+                    "original_inputs": input_str,
                 }
                 yield output_row
 
@@ -105,7 +105,7 @@ class ClassifierLM(RobertaPrompted):
         with torch.autocast(device_type="cuda"):
             self.train_mode_on()
             batch["class_indices"] = torch.tensor(
-                [self.tokenizer.class_to_id[label] for label in batch["gold_outputs"]]
+                [int(self.tokenizer.class_to_id[label]) for label in batch["gold_outputs"]]
             )
             if self.enable_data_augmentation == 1:
                 paraphrases = self.draw_samples_for_augmentation(batch)

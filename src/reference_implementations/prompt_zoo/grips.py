@@ -181,9 +181,9 @@ class GRIPSSearch(RobertaPrompted):
 
         # for grips, we always use the backbone LM for inference.
         # no need to compute gradients: train=False.
-        class_log_ps = self.gradient_search_forward_pass(batch, train=False, prompt_lists=prompt_lists)
+        class_log_ps = self.roberta_forward_pass(batch, train=False, prompt_lists=prompt_lists)
 
-        template_scores = class_log_ps.view(batch_size, len(prompt_templates))
+        template_scores = class_log_ps.reshape(batch_size, len(prompt_templates), -1)
         if not for_augmentation:
             return template_scores
         else:
@@ -192,10 +192,10 @@ class GRIPSSearch(RobertaPrompted):
             template_scores_arr = []
             for idx in range(orig_batch_size):
                 idx_template_scores = template_scores[
-                    idx * (FLAGS.test_sample_size + 1) : (idx + 1) * (FLAGS.test_sample_size + 1), :
+                    idx * (FLAGS.test_sample_size + 1) : (idx + 1) * (FLAGS.test_sample_size + 1), :, :
                 ]
-                idx_template_score = 0.5 * idx_template_scores[0, :] + 0.5 * torch.mean(
-                    idx_template_scores[1:, :], dim=0
+                idx_template_score = 0.5 * idx_template_scores[0, :, :] + 0.5 * torch.mean(
+                    idx_template_scores[1:, :, :], dim=0
                 )
                 template_scores_arr.append(idx_template_score)
             return torch.stack(template_scores_arr, dim=0)
@@ -206,7 +206,6 @@ class GRIPSSearch(RobertaPrompted):
         This function is used only during the training phase of grips.
         """
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
-        potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
         new_batch = batch
         if self.enable_data_augmentation == 1:
             new_batch = copy.deepcopy(batch)
@@ -215,11 +214,11 @@ class GRIPSSearch(RobertaPrompted):
                 new_batch,  # send a copy of the original batch that will be modified.
                 paraphrases,
                 self.tokenizer,
-                potentials_str,
                 num_return_seq=FLAGS.test_sample_size,
-                for_gradient_search=True,
+                remove_instruction=True,
             )
 
+        self.predict_mode_on()
         class_log_ps = self.score_templates(new_batch, [self.current_candidate_template], for_augmentation=False)
         # mean across the prompt templates.
         # for grips, we only evaluate one candidate prompt template at a time, so the mean doesn't have an effect.
@@ -230,36 +229,39 @@ class GRIPSSearch(RobertaPrompted):
         print("evaluating batch with prompt template:", prompt_str)
 
         if self.enable_data_augmentation == 1:
-            for index, potential_str in enumerate(potentials_str):
-                scores = class_log_ps[
-                    index * (FLAGS.test_sample_size + 1) : (index + 1) * (FLAGS.test_sample_size + 1)
-                ]
-                avg_score = np.mean(scores[1:])
-                para_index = (index // FLAGS.num_classes) * FLAGS.num_classes
-                output_row = {
-                    "potential_class": potential_str.strip(),
-                    "prediction_score": 0.5 * avg_score + 0.5 * scores[0],
-                    "gold_class": batch["gold_classes"][index],
-                    "paraphrases": paraphrases[
-                        para_index * FLAGS.test_sample_size : (para_index + 1) * FLAGS.test_sample_size
-                    ],
-                    "original_inputs": inputs_str[index].strip(),
-                }
-                yield output_row
-
+            for index, input_str in enumerate(inputs_str):
+                for class_idx in range(FLAGS.num_classes):
+                    scores = class_log_ps[
+                        index * (FLAGS.test_sample_size + 1) : (index + 1) * (FLAGS.test_sample_size + 1)
+                    ]
+                    avg_score = np.mean(scores[1:])
+                    output_row = {
+                        "potential_class": self.tokenizer.id_to_class[str(class_idx)],
+                        "prediction_score": avg_score,
+                        "all_prediction_score": 0.5 * avg_score + 0.5 * scores[0],
+                        "original_prediction_score": scores[0],
+                        "gold_class": batch["gold_outputs"][index],
+                        "paraphrases": paraphrases[
+                            index * FLAGS.test_sample_size : (index + 1) * FLAGS.test_sample_size
+                        ],
+                        "original_inputs": inputs_str[index],
+                    }
+                    yield output_row
         else:
-            for index, potential_class in enumerate(potentials_str):
-                output_row = {
-                    "potential_class": potential_class.strip(),
-                    "prediction_score": class_log_ps[index],
-                    "prompt_str": prompt_str,
-                    "original_inputs": inputs_str[index].strip(),
-                    "gold_class": batch["gold_classes"][index],
-                }
-                yield output_row
+            for index, input_str in enumerate(inputs_str):
+                for class_idx in range(FLAGS.num_classes):
+                    output_row = {
+                        "potential_class": self.tokenizer.id_to_class[str(class_idx)],
+                        "prediction_score": class_log_ps[index, class_idx],
+                        "prompt_str": prompt_str,
+                        "original_inputs": inputs_str[index],
+                        "gold_class": batch["gold_outputs"][index],
+                    }
+                    yield output_row
 
     def no_ensemble_predict(self, batch: torch.utils.data.Dataset) -> Iterator[Dict[str, str]]:
         """The main prediction loop for a given potential class label in the grips method."""
+        self.predict_mode_on()
         class_log_ps = self.score_templates(batch, [self.current_candidate_template], for_augmentation=False)
         class_log_ps = class_log_ps.mean(dim=1)  # mean across the beam size.
         class_log_ps = class_log_ps.cpu().detach().numpy()
@@ -267,57 +269,56 @@ class GRIPSSearch(RobertaPrompted):
         # not efficient, but let's pair potential class along the prediction scores.
         # all transformer special tokens will be removed.
         # same labels have been repeated once per template in beam.
-        potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
         prompt_str = self.tokenizer.batch_decode(self.current_candidate_template.tokens, skip_special_tokens=True)
         print("evaluating batch with prompt template:", prompt_str)
-        for index, potential_class in enumerate(potentials_str):
-            output_row = {
-                "potential_class": potential_class.strip(),
-                "original_prediction_score": class_log_ps[index],
-                "prompt_str": prompt_str,
-                "original_inputs": inputs_str[index].strip(),
-                "gold_class": batch["gold_classes"][index],
-            }
-            yield output_row
+        for index, input_str in enumerate(inputs_str):
+            for class_idx in range(FLAGS.num_classes):
+                output_row = {
+                    "potential_class": self.tokenizer.id_to_class[str(class_idx)],
+                    "original_prediction_score": class_log_ps[index, class_idx],
+                    "prompt_str": prompt_str,
+                    "original_inputs": inputs_str[index],
+                    "gold_class": batch["gold_outputs"][index],
+                }
+                yield output_row
 
     def paraphrase_and_predict(self, batch: torch.utils.data.Dataset) -> Iterator[Dict[str, str]]:
         """The main prediction loop for a given potential class label using a
         beam of templates and the paraphraser."""
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
-        potentials_str = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
         paraphrases = self.draw_samples_for_augmentation(batch, for_train=False)
         augment_batch(
             batch,
             paraphrases,
             self.tokenizer,
-            potentials_str,
             num_return_seq=FLAGS.test_sample_size,
-            for_gradient_search=True,
+            remove_instruction=True,
         )
 
+        self.predict_mode_on()
         class_log_ps = self.score_templates(batch, [self.current_candidate_template], for_augmentation=False)
         class_log_ps = class_log_ps.mean(dim=1)  # mean across the beam size.
         class_log_ps = class_log_ps.cpu().detach().numpy()
 
         prompt_str = self.tokenizer.batch_decode(self.current_candidate_template.tokens, skip_special_tokens=True)
         print("evaluating batch with prompt template:", prompt_str)
-        for index, potential_str in enumerate(potentials_str):
-            scores = class_log_ps[index * (FLAGS.test_sample_size + 1) : (index + 1) * (FLAGS.test_sample_size + 1)]
-            avg_score = np.mean(scores[1:])
-            para_index = (index // FLAGS.num_classes) * FLAGS.num_classes
-            output_row = {
-                "potential_class": potential_str.strip(),
-                "prediction_score": avg_score,
-                "all_prediction_score": 0.5 * avg_score + 0.5 * scores[0],
-                "original_prediction_score": scores[0],
-                "gold_class": batch["gold_classes"][index],
-                "paraphrases": paraphrases[
-                    para_index * FLAGS.test_sample_size : (para_index + 1) * FLAGS.test_sample_size
-                ],
-                "original_inputs": inputs_str[index].strip(),
-            }
-            yield output_row
+        for index, input_str in enumerate(inputs_str):
+            for class_idx in range(FLAGS.num_classes):
+                scores = class_log_ps[
+                    index * (FLAGS.test_sample_size + 1) : (index + 1) * (FLAGS.test_sample_size + 1)
+                ]
+                avg_score = np.mean(scores[1:])
+                output_row = {
+                    "potential_class": self.tokenizer.id_to_class[str(class_idx)],
+                    "prediction_score": avg_score,
+                    "all_prediction_score": 0.5 * avg_score + 0.5 * scores[0],
+                    "original_prediction_score": scores[0],
+                    "gold_class": batch["gold_outputs"][index],
+                    "paraphrases": paraphrases[index * FLAGS.test_sample_size : (index + 1) * FLAGS.test_sample_size],
+                    "original_inputs": inputs_str[index],
+                }
+                yield output_row
 
     def grips_score(self, batch: torch.utils.data.Dataset, prediction_file: str) -> float:
         """Predict over the search batch using the current prompt template and

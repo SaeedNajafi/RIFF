@@ -242,12 +242,6 @@ class MyBaseLM(torch.nn.Module):
         This function can be called multiple times for training or
         inference.
         """
-
-        if train:
-            self.train_mode_on()
-        else:
-            self.predict_mode_on()
-
         loaded_batch = self.move_to_gpu(batch, keys=["input_ids", "attention_mask"])
 
         # keep an internal link to the loaded batch on gpu or cpu.
@@ -265,7 +259,7 @@ class MyBaseLM(torch.nn.Module):
             labels_ids = torch.tensor(labels_ids, device=loaded_batch["input_ids"].device)[:, 0]
 
             original_batch_size = len(labels)
-            new_batch_size, seq_len = batch["input_ids"].size()
+            new_batch_size, seq_len = loaded_batch["modified_input_ids"].size()
             if new_batch_size > original_batch_size:
                 # augment the gold outputs for training.
                 labels_ids = (
@@ -683,6 +677,9 @@ class RobertaPrompted(MyBaseLM):
                 augment_batch(batch, samples, self.tokenizer, num_return_seq=FLAGS.train_sample_size)
                 to_train_lm = False
 
+            self.predict_mode_on()
+            if to_train_lm:
+                self.train_mode_on()
             class_log_ps = self.roberta_forward_pass(batch, train=to_train_lm, prompt_lists=None)
 
             if self.enable_paraphrase_training == 1:
@@ -775,6 +772,7 @@ class RobertaPrompted(MyBaseLM):
         """The main prediction loop for a given potential class verbalizer."""
 
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
+        self.predict_mode_on()
         class_log_ps = self.roberta_forward_pass(batch, train=False, prompt_lists=None)
         class_log_ps = class_log_ps.cpu().detach().numpy()
         for index, input_str in enumerate(inputs_str):
@@ -799,6 +797,7 @@ class RobertaPrompted(MyBaseLM):
         paraphrases = self.draw_samples_for_augmentation(batch, for_train=False)
         augment_batch(batch, paraphrases, self.tokenizer, num_return_seq=FLAGS.test_sample_size)
 
+        self.predict_mode_on()
         class_log_ps = self.roberta_forward_pass(batch, train=False, prompt_lists=None)
         class_log_ps = class_log_ps.cpu().detach().numpy()
         for index, input_str in enumerate(inputs_str):

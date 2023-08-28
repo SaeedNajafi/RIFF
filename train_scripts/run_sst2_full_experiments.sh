@@ -15,9 +15,9 @@ GPU_TYPE=${GPU_TYPE}
 #exps=(lora_finetune all_finetune input_finetune output_finetune soft_prompt_finetune classifier_finetune gradient_search grips)
 #augs=(0 1)
 
-rates=(0.0001)
-exps=(lora_finetune)
-augs=(1)
+rates=(0.001)
+exps=(grips)
+augs=(0)
 
 
 for i in ${!rates[@]};
