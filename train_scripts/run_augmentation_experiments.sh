@@ -19,7 +19,7 @@ CLUSTER_NAME=${CLUSTER_NAME}
 NUM_CLASSES=${NUM_CLASSES}
 GPU_TYPE=${GPU_TYPE}
 
-seeds=(11)
+seeds=(11 42 1993 2023 12321)
 
 for s in ${!seeds[@]};
 do

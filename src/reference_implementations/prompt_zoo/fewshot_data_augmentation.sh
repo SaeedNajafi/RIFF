@@ -60,23 +60,23 @@ if [ "${TASK_NAME}" = "sst2" ]; then
     train_batch_size=8
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
         instruction_type="manual_template_research_sst2_no_instruction"
-        train_batch_size=1
+        train_batch_size=8
     fi
 
 elif [ "${TASK_NAME}" = "SetFit_sst5" ]; then
     instruction_type="manual_template_research_sst5_with_instruction"
-    train_batch_size=16
+    train_batch_size=8
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
         instruction_type="manual_template_research_sst5_no_instruction"
-        train_batch_size=16
+        train_batch_size=8
     fi
 
 elif [ "${TASK_NAME}" = "ag_news" ]; then
     instruction_type="manual_template_research_agn_with_instruction"
-    train_batch_size=16
+    train_batch_size=8
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
         instruction_type="manual_template_research_agn_no_instruction"
-        train_batch_size=16
+        train_batch_size=8
     fi
 
 fi
@@ -105,7 +105,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --model_path ${model_path} \
     --para_model_path ${model_path} \
     --checkpoint best_step \
-    --max_epochs 5 \
+    --max_epochs 100 \
     --learning_rate ${LEARN_RATE} \
     --training_steps 1000000 \
     --steps_per_checkpoint 8 \
@@ -119,11 +119,11 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --load_paraphraser ${LOAD_PARAPHRASER} \
     --ensemble_type ${ensembling} \
     --test_temperature 1.0 \
-    --test_sample_size 4 \
+    --test_sample_size 8 \
     --metric_to_save ${METRIC_TO_SAVE} \
     --g_beam_size 1 \
-    --top_k 4 \
-    --num_candidates 4 \
+    --top_k 8 \
+    --num_candidates 8 \
     --num_compose 1 \
     --meta_dir . \
     --meta_name search.txt \
@@ -157,8 +157,8 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --test_temperature 1.0 \
     --test_sample_size 8 \
     --g_beam_size 1 \
-    --top_k 4 \
-    --num_candidates 4 \
+    --top_k 8 \
+    --num_candidates 8 \
     --num_compose 1 \
     --meta_dir . \
     --meta_name search.txt \
