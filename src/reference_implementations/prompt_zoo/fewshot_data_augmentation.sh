@@ -60,7 +60,7 @@ if [ "${TASK_NAME}" = "sst2" ]; then
     train_batch_size=8
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
         instruction_type="manual_template_research_sst2_no_instruction"
-        train_batch_size=8
+        train_batch_size=4
     fi
 
 elif [ "${TASK_NAME}" = "SetFit_sst5" ]; then
@@ -68,7 +68,7 @@ elif [ "${TASK_NAME}" = "SetFit_sst5" ]; then
     train_batch_size=8
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
         instruction_type="manual_template_research_sst5_no_instruction"
-        train_batch_size=8
+        train_batch_size=4
     fi
 
 elif [ "${TASK_NAME}" = "ag_news" ]; then
@@ -76,7 +76,7 @@ elif [ "${TASK_NAME}" = "ag_news" ]; then
     train_batch_size=8
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
         instruction_type="manual_template_research_agn_no_instruction"
-        train_batch_size=8
+        train_batch_size=4
     fi
 
 fi
