@@ -71,11 +71,12 @@ def start_training(model: MyBaseLM, dataloader: torch.utils.data.DataLoader) -> 
 
 def train_model(
     model: MyBaseLM,
-    metric: Callable[[str], Dict[str, float]],
+    metric: Callable[[str, int], Dict[str, float]],
     train_dataloader: torch.utils.data.DataLoader,
     eval_dataloader: torch.utils.data.DataLoader,
 ) -> None:
     """Run the model on input data; for training or inference."""
+    num_labels = len(list(model.tokenizer.class_to_id.keys()))
     if FLAGS.mode == "train":
         start_time = time.time()
         writer = SummaryWriter(FLAGS.model_path)
@@ -84,7 +85,7 @@ def train_model(
         total_loss = []
         eval_file = os.path.join(FLAGS.model_path, "temp_eval.csv")
         start_predicting(model, eval_dataloader, eval_file)
-        scores = metric(eval_file)  # type: ignore
+        scores = metric(eval_file, num_labels)  # type: ignore
         for score_name, score_val in scores.items():
             writer.add_scalar(f"{score_name}/dev", score_val, 0)
             if score_name == FLAGS.metric_to_save:
@@ -106,7 +107,7 @@ def train_model(
 
                 if global_step % FLAGS.steps_per_checkpoint == 0:
                     start_predicting(model, eval_dataloader, eval_file)
-                    scores = metric(eval_file)  # type: ignore
+                    scores = metric(eval_file, num_labels)  # type: ignore
                     for score_name, score_val in scores.items():
                         writer.add_scalar(f"{score_name}/dev", score_val, global_step)
                         if score_name == FLAGS.metric_to_save:
@@ -128,7 +129,7 @@ def train_model(
 
             # do final evaluation on the dev data at the end of epoch.
             start_predicting(model, eval_dataloader, eval_file)
-            scores = metric(eval_file)  # type: ignore
+            scores = metric(eval_file, num_labels)  # type: ignore
             for score_name, score_val in scores.items():
                 writer.add_scalar(f"{score_name}/dev", score_val, global_step)
                 if score_name == FLAGS.metric_to_save:
@@ -155,14 +156,15 @@ def train_model(
 def test_model(
     model: MyBaseLM,
     test_dataloader: torch.utils.data.DataLoader,
-    metric: Optional[Callable[[str], Dict[str, float]]] = None,
+    metric: Optional[Callable[[str, int], Dict[str, float]]] = None,
 ) -> None:
     writer = SummaryWriter(FLAGS.model_path)
+    num_labels = len(list(model.tokenizer.class_to_id.keys()))
     if FLAGS.mode in ["test", "inference", "eval", "no_finetune_test"]:
         print("Predicting...")
         start_predicting(model, test_dataloader, FLAGS.prediction_file)
         if metric is not None:
-            scores = metric(FLAGS.prediction_file)  # type: ignore
+            scores = metric(FLAGS.prediction_file, num_labels)  # type: ignore
             for score_name, score_val in scores.items():
                 writer.add_scalar(score_name, score_val, 0)
     else:

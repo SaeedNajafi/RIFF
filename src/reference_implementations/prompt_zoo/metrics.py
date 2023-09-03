@@ -11,7 +11,7 @@ from sklearn.metrics import balanced_accuracy_score
 FLAGS = flags.FLAGS
 
 
-def sentiment_metric(prediction_file: str) -> Dict[str, float]:
+def sentiment_metric(prediction_file: str, num_labels: int) -> Dict[str, float]:
     """Compute the classification accuracy for sentiment classification. We
     report the following metrics:
 
@@ -26,9 +26,6 @@ def sentiment_metric(prediction_file: str) -> Dict[str, float]:
     df = pd.read_csv(prediction_file, delimiter=",")
 
     gold_labels = [label.strip() for label in df["gold_class"].tolist()]
-
-    # pick the class with the highest score among the possible class labels!
-    num_labels = len(set(gold_labels))
 
     # This relies on the assumption that there is a prediction score for every label. (i.e. n label scores per input)
     predictions = [label.strip("<s>").strip("</s>").strip() for label in df["potential_class"].tolist()]
@@ -66,15 +63,13 @@ def sentiment_metric(prediction_file: str) -> Dict[str, float]:
     return return_metrics
 
 
-def grips_sentiment_metric(prediction_file: str) -> float:
+def grips_sentiment_metric(prediction_file: str, num_labels: int) -> float:
     """Compute the balanced accuracy + entropy for sentiment classification
     used in grips training."""
     df = pd.read_csv(prediction_file, delimiter=",")
 
     gold_labels = [label for label in df["gold_class"].tolist()]
 
-    # pick the class with the highest score among the possible class labels!
-    num_labels = len(set(gold_labels))
     # This relies on the assumption that there is a prediction score for every label. (i.e. n label scores per input)
     predictions = [label.strip("<s>").strip("</s>").strip() for label in df["potential_class"].tolist()]
     assert len(predictions) % num_labels == 0

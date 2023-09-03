@@ -335,7 +335,7 @@ class GRIPSSearch(RobertaPrompted):
                     header_written = True
                 writer.writerow(list(ret_row.values()))
 
-        return grips_sentiment_metric(prediction_file)
+        return grips_sentiment_metric(prediction_file, num_labels=len(list(self.tokenizer.class_to_id.keys())))
 
     def train(self, batch: torch.utils.data.Dataset) -> Dict[str, float]:
         """The train loop for grips method over search set given by batch."""
