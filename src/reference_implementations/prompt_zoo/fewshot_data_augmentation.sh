@@ -62,6 +62,10 @@ if [ "${TASK_NAME}" = "sst2" ]; then
         instruction_type="manual_template_research_sst2_no_instruction"
         train_batch_size=4
     fi
+    if [ "${EXPERIMENT_TYPE}" = "grips" ]; then
+        instruction_type="manual_template_research_sst2_no_instruction"
+        train_batch_size=4
+    fi
 
 elif [ "${TASK_NAME}" = "SetFit_sst5" ]; then
     instruction_type="manual_template_research_sst5_with_instruction"
@@ -70,11 +74,19 @@ elif [ "${TASK_NAME}" = "SetFit_sst5" ]; then
         instruction_type="manual_template_research_sst5_no_instruction"
         train_batch_size=4
     fi
+    if [ "${EXPERIMENT_TYPE}" = "grips" ]; then
+        instruction_type="manual_template_research_sst5_no_instruction"
+        train_batch_size=4
+    fi
 
 elif [ "${TASK_NAME}" = "ag_news" ]; then
     instruction_type="manual_template_research_agn_with_instruction"
     train_batch_size=8
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
+        instruction_type="manual_template_research_agn_no_instruction"
+        train_batch_size=4
+    fi
+    if [ "${EXPERIMENT_TYPE}" = "grips" ]; then
         instruction_type="manual_template_research_agn_no_instruction"
         train_batch_size=4
     fi
