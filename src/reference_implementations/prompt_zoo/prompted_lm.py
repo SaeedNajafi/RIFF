@@ -9,7 +9,7 @@ import numpy
 import torch
 from absl import flags
 from peft import LoraConfig, TaskType, get_peft_model
-from transformers import AutoTokenizer, BartForConditionalGeneration, BartTokenizer, RobertaForMaskedLM, RobertaModel
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, RobertaForMaskedLM, RobertaModel
 
 from src.reference_implementations.prompt_zoo.data_utility import augment_batch, tokenize_samples
 from src.reference_implementations.prompt_zoo.model_utility import (
@@ -56,8 +56,7 @@ flags.DEFINE_float(
 
 
 # details about the model
-# https://huggingface.co/stanford-oval/paraphraser-bart-large.
-paraphrase_model_name = "stanford-oval/paraphraser-bart-large"
+paraphrase_model_name = "humarin/chatgpt_paraphraser_on_T5_base"
 flags.DEFINE_string("ensemble_type", "no_ensemble", "ensemble type with the paraphraser.")
 flags.DEFINE_string("paraphrase_loss", "pg_z_score", "the training objective used to train the paraphrase model.")
 flags.DEFINE_string(
@@ -196,7 +195,7 @@ class MyBaseLM(torch.nn.Module):
         """The abstract predict function."""
         pass
 
-    def bart_forward_pass(self, batch: torch.utils.data.Dataset, train: bool = False) -> torch.Tensor:
+    def t5_forward_pass(self, batch: torch.utils.data.Dataset, train: bool = False) -> torch.Tensor:
         """Run a forward computation over the batch, compute the log
         probability over the batch.
 
@@ -219,11 +218,11 @@ class MyBaseLM(torch.nn.Module):
         orig_labels = loaded_batch["para_labels"]
         labels = orig_labels.masked_fill(orig_labels == self.tokenizer.pad_token_id, -100)
 
-        bart_model = self.model_pool["bart_model"]
+        t5_model = self.model_pool["t5_model"]
 
         with torch.set_grad_enabled(train):
             class_log_p = log_of_labels(
-                model=bart_model,
+                model=t5_model,
                 input_ids=loaded_batch["para_input_ids"],
                 input_mask=loaded_batch["para_attention_mask"],
                 decoder_mask=loaded_batch["para_target_attention_mask"],
@@ -368,8 +367,8 @@ class Paraphraser(MyBaseLM):
         super().__init__(seed, device)
 
         # construct tokenizer
-        self.tokenizer = BartTokenizer.from_pretrained(paraphrase_model_name)
-        self.model_pool["bart_model"] = BartForConditionalGeneration.from_pretrained(paraphrase_model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(paraphrase_model_name)
+        self.model_pool["t5_model"] = AutoModelForSeq2SeqLM.from_pretrained(paraphrase_model_name)
         self.fixed = fixed
 
         self.setup_models()
@@ -393,39 +392,34 @@ class Paraphraser(MyBaseLM):
         self.predict_mode_on()
         loaded_batch = self.move_to_gpu(batch, keys=["para_input_ids", "para_attention_mask"])
 
-        bart_model = self.model_pool["bart_model"]
+        t5_model = self.model_pool["t5_model"]
 
         sample_list_size = num_return_seq
         if train_mode:
             # in train mode, draw more samples but then sample from the larger list to promote diversity.
             sample_list_size = 8 * num_return_seq
 
-        predictions_output = bart_model.generate(
+        predictions_output = t5_model.generate(
             input_ids=loaded_batch["para_input_ids"],
             attention_mask=loaded_batch["para_attention_mask"],
             no_repeat_ngram_size=FLAGS.no_repeat_ngram_size,
             num_beams=sample_list_size,
+            num_beam_groups=sample_list_size,
             early_stopping=True,
             max_length=128,
             num_return_sequences=sample_list_size,
             output_scores=True,
             return_dict_in_generate=True,
             use_cache=True,
+            repetition_penalty=10.0,
+            diversity_penalty=3.0,
+            temperature=0.7,
         )
-
-        """
-        batch_size = len(predictions_output.sequences) // sample_list_size
-        selected_samples = []
-        for idx in range(batch_size):
-            to_sample_from = predictions_output.sequences[idx * sample_list_size : (idx + 1) * sample_list_size]
-            # sample without replacement.
-            selected_samples.extend(random.sample(list(to_sample_from), num_return_seq))
-        """
 
         selected_samples = predictions_output.sequences
         # all special tokens will be removed.
         predictions_str = self.tokenizer.batch_decode(selected_samples, skip_special_tokens=True)
-        predictions_str = [pred.strip() for pred in predictions_str]
+        predictions_str = [pred.lstrip('"').lstrip("'").rstrip("'").rstrip('"').strip() for pred in predictions_str]
         return predictions_str
 
     def generate_top_p_paraphrases(
@@ -435,14 +429,14 @@ class Paraphraser(MyBaseLM):
         # This function is to provide random samples for learning with RL!
         self.predict_mode_on()
         loaded_batch = self.move_to_gpu(batch, keys=["para_input_ids", "para_attention_mask"])
-        bart_model = self.model_pool["bart_model"]
+        t5_model = self.model_pool["t5_model"]
 
         sample_list_size = num_return_seq
         if train_mode:
             # in train mode, draw more samples but then sample from the larger list to promote diversity.
             sample_list_size = 8 * num_return_seq
 
-        predictions_output = bart_model.generate(
+        predictions_output = t5_model.generate(
             input_ids=loaded_batch["para_input_ids"],
             attention_mask=loaded_batch["para_attention_mask"],
             no_repeat_ngram_size=FLAGS.no_repeat_ngram_size,
@@ -456,19 +450,10 @@ class Paraphraser(MyBaseLM):
             use_cache=True,
         )
 
-        """
-        batch_size = len(predictions_output.sequences) // sample_list_size
-        selected_samples = []
-        for idx in range(batch_size):
-            to_sample_from = predictions_output.sequences[idx * sample_list_size : (idx + 1) * sample_list_size]
-            # sample without replacement.
-            selected_samples.extend(random.sample(list(to_sample_from), num_return_seq))
-        """
         selected_samples = predictions_output.sequences
-
         # all special tokens will be removed.
         predictions_str = self.tokenizer.batch_decode(selected_samples, skip_special_tokens=True)
-        predictions_str = [pred.strip() for pred in predictions_str]
+        predictions_str = [pred.lstrip('".').lstrip("'.").rstrip("'").rstrip('"').strip() for pred in predictions_str]
         return predictions_str
 
 
@@ -517,7 +502,7 @@ class RobertaPrompted(MyBaseLM):
 
         elif self.enable_paraphrase_training == 1:
             if FLAGS.sampling_method in ["off_policy", "ppo"]:
-                # two bart models, move to another gpu.
+                # two t5 models, move to another gpu.
                 self.fixed_para_model = Paraphraser(seed, device=0, mode=FLAGS.mode, fixed=True)
                 self.para_model = Paraphraser(seed, device=0, mode=FLAGS.mode, fixed=False)
             elif FLAGS.sampling_method == "on_policy":
@@ -668,11 +653,11 @@ class RobertaPrompted(MyBaseLM):
                 )
                 tokenize_samples(batch, samples, self.para_tokenizer)
 
-                para_log_ps = self.para_model.bart_forward_pass(batch, train=True)
+                para_log_ps = self.para_model.t5_forward_pass(batch, train=True)
 
                 if FLAGS.sampling_method in ["off_policy", "ppo"]:
                     # we also need this for off-policy sampling.
-                    fixed_para_log_ps = self.fixed_para_model.bart_forward_pass(batch, train=False)
+                    fixed_para_log_ps = self.fixed_para_model.t5_forward_pass(batch, train=False)
 
                 augment_batch(batch, samples, self.tokenizer, num_return_seq=FLAGS.train_sample_size)
                 to_train_lm = False

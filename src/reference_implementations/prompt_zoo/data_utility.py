@@ -70,7 +70,7 @@ def return_instruction() -> str:
 
 
 def tokenize_samples(batch: torch.utils.data.Dataset, samples: List[str], tokenizer: AutoTokenizer) -> None:
-    samples = [white_space_fix(f"<s> {sample} </s>") for sample in samples]
+    samples = [white_space_fix(f"{sample} </s>") for sample in samples]
     output_encodings = tokenizer(
         samples,
         truncation=True,
@@ -155,7 +155,7 @@ def template_data(sentences: List[str], labels: List[str]) -> ClassificationRawD
 
     inputs = [white_space_fix(f"<s> {sent} </s>") for sent in sentences]
     gold_outputs = [label for label in labels]
-    paraphrase_inputs = [white_space_fix(f"<s> {sent} </s>") for sent in paraphrase_sentences]
+    paraphrase_inputs = [white_space_fix(f"{sent} </s>") for sent in paraphrase_sentences]
     return ClassificationRawData(
         inputs=inputs,
         gold_outputs=gold_outputs,

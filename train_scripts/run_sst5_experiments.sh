@@ -11,8 +11,10 @@ done
 
 GPU_TYPE=${GPU_TYPE}
 
-rates=(0.0001 0.00001 0.001 0.00001 0.001 0.001 0.5 0.5)
-exps=(lora_finetune all_finetune input_finetune output_finetune soft_prompt_finetune classifier_finetune gradient_search grips)
+#rates=(0.0001 0.00001 0.001 0.00001 0.001 0.001 0.5 0.5)
+#exps=(lora_finetune all_finetune input_finetune output_finetune soft_prompt_finetune classifier_finetune gradient_search grips)
+rates=(0.5)
+exps=(grips)
 augs=(0)
 
 for i in ${!rates[@]};

@@ -140,7 +140,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --meta_dir . \
     --meta_name search.txt \
     --level phrase \
-    --test_sampling_algorithm "top_p" \
+    --test_sampling_algorithm "beam_search" \
     --use_cache 1
 
 
@@ -175,5 +175,5 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --meta_dir . \
     --meta_name search.txt \
     --level phrase \
-    --test_sampling_algorithm "top_p" \
+    --test_sampling_algorithm "beam_search" \
     --use_cache 1
