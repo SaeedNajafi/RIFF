@@ -35,7 +35,7 @@ def all_weights_opt(opt_args: OPTIMIZER_ARGS_TYPE) -> Optimizer:
     except Exception:
         # for paraphraser
         # we use the small learning rate for paraphraser which tunes everything.
-        return construct_optimizer(model=opt_args["bart_model"])
+        return construct_optimizer(model=opt_args["t5_model"])
 
 
 def input_embeddings_opt(opt_args: OPTIMIZER_ARGS_TYPE) -> Optimizer:

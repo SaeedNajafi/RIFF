@@ -45,7 +45,7 @@ def return_class_to_id() -> Dict[str, str]:
     elif "sst5" in FLAGS.instruction_type:
         return {"terrible": "0", "bad": "1", "okay": "2", "good": "3", "great": "4"}
     elif "agn" in FLAGS.instruction_type:
-        return {"world": "0", "sports": "1", "business": "2", "sci/tech": "3"}
+        return {"World": "0", "Sports": "1", "Business": "2", "Tech": "3"}
 
     return {}
 
@@ -66,7 +66,7 @@ def return_instruction() -> str:
             the article to one out of the four topics 'World', 'Sports', 'Business', 'Tech' \
             if the article's main topic is relevant to the world, sports, business, \
             and technology, correspondingly. If you are not sure about the topic, choose the closest option."
-    return instruction
+    return white_space_fix(instruction)
 
 
 def tokenize_samples(batch: torch.utils.data.Dataset, samples: List[str], tokenizer: AutoTokenizer) -> None:

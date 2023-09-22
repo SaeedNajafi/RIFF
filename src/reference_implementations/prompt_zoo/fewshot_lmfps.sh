@@ -80,7 +80,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --model_path ${model_path} \
     --para_model_path ${model_path} \
     --checkpoint best_step \
-    --max_epochs 100 \
+    --max_epochs 50 \
     --learning_rate ${LEARN_RATE} \
     --training_steps 1000000 \
     --steps_per_checkpoint 8 \
@@ -102,7 +102,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --sampling_algorithm ${SAMPLING_ALG} \
     --metric_to_save ${METRIC_TO_SAVE} \
     --kl_penalty_coefficient ${KL_COEFFICIENT} \
-    --test_sampling_algorithm "top_p" \
+    --test_sampling_algorithm "beam_search" \
     --use_cache 1
 
 # test phase
@@ -129,7 +129,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --ensemble_type paraphrase_predict \
     --test_temperature 1.0 \
     --test_sample_size 8 \
-    --test_sampling_algorithm "top_p" \
+    --test_sampling_algorithm "beam_search" \
     --use_cache 1
 
 rm -r -f ${model_path}/roberta_model_best_step

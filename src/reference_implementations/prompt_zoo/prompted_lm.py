@@ -233,7 +233,11 @@ class MyBaseLM(torch.nn.Module):
         return class_log_p
 
     def roberta_forward_pass(
-        self, batch: torch.utils.data.Dataset, train: bool = False, prompt_lists: Optional[List[List[int]]] = None
+        self,
+        batch: torch.utils.data.Dataset,
+        train: bool = False,
+        prompt_lists: Optional[List[List[int]]] = None,
+        para_training: bool = False,
     ) -> torch.Tensor:
         """Using the Roberta Model, run a forward computation over the batch,
         compute the log probability over the batch.
@@ -248,8 +252,8 @@ class MyBaseLM(torch.nn.Module):
 
         modify_inputs(loaded_batch, prompt_lists)
 
-        if train:
-            labels = batch["gold_outputs"]
+        if train or para_training:
+            labels = [" " + label for label in batch["gold_outputs"]]
             # pick the first label token!
             labels_ids = self.tokenizer(
                 labels, add_special_tokens=False, truncation=True, padding="max_length", max_length=16
@@ -268,7 +272,7 @@ class MyBaseLM(torch.nn.Module):
                 )
 
         else:
-            unique_labels = list(self.tokenizer.class_to_id.keys())
+            unique_labels = [" " + label for label in list(self.tokenizer.class_to_id.keys())]
             # pick the first label token!
             unique_labels_ids = self.tokenizer(
                 unique_labels, add_special_tokens=False, truncation=True, padding="max_length", max_length=16
@@ -284,7 +288,7 @@ class MyBaseLM(torch.nn.Module):
                 input_mask=loaded_batch["modified_attention_mask"],
             )
             mask_flags = loaded_batch["modified_input_ids"] == self.tokenizer.mask_token_id
-            if train:
+            if train or para_training:
                 labels_seq = mask_flags * labels_ids.view(-1, 1)
                 masked_labels = torch.where(mask_flags, labels_seq, -100)
                 return mlm_log_of_labels(logits=logits, labels=masked_labels, loss_func=self.loss_func)
@@ -406,7 +410,7 @@ class Paraphraser(MyBaseLM):
             num_beams=sample_list_size,
             num_beam_groups=sample_list_size,
             early_stopping=True,
-            max_length=128,
+            max_length=256,
             num_return_sequences=sample_list_size,
             output_scores=True,
             return_dict_in_generate=True,
@@ -443,7 +447,7 @@ class Paraphraser(MyBaseLM):
             do_sample=True,
             top_p=0.99,
             temperature=temperature,
-            max_length=128,
+            max_length=256,
             num_return_sequences=sample_list_size,
             output_scores=True,
             return_dict_in_generate=True,
@@ -586,163 +590,156 @@ class RobertaPrompted(MyBaseLM):
     def train(self, batch: torch.utils.data.Dataset) -> Dict[str, float]:
         """The main train loop for generating the class sequence in the
         backbone LM roberta-large."""
-
-        with torch.autocast(device_type="cuda"):
+        to_train_lm = True
+        if self.enable_data_augmentation == 1:
+            paraphrases = self.draw_samples_for_augmentation(batch)
+            augment_batch(batch, paraphrases, self.tokenizer, num_return_seq=FLAGS.test_sample_size)
             to_train_lm = True
-            if self.enable_data_augmentation == 1:
-                paraphrases = self.draw_samples_for_augmentation(batch)
-                augment_batch(batch, paraphrases, self.tokenizer, num_return_seq=FLAGS.test_sample_size)
-                to_train_lm = True
 
-            elif self.enable_paraphrase_training == 1:
-                if FLAGS.sampling_method in ["on_policy", "ppo"]:
-                    sampling_model = self.para_model
+        elif self.enable_paraphrase_training == 1:
+            if FLAGS.sampling_method in ["on_policy", "ppo"]:
+                sampling_model = self.para_model
 
-                elif FLAGS.sampling_method == "off_policy":
-                    sampling_model = self.fixed_para_model
+            elif FLAGS.sampling_method == "off_policy":
+                sampling_model = self.fixed_para_model
 
-                if FLAGS.sampling_algorithm == "top_p":
-                    samples = sampling_model.generate_top_p_paraphrases(
-                        batch,
-                        num_return_seq=FLAGS.train_sample_size,
-                        temperature=FLAGS.train_temperature,
-                        train_mode=False,
-                    )
-
-                elif FLAGS.sampling_algorithm == "beam_search":
-                    samples = sampling_model.generate_beam_paraphrases(
-                        batch, num_return_seq=FLAGS.train_sample_size, train_mode=False
-                    )
-
-                elif FLAGS.sampling_algorithm == "mixed":
-                    top_p_samples = sampling_model.generate_top_p_paraphrases(
-                        batch,
-                        num_return_seq=FLAGS.train_sample_size,
-                        temperature=FLAGS.train_temperature,
-                        train_mode=False,
-                    )
-                    beam_samples = sampling_model.generate_beam_paraphrases(
-                        batch, num_return_seq=FLAGS.train_sample_size, train_mode=False
-                    )
-                    batch_size = len(top_p_samples) // FLAGS.train_sample_size
-
-                    # the array to hold the mixed samples from beam-search and top-p sampling.
-                    samples = []
-                    for idx in range(batch_size):
-                        top_p_sample_arr = top_p_samples[
-                            idx * FLAGS.train_sample_size : (idx + 1) * FLAGS.train_sample_size
-                        ]
-                        beam_sample_arr = beam_samples[
-                            idx * FLAGS.train_sample_size : (idx + 1) * FLAGS.train_sample_size
-                        ]
-                        samples.extend(top_p_sample_arr[: FLAGS.train_sample_size // 2])
-                        samples.extend(beam_sample_arr[: FLAGS.train_sample_size // 2])
-
-                batch_size, seq_len = batch["para_input_ids"].size()
-                batch["para_input_ids"] = (
-                    batch["para_input_ids"]
-                    .reshape(batch_size, 1, seq_len)
-                    .expand(batch_size, FLAGS.train_sample_size, seq_len)
-                    .reshape(-1, seq_len)
+            if FLAGS.sampling_algorithm == "top_p":
+                samples = sampling_model.generate_top_p_paraphrases(
+                    batch,
+                    num_return_seq=FLAGS.train_sample_size,
+                    temperature=FLAGS.train_temperature,
+                    train_mode=False,
                 )
-                batch["para_attention_mask"] = (
-                    batch["para_attention_mask"]
-                    .reshape(batch_size, 1, seq_len)
-                    .expand(batch_size, FLAGS.train_sample_size, seq_len)
-                    .reshape(-1, seq_len)
+
+            elif FLAGS.sampling_algorithm == "beam_search":
+                samples = sampling_model.generate_beam_paraphrases(
+                    batch, num_return_seq=FLAGS.train_sample_size, train_mode=False
                 )
-                tokenize_samples(batch, samples, self.para_tokenizer)
 
-                para_log_ps = self.para_model.t5_forward_pass(batch, train=True)
-
-                if FLAGS.sampling_method in ["off_policy", "ppo"]:
-                    # we also need this for off-policy sampling.
-                    fixed_para_log_ps = self.fixed_para_model.t5_forward_pass(batch, train=False)
-
-                augment_batch(batch, samples, self.tokenizer, num_return_seq=FLAGS.train_sample_size)
-                to_train_lm = False
-
-            self.predict_mode_on()
-            if to_train_lm:
-                self.train_mode_on()
-            class_log_ps = self.roberta_forward_pass(batch, train=to_train_lm, prompt_lists=None)
-
-            if self.enable_paraphrase_training == 1:
-                class_log_ps = class_log_ps.reshape(batch_size, FLAGS.train_sample_size + 1)
-                normal_class_log_ps = (
-                    class_log_ps[:, 0].reshape(batch_size, 1).expand(batch_size, FLAGS.train_sample_size)
+            elif FLAGS.sampling_algorithm == "mixed":
+                top_p_samples = sampling_model.generate_top_p_paraphrases(
+                    batch,
+                    num_return_seq=FLAGS.train_sample_size,
+                    temperature=FLAGS.train_temperature,
+                    train_mode=False,
                 )
-                paraphrase_class_log_ps = class_log_ps[:, 1:]
+                beam_samples = sampling_model.generate_beam_paraphrases(
+                    batch, num_return_seq=FLAGS.train_sample_size, train_mode=False
+                )
+                batch_size = len(top_p_samples) // FLAGS.train_sample_size
 
-                final_rewards = paraphrase_class_log_ps  # basic rewards.
-                final_rewards_z = z_scoring(paraphrase_class_log_ps - normal_class_log_ps)
+                # the array to hold the mixed samples from beam-search and top-p sampling.
+                samples = []
+                for idx in range(batch_size):
+                    top_p_sample_arr = top_p_samples[
+                        idx * FLAGS.train_sample_size : (idx + 1) * FLAGS.train_sample_size
+                    ]
+                    beam_sample_arr = beam_samples[idx * FLAGS.train_sample_size : (idx + 1) * FLAGS.train_sample_size]
+                    samples.extend(top_p_sample_arr[: FLAGS.train_sample_size // 2])
+                    samples.extend(beam_sample_arr[: FLAGS.train_sample_size // 2])
 
-                if FLAGS.sampling_method in ["off_policy", "ppo"]:
-                    para_log_ps = para_log_ps.to(self.device)
-                    para_log_ps_copy = para_log_ps.detach().clone()
-                    fixed_para_log_ps = fixed_para_log_ps.to(self.device)
-                    importance_ratio_log = para_log_ps_copy - fixed_para_log_ps
-                    importance_ratio_log = importance_ratio_log.reshape(batch_size, FLAGS.train_sample_size)
-                    fixed_para_log_ps = fixed_para_log_ps.reshape(batch_size, FLAGS.train_sample_size)
-                    importance_ratio = torch.exp(importance_ratio_log)
-                    para_log_ps = para_log_ps.reshape(batch_size, FLAGS.train_sample_size)
+            batch_size, seq_len = batch["para_input_ids"].size()
+            batch["para_input_ids"] = (
+                batch["para_input_ids"]
+                .reshape(batch_size, 1, seq_len)
+                .expand(batch_size, FLAGS.train_sample_size, seq_len)
+                .reshape(-1, seq_len)
+            )
+            batch["para_attention_mask"] = (
+                batch["para_attention_mask"]
+                .reshape(batch_size, 1, seq_len)
+                .expand(batch_size, FLAGS.train_sample_size, seq_len)
+                .reshape(-1, seq_len)
+            )
+            tokenize_samples(batch, samples, self.para_tokenizer)
 
-                elif FLAGS.sampling_method == "on_policy":
-                    para_log_ps = para_log_ps.to(self.device)
-                    para_log_ps = para_log_ps.reshape(batch_size, FLAGS.train_sample_size)
-                    importance_ratio = torch.ones(
-                        batch_size, FLAGS.train_sample_size, device=self.device, dtype=para_log_ps.dtype
-                    )
+            para_log_ps = self.para_model.t5_forward_pass(batch, train=True)
 
-                if FLAGS.paraphrase_loss == "pg_zscore":
-                    pg_loss = -torch.mean(torch.mean(importance_ratio * para_log_ps * final_rewards_z, dim=1), dim=0)
-                    loss = pg_loss
+            if FLAGS.sampling_method in ["off_policy", "ppo"]:
+                # we also need this for off-policy sampling.
+                fixed_para_log_ps = self.fixed_para_model.t5_forward_pass(batch, train=False)
 
-                elif FLAGS.paraphrase_loss == "pg_basic":
-                    pg_loss = -torch.mean(torch.mean(importance_ratio * para_log_ps * final_rewards, dim=1), dim=0)
-                    loss = pg_loss
+            augment_batch(batch, samples, self.tokenizer, num_return_seq=FLAGS.train_sample_size)
+            to_train_lm = False
 
-                elif FLAGS.paraphrase_loss == "mml_zscore":
-                    if FLAGS.sampling_method == "off_policy":
-                        ratio_log = para_log_ps - fixed_para_log_ps + final_rewards_z
-                    elif FLAGS.sampling_method in ["on_policy", "ppo"]:
-                        ratio_log = para_log_ps + final_rewards_z
-                    mml_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
-                    loss = mml_loss
+        self.predict_mode_on()
+        if to_train_lm:
+            self.train_mode_on()
+        class_log_ps = self.roberta_forward_pass(batch, train=to_train_lm, prompt_lists=None, para_training=True)
 
-                elif FLAGS.paraphrase_loss == "mml_basic":
-                    if FLAGS.sampling_method == "off_policy":
-                        ratio_log = para_log_ps - fixed_para_log_ps + final_rewards
-                    elif FLAGS.sampling_method in ["on_policy", "ppo"]:
-                        ratio_log = para_log_ps + final_rewards
-                    mml_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
-                    loss = mml_loss
+        if self.enable_paraphrase_training == 1:
+            class_log_ps = class_log_ps.reshape(batch_size, FLAGS.train_sample_size + 1)
+            normal_class_log_ps = class_log_ps[:, 0].reshape(batch_size, 1).expand(batch_size, FLAGS.train_sample_size)
+            paraphrase_class_log_ps = class_log_ps[:, 1:]
 
-                if FLAGS.sampling_method == "ppo":
-                    # now we need to add the kl penalty.
-                    kl_penalty = torch.mean(torch.mean((importance_ratio_log + 1) * para_log_ps, dim=1), dim=0)
-                    loss = loss + FLAGS.kl_penalty_coefficient * kl_penalty
+            final_rewards = paraphrase_class_log_ps  # basic rewards.
+            final_rewards_z = z_scoring(paraphrase_class_log_ps - normal_class_log_ps)
 
-            elif self.enable_data_augmentation == 1:
-                class_log_ps = class_log_ps.reshape(-1, FLAGS.test_sample_size + 1)
-                normal_class_log_ps = class_log_ps[:, 0]
-                paraphrase_class_log_ps = class_log_ps[:, 1:]
-                objective = 0.5 * normal_class_log_ps + 0.5 * paraphrase_class_log_ps.mean(dim=1)
-                loss = -objective.mean(dim=0)
+            if FLAGS.sampling_method in ["off_policy", "ppo"]:
+                para_log_ps = para_log_ps.to(self.device)
+                para_log_ps_copy = para_log_ps.detach().clone()
+                fixed_para_log_ps = fixed_para_log_ps.to(self.device)
+                importance_ratio_log = para_log_ps_copy - fixed_para_log_ps
+                importance_ratio_log = importance_ratio_log.reshape(batch_size, FLAGS.train_sample_size)
+                fixed_para_log_ps = fixed_para_log_ps.reshape(batch_size, FLAGS.train_sample_size)
+                importance_ratio = torch.exp(importance_ratio_log)
+                para_log_ps = para_log_ps.reshape(batch_size, FLAGS.train_sample_size)
 
-            else:
-                # average log probs over the batch dimension.
-                loss = -class_log_ps.mean(dim=0)
+            elif FLAGS.sampling_method == "on_policy":
+                para_log_ps = para_log_ps.to(self.device)
+                para_log_ps = para_log_ps.reshape(batch_size, FLAGS.train_sample_size)
+                importance_ratio = torch.ones(
+                    batch_size, FLAGS.train_sample_size, device=self.device, dtype=para_log_ps.dtype
+                )
 
-        self.grad_scalar.scale(loss).backward()
+            if FLAGS.paraphrase_loss == "pg_zscore":
+                pg_loss = -torch.mean(torch.mean(importance_ratio * para_log_ps * final_rewards_z, dim=1), dim=0)
+                loss = pg_loss
+
+            elif FLAGS.paraphrase_loss == "pg_basic":
+                pg_loss = -torch.mean(torch.mean(importance_ratio * para_log_ps * final_rewards, dim=1), dim=0)
+                loss = pg_loss
+
+            elif FLAGS.paraphrase_loss == "mml_zscore":
+                if FLAGS.sampling_method == "off_policy":
+                    ratio_log = para_log_ps - fixed_para_log_ps + final_rewards_z
+                elif FLAGS.sampling_method in ["on_policy", "ppo"]:
+                    ratio_log = para_log_ps + final_rewards_z
+                mml_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
+                loss = mml_loss
+
+            elif FLAGS.paraphrase_loss == "mml_basic":
+                if FLAGS.sampling_method == "off_policy":
+                    ratio_log = para_log_ps - fixed_para_log_ps + final_rewards
+                elif FLAGS.sampling_method in ["on_policy", "ppo"]:
+                    ratio_log = para_log_ps + final_rewards
+                mml_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
+                loss = mml_loss
+
+            if FLAGS.sampling_method == "ppo":
+                # now we need to add the kl penalty.
+                kl_penalty = torch.mean(torch.mean((importance_ratio_log + 1) * para_log_ps, dim=1), dim=0)
+                loss = loss + FLAGS.kl_penalty_coefficient * kl_penalty
+
+        elif self.enable_data_augmentation == 1:
+            class_log_ps = class_log_ps.reshape(-1, FLAGS.test_sample_size + 1)
+            normal_class_log_ps = class_log_ps[:, 0]
+            paraphrase_class_log_ps = class_log_ps[:, 1:]
+            objective = 0.5 * normal_class_log_ps + 0.5 * paraphrase_class_log_ps.mean(dim=1)
+            loss = -objective.mean(dim=0)
+
+        else:
+            # average log probs over the batch dimension.
+            loss = -class_log_ps.mean(dim=0)
+
+        loss.backward()
         if self.enable_paraphrase_training == 1:
             # updates only the paraphrase model.
-            self.grad_scalar.step(self.para_model.optimizer)
+            self.para_model.optimizer.step()
         else:
             # updates the main language model.
-            self.grad_scalar.step(self.optimizer)
+            self.optimizer.step()
 
-        self.grad_scalar.update()
         loss_value = loss.item()
 
         return {"loss_value": loss_value}

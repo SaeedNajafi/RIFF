@@ -102,47 +102,45 @@ class ClassifierLM(RobertaPrompted):
 
     def train(self, batch: torch.utils.data.Dataset) -> Dict[str, float]:
         """The classifier training step."""
-        with torch.autocast(device_type="cuda"):
-            self.train_mode_on()
-            batch["class_indices"] = torch.tensor(
-                [int(self.tokenizer.class_to_id[label]) for label in batch["gold_outputs"]]
-            )
-            if self.enable_data_augmentation == 1:
-                paraphrases = self.draw_samples_for_augmentation(batch)
-                augment_batch(batch, paraphrases, self.tokenizer, num_return_seq=FLAGS.test_sample_size)
+        self.train_mode_on()
+        batch["class_indices"] = torch.tensor(
+            [int(self.tokenizer.class_to_id[label]) for label in batch["gold_outputs"]]
+        )
+        if self.enable_data_augmentation == 1:
+            paraphrases = self.draw_samples_for_augmentation(batch)
+            augment_batch(batch, paraphrases, self.tokenizer, num_return_seq=FLAGS.test_sample_size)
 
-                batch_size = batch["class_indices"].size()[0]
-                batch["class_indices"] = (
-                    batch.pop("class_indices")
-                    .reshape(batch_size, 1)
-                    .expand(batch_size, 1 + FLAGS.test_sample_size)
-                    .reshape(
-                        -1,
-                    )
+            batch_size = batch["class_indices"].size()[0]
+            batch["class_indices"] = (
+                batch.pop("class_indices")
+                .reshape(batch_size, 1)
+                .expand(batch_size, 1 + FLAGS.test_sample_size)
+                .reshape(
+                    -1,
                 )
-
-            loaded_batch = self.move_to_gpu(batch, keys=["input_ids", "attention_mask", "class_indices"])
-
-            encoder = self.model_pool["roberta_model"]
-            classifier_model = self.model_pool["classifier_model"]
-
-            output = encoder(
-                input_ids=loaded_batch["input_ids"],
-                attention_mask=loaded_batch["attention_mask"],
-            )
-            encoder_hidden_states = output.last_hidden_state
-            loss = classifier_model.compute_loss(
-                encoder_hidden_states,
-                loaded_batch["attention_mask"],
-                loaded_batch["class_indices"],
-                enable_data_augmentation=self.enable_data_augmentation == 1,
             )
 
-        self.grad_scalar.scale(loss).backward()
+        loaded_batch = self.move_to_gpu(batch, keys=["input_ids", "attention_mask", "class_indices"])
+
+        encoder = self.model_pool["roberta_model"]
+        classifier_model = self.model_pool["classifier_model"]
+
+        output = encoder(
+            input_ids=loaded_batch["input_ids"],
+            attention_mask=loaded_batch["attention_mask"],
+        )
+        encoder_hidden_states = output.last_hidden_state
+        loss = classifier_model.compute_loss(
+            encoder_hidden_states,
+            loaded_batch["attention_mask"],
+            loaded_batch["class_indices"],
+            enable_data_augmentation=self.enable_data_augmentation == 1,
+        )
+
+        loss.backward()
 
         # updates the main language model.
-        self.grad_scalar.step(self.optimizer)
-        self.grad_scalar.update()
+        self.optimizer.step()
         loss_value = loss.item()
 
         return {"loss_value": loss_value}

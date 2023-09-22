@@ -4,13 +4,15 @@ rates=(0.00001)
 exps=(all_finetune)
 seeds=(11 42 1993 2023 12321)
 tasks=(sst2)
+
 #losses=(pg_basic mml_basic pg_zscore mml_zscore)
-losses=(mml_basic)
-#sampling_methods=(on_policy off_policy)
+losses=(pg_zscore)
+sampling_methods=(on_policy)
 #sampling_methods=(ppo)
-sampling_methods=(off_policy)
-#sampling_algs=(top_p beam_search mixed)
-sampling_algs=(beam_search)
+#sampling_methods=(off_policy)
+sampling_algs=(top_p beam_search mixed)
+
+#sampling_algs=(beam_search)
 
 for i in ${!rates[@]};
 do
@@ -40,7 +42,7 @@ do
                                 TASK=${task} \
                                 SEED=${seed} \
                                 NUM_CLASSES=2 \
-                                FEWSHOT_SIZE=16 \
+                                FEWSHOT_SIZE=128 \
                                 LR=${rate} \
                                 AUG=0 \
                                 TRAIN_PARA=1 \
@@ -51,7 +53,8 @@ do
                                 SAMPLING_ALG=${sampling_alg} \
                                 METRIC_TO_SAVE=accuracy \
                                 KL_COEFFICIENT=0.7 \
-                                CLUSTER_NAME=vcluster
+                                CLUSTER_NAME=vcluster \
+                                GPU_TYPE=a40
                         done
                     done
                 done
