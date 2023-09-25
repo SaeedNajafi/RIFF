@@ -177,28 +177,20 @@ class GRIPSSearch(RobertaPrompted):
         and compute the log probability over the batch for each prompt
         template."""
         batch_size, _ = batch["input_ids"].size()
-        prompt_lists = [template.tokens for template in prompt_templates]
+        template_scores_arr = []
+        for template in prompt_templates:
+            # for grips, we always use the backbone LM for inference.
+            # no need to compute gradients: train=False.
+            class_log_ps = self.roberta_forward_pass(batch, train=False, prompt_lists=[template.tokens])
 
-        # for grips, we always use the backbone LM for inference.
-        # no need to compute gradients: train=False.
-        class_log_ps = self.roberta_forward_pass(batch, train=False, prompt_lists=prompt_lists)
-
-        template_scores = class_log_ps.reshape(batch_size, len(prompt_templates), -1)
-        if not for_augmentation:
-            return template_scores
-        else:
-            # compute the correct objective for data augmentation.
-            orig_batch_size = batch_size // (FLAGS.test_sample_size + 1)
-            template_scores_arr = []
-            for idx in range(orig_batch_size):
-                idx_template_scores = template_scores[
-                    idx * (FLAGS.test_sample_size + 1) : (idx + 1) * (FLAGS.test_sample_size + 1), :, :
-                ]
-                idx_template_score = 0.5 * idx_template_scores[0, :, :] + 0.5 * torch.mean(
-                    idx_template_scores[1:, :, :], dim=0
-                )
-                template_scores_arr.append(idx_template_score)
-            return torch.stack(template_scores_arr, dim=0)
+            template_scores = class_log_ps.reshape(batch_size, 1, -1)
+            if not for_augmentation:
+                template_scores_arr.append(template_scores)
+            else:
+                orig_batch_size = batch_size // (FLAGS.test_sample_size + 1)
+                scores = template_scores.reshape(orig_batch_size, FLAGS.test_sample_size + 1, 1, -1)
+                template_scores_arr.append(0.5 * scores[:, 0, :, :] + 0.5 * torch.mean(scores[:, 1:, :, :], dim=1))
+        return torch.stack(template_scores_arr, dim=1)
 
     def grips_internal_predict(self, batch: torch.utils.data.Dataset) -> Iterator[Dict[str, Union[str, float]]]:
         """The main prediction loop for a given candidate over a batch from the

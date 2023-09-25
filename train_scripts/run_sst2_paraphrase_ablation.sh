@@ -10,9 +10,9 @@ losses=(pg_zscore)
 sampling_methods=(on_policy)
 #sampling_methods=(ppo)
 #sampling_methods=(off_policy)
-sampling_algs=(top_p beam_search mixed)
+#sampling_algs=(top_p beam_search mixed)
 
-#sampling_algs=(beam_search)
+sampling_algs=(top_p)
 
 for i in ${!rates[@]};
 do

@@ -88,13 +88,19 @@ class PromptSearchMemory:
         """
         beam_candidates = []
         embedding_grads = []
+
         for beam_idx, prompt_template in enumerate(self.beam):
             prompt_token_idx = prompt_template.tokens[prompt_step]
             log_likelihood = log_likelihoods[beam_idx].squeeze()
-            log_likelihood.backward(retain_graph=True)
-            embedding_grad = embedding_weight.grad[prompt_token_idx].detach().clone()
-            embedding_grads.append(embedding_grad)
-            embedding_weight.grad.data.zero_()
+            if FLAGS.g_beam_size == 1:
+                log_likelihood.backward()
+                embedding_grad = embedding_weight.grad[prompt_token_idx]
+                embedding_grads.append(embedding_grad)
+            else:
+                log_likelihood.backward(retain_graph=True)
+                embedding_grad = embedding_weight.grad[prompt_token_idx].detach().clone()
+                embedding_grads.append(embedding_grad)
+                embedding_weight.grad.data.zero_()
 
         embedding_grads_tensor = torch.stack(embedding_grads, dim=1)
         vocab_scores = torch.matmul(embedding_weight - embedding_weight[prompt_token_idx], embedding_grads_tensor)
@@ -191,29 +197,23 @@ class SearchRoberta(RobertaPrompted):
         This function can be called for training or inference.
         """
         batch_size, _ = batch["input_ids"].size()
-        prompt_lists = [template.tokens for template in prompt_templates]
-        class_log_ps = self.roberta_forward_pass(batch, train, prompt_lists)
+        template_scores_arr = []
+        for template in prompt_templates:
+            class_log_ps = self.roberta_forward_pass(batch, train, [template.tokens])
 
-        if train:
-            template_scores = class_log_ps.view(-1, 1, 1).reshape(batch_size, len(prompt_templates), 1)
-        else:
-            template_scores = class_log_ps.reshape(batch_size, len(prompt_templates), -1)
+            if train:
+                template_scores = class_log_ps.view(-1, 1, 1).reshape(batch_size, 1, 1)
+            else:
+                template_scores = class_log_ps.reshape(batch_size, 1, -1)
 
-        if not for_augmentation:
-            return template_scores
-        else:
-            # compute the correct objective for data augmentation.
-            orig_batch_size = batch_size // (FLAGS.test_sample_size + 1)
-            template_scores_arr = []
-            for idx in range(orig_batch_size):
-                idx_template_scores = template_scores[
-                    idx * (FLAGS.test_sample_size + 1) : (idx + 1) * (FLAGS.test_sample_size + 1), :, :
-                ]
-                idx_template_score = 0.5 * idx_template_scores[0, :, :] + 0.5 * torch.mean(
-                    idx_template_scores[1:, :, :], dim=0
-                )
-                template_scores_arr.append(idx_template_score)
-            return torch.stack(template_scores_arr, dim=0)
+            if not for_augmentation:
+                template_scores_arr.append(template_scores)
+            else:
+                # compute the correct objective for data augmentation.
+                orig_batch_size = batch_size // (FLAGS.test_sample_size + 1)
+                scores = template_scores.reshape(orig_batch_size, FLAGS.test_sample_size + 1, 1, -1)
+                template_scores_arr.append(0.5 * scores[:, 0, :, :] + 0.5 * torch.mean(scores[:, 1:, :, :], dim=1))
+        return torch.stack(template_scores_arr, dim=1)
 
     def train(self, batch: torch.utils.data.Dataset) -> Dict[str, float]:
         """The train loop for gradient-search method."""

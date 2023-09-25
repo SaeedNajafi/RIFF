@@ -65,8 +65,8 @@ if [ "${TASK_NAME}" = "sst2" ]; then
     if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
         instruction_type="manual_template_research_sst2_no_instruction"
         train_batch_size=2
-        eval_batch_size=2
-        test_sample_size=6
+        eval_batch_size=8
+        test_sample_size=8
 
     fi
     if [ "${EXPERIMENT_TYPE}" = "grips" ]; then

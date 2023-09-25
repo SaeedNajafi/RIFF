@@ -15,7 +15,7 @@ GPU_TYPE=${GPU_TYPE}
 #exps=(lora_finetune all_finetune input_finetune output_finetune soft_prompt_finetune classifier_finetune gradient_search)
 
 rates=(0.5)
-exps=(gradient_search)
+exps=(grips)
 augs=(1)
 
 
@@ -29,7 +29,7 @@ do
         TOKENIZERS_PARALLELISM=false bash train_scripts/run_augmentation_experiments.sh \
             AUG=${aug} LR=${rate} \
             EXP_TYPE=${exp} TASK=sst2 \
-            FEWSHOT_SIZE=128 CLUSTER_NAME=vcluster NUM_CLASSES=2 \
+            FEWSHOT_SIZE=128 CLUSTER_NAME=linux NUM_CLASSES=2 \
             GPU_TYPE=${GPU_TYPE}
     done
 done
