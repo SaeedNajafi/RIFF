@@ -4,7 +4,7 @@ import random
 
 import torch
 from absl import flags
-from transformers import RobertaForMaskedLM, T5ForConditionalGeneration
+from transformers import RobertaForMaskedLM
 
 FLAGS = flags.FLAGS
 
@@ -20,12 +20,7 @@ class PromptEmbedding(torch.nn.Module):
     """
 
     def __init__(
-        self,
-        prompt_length: int,
-        embedding_dim: int,
-        normal_embedder: torch.nn.Embedding,
-        normal_vocab_size: int,
-        lm_type: str,
+        self, prompt_length: int, embedding_dim: int, normal_embedder: torch.nn.Embedding, normal_vocab_size: int
     ) -> None:
         """
         Args:
@@ -37,8 +32,6 @@ class PromptEmbedding(torch.nn.Module):
         super().__init__()
         self.prompt_length = prompt_length
 
-        self.lm_type = lm_type
-
         self.normal_embedder = normal_embedder
 
         self.prompt_embedder = torch.nn.Embedding(prompt_length, embedding_dim)
@@ -48,10 +41,7 @@ class PromptEmbedding(torch.nn.Module):
         self.prompt_embedder.weight.data = self.normal_embedder.weight.data[sampled_indices, :]
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
-        """T5 model doesn't have BOS, so the fist prompt_length steps
-        are going to be part of the prompt embeddings.
-
-        Prompt tokens are always at the first prompt_length steps of the
+        """Prompt tokens are always at the first prompt_length steps of the
         input after the BOS token. split the input sequences into three parts:
 
             1 - the first BOS token to be embedded by the normal embedding.
@@ -61,82 +51,44 @@ class PromptEmbedding(torch.nn.Module):
         """
         batch_size, sequence_length = input.size()
 
-        if self.lm_type == "roberta":
-            bos_input, prompt_input, normal_input = torch.split(
-                input, [1, self.prompt_length, sequence_length - self.prompt_length - 1], dim=1
-            )
+        bos_input, prompt_input, normal_input = torch.split(
+            input, [1, self.prompt_length, sequence_length - self.prompt_length - 1], dim=1
+        )
 
-            # prompt_embedded has shape: (batch_size,  self.prompt_length, embedding_dim)
-            prompt_embedded = self.prompt_embedder(prompt_input)
+        # prompt_embedded has shape: (batch_size,  self.prompt_length, embedding_dim)
+        prompt_embedded = self.prompt_embedder(prompt_input)
 
-            # normal_input_embedded has shape: (batch_size,  sequence_length - self.prompt_length, embedding_dim)
-            normal_input_embedded = self.normal_embedder(normal_input)
+        # normal_input_embedded has shape: (batch_size,  sequence_length - self.prompt_length, embedding_dim)
+        normal_input_embedded = self.normal_embedder(normal_input)
+        bos_input_embedded = self.normal_embedder(bos_input.view(batch_size, 1))
 
-            bos_input_embedded = self.normal_embedder(bos_input.view(batch_size, 1))
-
-            # concat along the dimension 1
-            return torch.cat((bos_input_embedded, prompt_embedded, normal_input_embedded), dim=1)
-
-        elif self.lm_type == "t5":
-            prompt_input, normal_input = torch.split(
-                input, [self.prompt_length, sequence_length - self.prompt_length], dim=1
-            )
-
-            # prompt_embedded has shape: (batch_size,  self.prompt_length, embedding_dim)
-            prompt_embedded = self.prompt_embedder(prompt_input)
-
-            # normal_input_embedded has shape: (batch_size,  sequence_length - self.prompt_length, embedding_dim)
-            normal_input_embedded = self.normal_embedder(normal_input)
-            # concat along the dimension 1
-            return torch.cat((prompt_embedded, normal_input_embedded), dim=1)
+        # concat along the dimension 1
+        return torch.cat((bos_input_embedded, prompt_embedded, normal_input_embedded), dim=1)
 
 
-def create_softprompt_roberta(lm_type: str) -> torch.nn.Module:
+def create_softprompt_roberta() -> torch.nn.Module:
     """This function implements the modifications to the roberta module of the
     huggingface to include the soft prompt vectors in the input."""
     # prompt length
     p_len = FLAGS.prompt_length
 
-    if lm_type == "roberta":
-        # let the RobertaForMaskedLM load the initial checkpoint of the roberta
-        # with the normal embedding table.
-        try:
-            roberta_model = RobertaForMaskedLM.from_pretrained(FLAGS.roberta_pretrained_model)
-        except Exception:
-            # load the local pre-trained model on narval.
-            # path to the local pre-trained models on the narval cluster.
-            NARVAL_PATH = "/home/saeednjf/scratch/paraphrase_inputs_for_prompts/models"
-            path = f"{NARVAL_PATH}/roberta-large-masked-lm"
-            roberta_model = RobertaForMaskedLM.from_pretrained(path)
+    # let the RobertaForMaskedLM load the initial checkpoint of the roberta
+    # with the normal embedding table.
+    try:
+        roberta_model = RobertaForMaskedLM.from_pretrained(FLAGS.pretrained_model)
+    except Exception:
+        # load the local pre-trained model on narval.
+        # path to the local pre-trained models on the narval cluster.
+        NARVAL_PATH = "/home/saeednjf/scratch/paraphrase_inputs_for_prompts/models"
+        path = f"{NARVAL_PATH}/roberta-large-masked-lm"
+        roberta_model = RobertaForMaskedLM.from_pretrained(path)
 
-        d_model = roberta_model.config.hidden_size
-        vocab_size = roberta_model.config.vocab_size
+    d_model = roberta_model.config.hidden_size
+    vocab_size = roberta_model.config.vocab_size
 
-        prompt_embedding = PromptEmbedding(
-            p_len, d_model, roberta_model.roberta.get_input_embeddings(), vocab_size, lm_type=lm_type
-        )
+    prompt_embedding = PromptEmbedding(p_len, d_model, roberta_model.roberta.get_input_embeddings(), vocab_size)
 
-        # update the general embedding module of huggingface roberta.
-        # https://github.com/huggingface/transformers/blob/main/src/transformers/models/roberta/modeling_roberta.py
-        roberta_model.roberta.set_input_embeddings(prompt_embedding)
-        return roberta_model
-
-    elif lm_type == "t5":
-        # let the T5ForConditionalGeneration load the initial checkpoint of the T5
-        # with the normal embedding table.
-        t5_model = T5ForConditionalGeneration.from_pretrained(FLAGS.t5_pretrained_model)
-
-        # t5_model.config.d_model is from the class T5ForConditionalGeneration
-        # which is the embedding dimension of the embedding table of the T5.
-        d_model = t5_model.config.d_model
-        vocab_size = t5_model.config.vocab_size
-
-        prompt_embedding = PromptEmbedding(p_len, d_model, t5_model.shared, vocab_size, lm_type=lm_type)
-
-        # update the general shared embedding module of huggingface T5.
-        # now every call by t5_model.shared(input_ids) will use our forward method of the PromptEmbedding
-        # we don't want to update the decoder embedding to add the prompt tokens for the output tokens.
-        # see https://github.com/huggingface/transformers/blob/main/src/transformers/models/t5/modeling_t5.py#L1344
-        t5_model.shared = prompt_embedding
-        t5_model.encoder.embed_tokens = prompt_embedding
-        return t5_model
+    # update the general embedding module of huggingface roberta.
+    # https://github.com/huggingface/transformers/blob/main/src/transformers/models/roberta/modeling_roberta.py
+    roberta_model.roberta.set_input_embeddings(prompt_embedding)
+    return roberta_model

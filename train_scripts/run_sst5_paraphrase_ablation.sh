@@ -2,13 +2,15 @@
 
 rates=(0.00001)
 exps=(all_finetune)
-#seeds=(12321 11 42 1993 2023)
-seeds=(2023)
+seeds=(11 42 1993 2023 12321)
 tasks=(SetFit_sst5)
-
-losses=(mml_zscore)
-sampling_methods=(ppo)
-sampling_algs=(mixed)
+#losses=(pg_basic mml_basic pg_zscore mml_zscore)
+losses=(mml_basic)
+#sampling_methods=(on_policy off_policy)
+#sampling_methods=(ppo)
+sampling_methods=(off_policy)
+#sampling_algs=(top_p beam_search mixed)
+sampling_algs=(beam_search)
 
 for i in ${!rates[@]};
 do
@@ -48,9 +50,8 @@ do
                                 SAMPLING_METHOD=${sampling_method} \
                                 SAMPLING_ALG=${sampling_alg} \
                                 METRIC_TO_SAVE=accuracy \
-                                KL_COEFFICIENT=0.1 \
-                                CLUSTER_NAME=vcluster \
-                                GPU_TYPE=a40
+                                KL_COEFFICIENT=0.7 \
+                                CLUSTER_NAME=vcluster
                         done
                     done
                 done
