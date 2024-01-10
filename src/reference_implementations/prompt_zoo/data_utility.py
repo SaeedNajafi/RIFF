@@ -4,9 +4,9 @@ pytorch datasets."""
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple, Union
 
+import pandas as pd
 import torch
 from absl import flags
-from datasets import load_dataset
 from torch.utils.data import DataLoader, Dataset
 from transformers import AutoTokenizer, T5Tokenizer
 
@@ -22,7 +22,8 @@ flags.DEFINE_string(
 )
 flags.DEFINE_integer("fewshot_sample_size", 16, "size of samples to take for fewshot learning per class.")
 flags.DEFINE_integer("seed", 42, "the seed number")
-flags.DEFINE_string("instruction_type", "qa", "The intruction type to format the input sentences.")
+flags.DEFINE_string("instruction_type", "qa", "The instruction type to format the input sentences.")
+flags.DEFINE_string("lm_type", "roberta", "which lm type? t5 or roberta?")
 
 
 @dataclass
@@ -40,33 +41,72 @@ def white_space_fix(text: str) -> str:
 
 
 def return_class_to_id() -> Dict[str, str]:
-    if "sst2" in FLAGS.instruction_type:
+    if "_sst2_" in FLAGS.instruction_type:
         return {"terrible": "0", "great": "1"}
-    elif "sst5" in FLAGS.instruction_type:
+    if "_mr_" in FLAGS.instruction_type:
+        return {"terrible": "0", "great": "1"}
+    if "_cr_" in FLAGS.instruction_type:
+        return {"terrible": "0", "great": "1"}
+    elif "_sst5_" in FLAGS.instruction_type:
         return {"terrible": "0", "bad": "1", "okay": "2", "good": "3", "great": "4"}
-    elif "agn" in FLAGS.instruction_type:
+    elif "_agnews_" in FLAGS.instruction_type:
         return {"World": "0", "Sports": "1", "Business": "2", "Tech": "3"}
-
+    elif "_trec_" in FLAGS.instruction_type:
+        return {"Description": "0", "Entity": "1", "Expression": "2", "Human": "3", "Location": "4", "Number": "5"}
+    elif "_subj_" in FLAGS.instruction_type:
+        return {"subjective": "0", "objective": "1"}
     return {}
 
 
-def return_instruction() -> str:
+def return_instruction() -> Tuple[str, str, str]:
     """Return the instruction type."""
     instruction = ""
-    if FLAGS.instruction_type == "manual_template_research_sst2_with_instruction":
+    if "_sst2_" in FLAGS.instruction_type:
         instruction = "In this task, you are given sentences from movie reviews. \
             The task is to classify a sentence as 'great' if the sentiment of the \
             sentence is positive or as 'terrible' if the sentiment of the sentence is negative."
-    elif FLAGS.instruction_type == "manual_template_research_sst5_with_instruction":
+        template = "<s> {instruction} {sentence} . It was <mask> . </s>"
+    elif "_cr_" in FLAGS.instruction_type:
+        instruction = "In this task, you are given sentences from customer \
+                reviews. The task is to classify a sentence as 'great' if \
+                the sentiment of the sentence is positive or as 'terrible' \
+                if the sentiment of the sentence is negative."
+        template = "<s> {instruction} {sentence} . It was <mask> . </s>"
+    elif "_mr_" in FLAGS.instruction_type:
+        instruction = "In this task, you are given sentences from movie \
+                reviews. The task is to classify a sentence as 'great' if \
+                the sentiment of the sentence is positive or as 'terrible' \
+                if the sentiment of the sentence is negative."
+        template = "<s> {instruction} {sentence} . It was <mask> . </s>"
+    elif "_sst5_" in FLAGS.instruction_type:
         instruction = "In this task, you are given sentences from movie reviews. \
             Based on the given review, classify it to one of the five classes: \
                 (1) terrible, (2) bad, (3) okay, (4) good, and (5) great."
-    elif FLAGS.instruction_type == "manual_template_research_agn_with_instruction":
+        template = "<s> {instruction} {sentence} . It was <mask> . </s>"
+    elif "_subj_" in FLAGS.instruction_type:
+        instruction = "In this task, you are given sentences from reviews. \
+            The task is to classify a sentence as 'subjective' if the \
+            opinion of the sentence is subjective or as 'objective' \
+            if the opinion of the sentence is objective."
+        template = "<s> {instruction} {sentence} . This is <mask> . </s>"
+    elif "_trec_" in FLAGS.instruction_type:
+        instruction = "You are given a question. You need to detect which \
+            category better describes the question. Answer with \
+            'Description', 'Entity', 'Expression', 'Human', 'Location', and 'Number'."
+        template = "<s> {instruction} <mask>: {sentence} . </s>"
+    elif "_agnews_" in FLAGS.instruction_type:
         instruction = "In this task, you are given a news article. Your task is to classify \
             the article to one out of the four topics 'World', 'Sports', 'Business', 'Tech' \
             if the article's main topic is relevant to the world, sports, business, \
             and technology, correspondingly. If you are not sure about the topic, choose the closest option."
-    return white_space_fix(instruction)
+        template = "<s> {instruction} <mask> News: {sentence} . </s>"
+
+    t5_template = template.replace("<s> ", "").replace("<mask>", "<extra_id_0>")
+    if FLAGS.lm_type in ["roberta", "llama2"]:
+        return white_space_fix(instruction), white_space_fix(template), "{label}"
+    elif FLAGS.lm_type == "t5":
+        return white_space_fix(instruction), white_space_fix(t5_template), "{label} </s>"
+    return "", "", ""
 
 
 def tokenize_samples(batch: torch.utils.data.Dataset, samples: List[str], tokenizer: AutoTokenizer) -> None:
@@ -95,18 +135,16 @@ def augment_batch(
     attention_mask = batch.pop("attention_mask").reshape(batch_size, 1, seq_len)
 
     inputs = []
-    instruction = return_instruction()
+    instruction, template, label_template = return_instruction()
     for index in range(batch_size):
         for par_index in range(num_return_seq):
             par_base_index = index * num_return_seq
             paraphrase = paraphrases[par_base_index + par_index : par_base_index + par_index + 1][0]
-            if FLAGS.instruction_type == "manual_template_research_agn_with_instruction":
-                inputs.append(white_space_fix(f"<s> {instruction} <mask> News: {paraphrase} </s>"))
-            else:
-                inputs.append(white_space_fix(f"<s> {instruction} {paraphrase} It was <mask> . </s>"))
+            input_str = template.format(instruction=instruction, sentence=paraphrase.removesuffix("."))
             if remove_instruction:
                 # for gradient_search.
-                inputs.append(inputs.pop().replace(f" {instruction} ", " "))
+                input_str = input_str.replace(f" {instruction} ", " ")
+            inputs.append(input_str)
 
     input_encodings = tokenizer(
         inputs,
@@ -123,7 +161,7 @@ def augment_batch(
     batch["attention_mask"] = torch.cat((attention_mask, par_attention_mask), dim=1).reshape(-1, seq_len)
 
 
-def template_data(sentences: List[str], labels: List[str]) -> ClassificationRawData:
+def template_data(sentences: List[str], labels: List[str], id_to_class: Dict[str, str]) -> ClassificationRawData:
     """Helper function to format the data for the models.
 
     if with_instructions is True, we will add an instruction to the
@@ -136,106 +174,32 @@ def template_data(sentences: List[str], labels: List[str]) -> ClassificationRawD
     Finally, the end of sentence token </s> used with T5 models are
     added to both input and output.
     """
-    paraphrase_sentences = [f"{sent}" for sent in sentences]
-    instruction = return_instruction()
-    if FLAGS.instruction_type in {
-        "manual_template_research_sst2_with_instruction",
-        "manual_template_research_sst5_with_instruction",
-    }:
-        sentences = [f"{instruction} {sent} It was <mask> ." for sent in sentences]
-    elif FLAGS.instruction_type == "manual_template_research_agn_with_instruction":
-        sentences = [f"{instruction} <mask> News: {sent}" for sent in sentences]
-    elif FLAGS.instruction_type in [
-        "manual_template_research_sst2_no_instruction",
-        "manual_template_research_sst5_no_instruction",
-    ]:
-        sentences = [f"{sent} It was <mask> ." for sent in sentences]
-    elif FLAGS.instruction_type == "manual_template_research_agn_no_instruction":
-        sentences = [f"<mask> News: {sent}" for sent in sentences]
-
-    inputs = [white_space_fix(f"<s> {sent} </s>") for sent in sentences]
-    gold_outputs = [label for label in labels]
-    paraphrase_inputs = [white_space_fix(f"{sent} </s>") for sent in paraphrase_sentences]
+    instruction, template, label_template = return_instruction()
+    input_sentences = [template.format(instruction=instruction, sentence=sent.removesuffix(".")) for sent in sentences]
+    if "_no_instruction" in FLAGS.instruction_type:
+        input_sentences = [in_sent.replace(instruction, "") for in_sent in input_sentences]
+    input_sentences = [white_space_fix(in_sent) for in_sent in input_sentences]
+    gold_outputs = [label_template.format(label=label) for label in labels]
+    paraphrase_inputs = [white_space_fix(f"{sent} </s>") for sent in sentences]
     return ClassificationRawData(
-        inputs=inputs,
+        inputs=input_sentences,
         gold_outputs=gold_outputs,
         paraphrase_inputs=paraphrase_inputs,
     )
 
 
-def read_sst_sentiment_file(
-    class_to_id: Dict[str, str], split_name: str, task_name: str
-) -> Tuple[Union[ClassificationRawData, None], Union[ClassificationRawData, None]]:
-    """Load the sst sentiment analysis split for train, validation or test."""
-    assert split_name in {"train", "validation", "test"}
-    if task_name == "SetFit_sst5":
-        dataset = load_dataset("SetFit/sst5", split=split_name)
+def read_fewshot_file(class_to_id: Dict[str, str], file_path: str) -> ClassificationRawData:
+    """Load the fewshot files."""
+    df = pd.read_csv(file_path, sep="\t")
+    if "text" in df:
+        sentences = df.text.tolist()
     else:
-        dataset = load_dataset(task_name, split=split_name)
+        sentences = df.sentence.tolist()
 
     id_to_class = {id: label for label, id in class_to_id.items()}
 
-    def process_row(row: Dict[str, str]) -> Dict[str, str]:
-        """Helper function to process each row of the dataset."""
-        # verbalizers are from the following paper.
-        # https://arxiv.org/pdf/2205.12548.pdf.
-        label = id_to_class[str(row["label"])]
-        if "sentence" in row:
-            return {"sentence": white_space_fix(row["sentence"]), "sentiment": label}
-
-        return {"sentence": white_space_fix(row["text"]), "sentiment": label}
-
-    if task_name == "sst2":
-        new_dataset = dataset.map(
-            process_row,
-            remove_columns=["idx", "label"],
-        )
-    elif task_name == "SetFit_sst5":
-        new_dataset = dataset.map(
-            process_row,
-            remove_columns=["text", "label", "label_text"],
-        )
-    elif task_name == "ag_news":
-        new_dataset = dataset.map(
-            process_row,
-            remove_columns=["text", "label"],
-        )
-
-    if split_name in ["validation", "test"]:
-        sentences = []
-        labels = []
-        for row in new_dataset:
-            sentences.append(row["sentence"])
-            labels.append(row["sentiment"])
-        return None, template_data(sentences, labels)
-
-    elif FLAGS.classification_type == "fewshot":
-        new_dataset = new_dataset.shuffle(FLAGS.seed)
-        # train for fewshot.
-        label_counter = {label: 0 for label in class_to_id.keys()}
-        train_sentences = []
-        train_labels = []
-        val_sentences = []
-        val_labels = []
-        for row in new_dataset:
-            label_counter[row["sentiment"]] = label_counter.get(row["sentiment"], 0) + 1
-            if label_counter[row["sentiment"]] <= FLAGS.fewshot_sample_size:
-                train_sentences.append(row["sentence"])
-                train_labels.append(row["sentiment"])
-            elif (FLAGS.fewshot_sample_size + 1) <= label_counter[row["sentiment"]] <= FLAGS.fewshot_sample_size * 2:
-                val_sentences.append(row["sentence"])
-                val_labels.append(row["sentiment"])
-
-        return template_data(train_sentences, train_labels), template_data(val_sentences, val_labels)
-
-    else:
-        # this is train split for fullshot.
-        sentences = []
-        labels = []
-        for row in new_dataset:
-            sentences.append(row["sentence"])
-            labels.append(row["sentiment"])
-        return template_data(sentences, labels), None
+    labels = [id_to_class[str(id)] for id in df.label.tolist()]
+    return template_data(sentences, labels, id_to_class)
 
 
 class ClassificationDataset(Dataset):
@@ -273,6 +237,7 @@ def tokenize_data(
         max_length=FLAGS.source_max_length,
         add_special_tokens=False,
     )
+
     data = {
         "input_ids": input_encodings.input_ids,
         "attention_mask": input_encodings.attention_mask,
@@ -296,35 +261,35 @@ def tokenize_data(
 
 def create_sentiment_dataset(
     tokenizer: AutoTokenizer,
-    file_name: str,
-    task_name: str,
+    train_file_name: Optional[str] = None,
+    dev_file_name: Optional[str] = None,
+    test_file_name: Optional[str] = None,
+    task_name: Optional[str] = None,
     para_tokenizer: Optional[T5Tokenizer] = None,
-) -> Tuple[DataLoader, DataLoader]:
-    """Function to create the required huggingface dataset to train the T5
-    models on the sentiment analysis task."""
+) -> DataLoader:
+    """Function to create the required hugging-face dataset to train the LM
+    models."""
 
     # create a class to id in the tokenizer.
     class_to_id = return_class_to_id()
     tokenizer.class_to_id = class_to_id
     tokenizer.id_to_class = {id: label for label, id in class_to_id.items()}
 
-    if task_name in ["sst2", "SetFit_sst5", "ag_news"]:
-        train_rawdata, eval_rawdata = read_sst_sentiment_file(class_to_id, file_name, task_name)
-    else:
-        raise Exception(f"this {task_name} is not supported!")
+    if task_name not in ["sst2", "sst5", "mr", "cr", "trec", "subj", "agnews"]:
+        raise ValueError(f"this {task_name} is not supported!")
 
-    train_dataloader = None
-    eval_dataloader = None
-    if train_rawdata is not None:
-        train_dataset = tokenize_data(train_rawdata, tokenizer, para_tokenizer)
-        # this is training phase.
-        train_dataloader = DataLoader(
-            train_dataset, batch_size=FLAGS.train_batch_size, shuffle=True, pin_memory=True, num_workers=3
-        )
-    if eval_rawdata is not None:
-        eval_dataset = tokenize_data(eval_rawdata, tokenizer, para_tokenizer)
-        eval_dataloader = DataLoader(
-            eval_dataset, batch_size=FLAGS.eval_batch_size, shuffle=False, pin_memory=True, num_workers=3
-        )
+    if train_file_name is not None:
+        rawdata = read_fewshot_file(class_to_id, train_file_name)
+        shuffle = True
 
-    return train_dataloader, eval_dataloader
+    if dev_file_name is not None:
+        rawdata = read_fewshot_file(class_to_id, dev_file_name)
+        shuffle = False
+
+    if test_file_name is not None:
+        rawdata = read_fewshot_file(class_to_id, test_file_name)
+        shuffle = False
+
+    dataset = tokenize_data(rawdata, tokenizer, para_tokenizer)
+    dataloader = DataLoader(dataset, batch_size=FLAGS.train_batch_size, shuffle=shuffle)
+    return dataloader

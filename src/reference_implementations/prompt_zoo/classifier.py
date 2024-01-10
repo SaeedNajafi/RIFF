@@ -6,12 +6,12 @@ import torch
 from absl import flags
 
 from src.reference_implementations.prompt_zoo.data_utility import augment_batch
-from src.reference_implementations.prompt_zoo.prompted_lm import RobertaPrompted
+from src.reference_implementations.prompt_zoo.prompted_lm import LMPrompted
 
 FLAGS = flags.FLAGS
 
 
-class ClassifierLM(RobertaPrompted):
+class ClassifierLM(LMPrompted):
     """Wrapper class around the LM Model with a classifier on top of the LM."""
 
     def __init__(
@@ -25,7 +25,7 @@ class ClassifierLM(RobertaPrompted):
         self.predict_mode_on()
         loaded_batch = self.move_to_gpu(batch, keys=["input_ids", "attention_mask"])
 
-        encoder = self.model_pool["roberta_model"]
+        encoder = self.model_pool[f"{self.lm}_model"]
         classifier_model = self.model_pool["classifier_model"]
 
         output = encoder(
@@ -57,7 +57,7 @@ class ClassifierLM(RobertaPrompted):
         For each example, the first score belongs to the original input.
         """
         self.predict_mode_on()
-        # for classifier_finetuning, the dummy labels doesn't have any effect.
+        # for classifier_fine-tuning, the dummy labels doesn't have any effect.
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
         paraphrases = self.draw_samples_for_augmentation(batch, for_train=False)
         augment_batch(
@@ -69,7 +69,7 @@ class ClassifierLM(RobertaPrompted):
 
         loaded_batch = self.move_to_gpu(batch, keys=["input_ids", "attention_mask"])
 
-        encoder = self.model_pool["roberta_model"]
+        encoder = self.model_pool[f"{self.lm}_model"]
         classifier_model = self.model_pool["classifier_model"]
 
         output = encoder(
@@ -122,7 +122,7 @@ class ClassifierLM(RobertaPrompted):
 
         loaded_batch = self.move_to_gpu(batch, keys=["input_ids", "attention_mask", "class_indices"])
 
-        encoder = self.model_pool["roberta_model"]
+        encoder = self.model_pool[f"{self.lm}_model"]
         classifier_model = self.model_pool["classifier_model"]
 
         output = encoder(

@@ -18,17 +18,18 @@ from torch.utils.tensorboard import SummaryWriter
 
 from src.reference_implementations.prompt_zoo.classifier import ClassifierLM
 from src.reference_implementations.prompt_zoo.data_utility import create_sentiment_dataset
-from src.reference_implementations.prompt_zoo.gradient_search import SearchRoberta
-from src.reference_implementations.prompt_zoo.grips import GRIPSSearch
+from src.reference_implementations.prompt_zoo.gradient_search import SearchLM
 from src.reference_implementations.prompt_zoo.metrics import sentiment_metric
 from src.reference_implementations.prompt_zoo.model_utility import set_random_seed
-from src.reference_implementations.prompt_zoo.prompted_lm import MyBaseLM, RobertaPrompted
+from src.reference_implementations.prompt_zoo.prompted_lm import LMPrompted, MyBaseLM
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("max_epochs", 20, "The maximum number of epochs for training.")
 flags.DEFINE_integer("training_steps", 100, "The number of training steps for each epoch.")
 flags.DEFINE_integer("steps_per_checkpoint", 50, "keep checkpoint of the model every this number of steps")
 flags.DEFINE_string("prediction_file", "/tmp/predictions.csv", "the path/name for saving the predictions.")
+flags.DEFINE_string("paraphrase_save_path", "/tmp/paraphrases.json", "path to save the generated paraphrases.")
+
 flags.DEFINE_string("dev_file", "/tmp/dev.csv", "the path/name of the dev file.")
 flags.DEFINE_string("test_file", "/tmp/test.csv", "the path/name of the test file.")
 flags.DEFINE_string("task_name", "semeval_3_class_sentiment", "the name of the downstream nlp task.")
@@ -91,6 +92,7 @@ def train_model(
             if score_name == FLAGS.metric_to_save:
                 best_score = score_val
                 model.save("best_step")
+
         while epoch < FLAGS.max_epochs and global_step < FLAGS.training_steps:
             print("\nEpoch:{0}\n".format(epoch))
             epoch_loss = []
@@ -114,7 +116,7 @@ def train_model(
                             if score_val > best_score:
                                 best_score = score_val
                                 model.save("best_step")
-                            elif score_val < best_score and FLAGS.exp_type in ["gradient_search", "grips"]:
+                            elif score_val < best_score and FLAGS.exp_type in ["gradient_search"]:
                                 # re-load the best previous template searched so far!
                                 # the previous templates was not good!
                                 FLAGS.checkpoint = "best_step"
@@ -136,7 +138,7 @@ def train_model(
                     if score_val > best_score:
                         best_score = score_val
                         model.save("best_step")
-                    elif score_val < best_score and FLAGS.exp_type in ["gradient_search", "grips"]:
+                    elif score_val < best_score and FLAGS.exp_type in ["gradient_search"]:
                         # re-load the best previous template searched so far!
                         # the previous templates was not good!
                         FLAGS.checkpoint = "best_step"
@@ -149,6 +151,7 @@ def train_model(
         os.remove(eval_file)
         end_time = time.time()
         print(f"Training finished in {end_time - start_time} seconds!")
+
     else:
         raise Exception(f"the mode {FLAGS.mode} is not for training.")
 
@@ -166,7 +169,7 @@ def test_model(
         if metric is not None:
             scores = metric(FLAGS.prediction_file, num_labels)  # type: ignore
             for score_name, score_val in scores.items():
-                writer.add_scalar(score_name, score_val, 0)
+                writer.add_scalar(f"{score_name}/test", score_val, 0)
     else:
         raise Exception(f"the mode {FLAGS.mode} is not for testing.")
 
@@ -175,7 +178,7 @@ def launch_test_or_train() -> None:
     """Launch the testing or training phase for the prompting experiments."""
 
     if FLAGS.exp_type == "gradient_search":
-        model = SearchRoberta(
+        model = SearchLM(
             FLAGS.seed,
             FLAGS.task_name,
             FLAGS.enable_data_augmentation,
@@ -183,14 +186,6 @@ def launch_test_or_train() -> None:
             FLAGS.load_paraphraser,
         )
 
-    elif FLAGS.exp_type == "grips":
-        model = GRIPSSearch(
-            FLAGS.seed,
-            FLAGS.task_name,
-            FLAGS.enable_data_augmentation,
-            FLAGS.enable_paraphrase_training,
-            FLAGS.load_paraphraser,
-        )
     elif FLAGS.exp_type == "classifier_finetune":
         model = ClassifierLM(
             FLAGS.seed, FLAGS.enable_data_augmentation, FLAGS.enable_paraphrase_training, FLAGS.load_paraphraser
@@ -198,11 +193,11 @@ def launch_test_or_train() -> None:
 
     elif FLAGS.exp_type == "no_finetune":
         FLAGS.mode = "no_finetune_test"
-        model = RobertaPrompted(
+        model = LMPrompted(
             FLAGS.seed, FLAGS.enable_data_augmentation, FLAGS.enable_paraphrase_training, FLAGS.load_paraphraser
         )
     else:
-        model = RobertaPrompted(
+        model = LMPrompted(
             FLAGS.seed, FLAGS.enable_data_augmentation, FLAGS.enable_paraphrase_training, FLAGS.load_paraphraser
         )
 
@@ -212,25 +207,21 @@ def launch_test_or_train() -> None:
 
     if FLAGS.mode == "train":
         if FLAGS.classification_type == "fewshot":
-            train_dataloader, eval_dataloader = create_sentiment_dataset(
+            train_dataloader = create_sentiment_dataset(
                 tokenizer=model.tokenizer,
-                file_name=FLAGS.train_file,
+                train_file_name=FLAGS.train_file,
+                task_name=FLAGS.task_name,
+                para_tokenizer=para_tokenizer,
+            )
+            eval_dataloader = create_sentiment_dataset(
+                tokenizer=model.tokenizer,
+                dev_file_name=FLAGS.dev_file,
                 task_name=FLAGS.task_name,
                 para_tokenizer=para_tokenizer,
             )
         else:
-            train_dataloader, _ = create_sentiment_dataset(
-                tokenizer=model.tokenizer,
-                file_name=FLAGS.train_file,
-                task_name=FLAGS.task_name,
-                para_tokenizer=para_tokenizer,
-            )
-            _, eval_dataloader = create_sentiment_dataset(
-                tokenizer=model.tokenizer,
-                file_name=FLAGS.dev_file,
-                task_name=FLAGS.task_name,
-                para_tokenizer=para_tokenizer,
-            )
+            raise ValueError("Is this fewshot learning?")
+
         train_model(
             model=model,
             metric=sentiment_metric,
@@ -239,9 +230,9 @@ def launch_test_or_train() -> None:
         )
 
     elif FLAGS.mode in ["test", "inference", "eval", "no_finetune_test"]:
-        _, test_dataloader = create_sentiment_dataset(
+        test_dataloader = create_sentiment_dataset(
             tokenizer=model.tokenizer,
-            file_name=FLAGS.test_file,
+            test_file_name=FLAGS.test_file,
             task_name=FLAGS.task_name,
             para_tokenizer=para_tokenizer,
         )
@@ -263,7 +254,6 @@ def main(argv: Any) -> None:
         "gradient_search",
         "classifier_finetune",
         "no_finetune",
-        "grips",
         "lora_finetune",
     ]:
         launch_test_or_train()

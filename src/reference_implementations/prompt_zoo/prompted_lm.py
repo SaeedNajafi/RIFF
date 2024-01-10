@@ -9,9 +9,19 @@ import numpy
 import torch
 from absl import flags
 from peft import LoraConfig, TaskType, get_peft_model
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, RobertaForMaskedLM, RobertaModel
+from transformers import (
+    AutoModelForSeq2SeqLM,
+    AutoTokenizer,
+    LlamaForCausalLM,
+    LlamaTokenizer,
+    RobertaForMaskedLM,
+    RobertaModel,
+    T5EncoderModel,
+    T5ForConditionalGeneration,
+    T5Tokenizer,
+)
 
-from src.reference_implementations.prompt_zoo.data_utility import augment_batch, tokenize_samples
+from src.reference_implementations.prompt_zoo.data_utility import augment_batch, tokenize_samples, white_space_fix
 from src.reference_implementations.prompt_zoo.model_utility import (
     clear_cache,
     log_of_labels,
@@ -21,12 +31,16 @@ from src.reference_implementations.prompt_zoo.model_utility import (
     set_random_seed,
     z_scoring,
 )
-from src.reference_implementations.prompt_zoo.prompt_optimizers import optimizer_definer
+from src.reference_implementations.prompt_zoo.prompt_optimizers import construct_optimizer, define_optimizer
 from src.reference_implementations.prompt_zoo.soft_prompt_modules import create_softprompt_roberta
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string("pretrained_model", "roberta-large", "initial pre-trained model to use as backbone LM.")
+flags.DEFINE_string("roberta_pretrained_model", "roberta-large", "initial pre-trained model to use as backbone LM.")
+flags.DEFINE_string("t5_pretrained_model", "t5-large", "initial pre-trained model to use as backbone LM.")
+flags.DEFINE_string(
+    "llama2_pretrained_model", "/model-weights/Llama-2-7b-hf", "initial pre-trained model to use as backbone LM."
+)
 flags.DEFINE_string("mode", "train", "the mode of run? train or test")
 flags.DEFINE_string("model_path", "/tmp/", "main directory to save or load the model from")
 flags.DEFINE_string("para_model_path", "/tmp/", "main directory to save or load the paraphrase model from")
@@ -86,7 +100,7 @@ flags.DEFINE_integer("use_cache", 1, "Whether to use cache for the samples durin
 
 
 class MyBaseLM(torch.nn.Module):
-    """Base LM class for different finetuning + prompt-tuning experiments."""
+    """Base LM class for different fine-tuning + prompt-tuning experiments."""
 
     def __init__(self, seed: int, device: int) -> None:
         super().__init__()
@@ -195,7 +209,7 @@ class MyBaseLM(torch.nn.Module):
         """The abstract predict function."""
         pass
 
-    def t5_forward_pass(self, batch: torch.utils.data.Dataset, train: bool = False) -> torch.Tensor:
+    def para_t5_forward_pass(self, batch: torch.utils.data.Dataset, train: bool = False) -> torch.Tensor:
         """Run a forward computation over the batch, compute the log
         probability over the batch.
 
@@ -218,7 +232,7 @@ class MyBaseLM(torch.nn.Module):
         orig_labels = loaded_batch["para_labels"]
         labels = orig_labels.masked_fill(orig_labels == self.tokenizer.pad_token_id, -100)
 
-        t5_model = self.model_pool["t5_model"]
+        t5_model = self.model_pool["para_t5_model"]
 
         with torch.set_grad_enabled(train):
             class_log_p = log_of_labels(
@@ -250,10 +264,11 @@ class MyBaseLM(torch.nn.Module):
         # keep an internal link to the loaded batch on gpu or cpu.
         self.loaded_batch = loaded_batch
 
-        modify_inputs(loaded_batch, prompt_lists)
+        modify_inputs(loaded_batch, prompt_lists, lm_type=self.lm)
 
         if train or para_training:
             labels = [" " + label for label in batch["gold_outputs"]]
+
             # pick the first label token!
             labels_ids = self.tokenizer(
                 labels, add_special_tokens=False, truncation=True, padding="max_length", max_length=16
@@ -283,7 +298,7 @@ class MyBaseLM(torch.nn.Module):
         with torch.set_grad_enabled(train):
             class_log_ps = []
             logits = mlm_logits(
-                model=self.model_pool["roberta_model"],
+                model=self.model_pool[f"{self.lm}_model"],
                 input_ids=loaded_batch["modified_input_ids"],
                 input_mask=loaded_batch["modified_attention_mask"],
             )
@@ -303,6 +318,98 @@ class MyBaseLM(torch.nn.Module):
                     class_log_ps.append(class_log_ps_per_label)
 
         return torch.stack(class_log_ps, dim=1).squeeze()
+
+    def t5_forward_pass(
+        self,
+        batch: torch.utils.data.Dataset,
+        train: bool = False,
+        prompt_lists: Optional[List[List[int]]] = None,
+        para_training: bool = False,
+    ) -> torch.Tensor:
+        """Using the T5 for conditional generation Model, run a forward computation over the batch,
+        compute the log probability over the batch.
+
+        This function can be called multiple times for training or
+        inference.
+        """
+        loaded_batch = self.move_to_gpu(batch, keys=["input_ids", "attention_mask"])
+
+        # keep an internal link to the loaded batch on gpu or cpu.
+        self.loaded_batch = loaded_batch
+
+        modify_inputs(loaded_batch, prompt_lists, lm_type=self.lm)
+
+        gold_outputs = batch["gold_outputs"]
+        unique_labels = list(self.tokenizer.class_to_id.keys())
+        orig_batch_size = len(gold_outputs)
+        extended_labels = []
+        for data_index in range(orig_batch_size):
+            if train or para_training:
+                iteration_over_labels = 1
+                extended_labels.append([gold_outputs[data_index]])
+            else:
+                iteration_over_labels = len(unique_labels)
+                temp_arr = []
+                for unique_label in unique_labels:
+                    temp_arr.append(white_space_fix(f"{unique_label} </s>"))
+                extended_labels.append(temp_arr)
+
+        class_log_ps = []
+        for iter_idx in range(iteration_over_labels):
+            current_iter_labels = [labels[iter_idx] for labels in extended_labels]
+            current_iter_label_encodings = self.tokenizer(
+                current_iter_labels,
+                truncation=True,
+                padding="max_length",
+                max_length=FLAGS.source_max_length,
+                add_special_tokens=False,
+            )
+            label_ids = current_iter_label_encodings.input_ids
+            label_masks = current_iter_label_encodings.attention_mask
+            label_ids = torch.tensor(label_ids, device=loaded_batch["modified_input_ids"].device)
+            label_masks = torch.tensor(label_masks, device=loaded_batch["modified_input_ids"].device)
+
+            original_batch_size, orig_seq_len = label_ids.size()
+            new_batch_size, _ = loaded_batch["modified_input_ids"].size()
+            if new_batch_size > original_batch_size:
+                # augment the gold outputs for training.
+                label_ids = (
+                    label_ids.reshape(original_batch_size, 1, orig_seq_len)
+                    .expand(original_batch_size, new_batch_size // original_batch_size, orig_seq_len)
+                    .reshape(-1, orig_seq_len)
+                )
+                label_masks = (
+                    label_masks.reshape(original_batch_size, 1, orig_seq_len)
+                    .expand(original_batch_size, new_batch_size // original_batch_size, orig_seq_len)
+                    .reshape(-1, orig_seq_len)
+                )
+
+            labels_to_feed = label_ids.masked_fill(label_ids == self.tokenizer.pad_token_id, -100)
+            with torch.set_grad_enabled(train):
+                class_log_p = log_of_labels(
+                    model=self.model_pool[f"{self.lm}_model"],
+                    input_ids=loaded_batch["modified_input_ids"],
+                    input_mask=loaded_batch["modified_attention_mask"],
+                    decoder_mask=label_masks,
+                    labels=labels_to_feed,
+                    loss_func=self.loss_func,
+                )
+            class_log_ps.append(class_log_p)
+
+        return torch.stack(class_log_ps, dim=1).squeeze()
+
+    def lm_forward_pass(
+        self,
+        batch: torch.utils.data.Dataset,
+        train: bool = False,
+        prompt_lists: Optional[List[List[int]]] = None,
+        para_training: bool = False,
+    ) -> torch.Tensor:
+        """Which forward pass to use?"""
+        if self.lm in ["roberta", "llama2"]:
+            return self.roberta_forward_pass(batch, train, prompt_lists, para_training)
+        elif self.lm == "t5":
+            return self.t5_forward_pass(batch, train, prompt_lists, para_training)
 
 
 class FFClassifier(torch.nn.Module):
@@ -372,7 +479,7 @@ class Paraphraser(MyBaseLM):
 
         # construct tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(paraphrase_model_name)
-        self.model_pool["t5_model"] = AutoModelForSeq2SeqLM.from_pretrained(paraphrase_model_name)
+        self.model_pool["para_t5_model"] = AutoModelForSeq2SeqLM.from_pretrained(paraphrase_model_name)
         self.fixed = fixed
 
         self.setup_models()
@@ -382,7 +489,7 @@ class Paraphraser(MyBaseLM):
             temp_learning_rate = FLAGS.learning_rate
             # for paraphraser, we use the all_finetune 0.00001 learning rate.
             FLAGS.learning_rate = 0.00001
-            self.optimizer = optimizer_definer["all_finetune"](self.model_pool)
+            self.optimizer = construct_optimizer(model=self.model_pool["para_t5_model"])
             FLAGS.learning_rate = temp_learning_rate
 
         elif not self.fixed and mode in ["test", "inference", "eval"]:
@@ -396,7 +503,7 @@ class Paraphraser(MyBaseLM):
         self.predict_mode_on()
         loaded_batch = self.move_to_gpu(batch, keys=["para_input_ids", "para_attention_mask"])
 
-        t5_model = self.model_pool["t5_model"]
+        t5_model = self.model_pool["para_t5_model"]
 
         sample_list_size = num_return_seq
         if train_mode:
@@ -410,7 +517,7 @@ class Paraphraser(MyBaseLM):
             num_beams=sample_list_size,
             num_beam_groups=sample_list_size,
             early_stopping=True,
-            max_length=256,
+            max_length=400,
             num_return_sequences=sample_list_size,
             output_scores=True,
             return_dict_in_generate=True,
@@ -433,7 +540,7 @@ class Paraphraser(MyBaseLM):
         # This function is to provide random samples for learning with RL!
         self.predict_mode_on()
         loaded_batch = self.move_to_gpu(batch, keys=["para_input_ids", "para_attention_mask"])
-        t5_model = self.model_pool["t5_model"]
+        t5_model = self.model_pool["para_t5_model"]
 
         sample_list_size = num_return_seq
         if train_mode:
@@ -447,7 +554,7 @@ class Paraphraser(MyBaseLM):
             do_sample=True,
             top_p=0.99,
             temperature=temperature,
-            max_length=256,
+            max_length=400,
             num_return_sequences=sample_list_size,
             output_scores=True,
             return_dict_in_generate=True,
@@ -461,56 +568,115 @@ class Paraphraser(MyBaseLM):
         return predictions_str
 
 
-class RobertaPrompted(MyBaseLM):
-    """Wrapper class around the Roberta-large Model to experiment with
-    different finetuning or prompting ideas."""
+class LMPrompted(MyBaseLM):
+    """Wrapper class around the LM Model to experiment with
+    different fine-tuning or prompting ideas."""
 
     def __init__(
         self, seed: int, enable_data_augmentation: int, enable_paraphrase_training: int, load_paraphraser: int
     ) -> None:
         super().__init__(seed, device=0)
-
-        # construct tokenizer.
-        self.tokenizer = AutoTokenizer.from_pretrained(FLAGS.pretrained_model)
+        self.lm = FLAGS.lm_type
+        if self.lm == "t5":
+            self.tokenizer = T5Tokenizer.from_pretrained(FLAGS.t5_pretrained_model)
+        elif self.lm == "roberta":
+            # construct tokenizer.
+            self.tokenizer = AutoTokenizer.from_pretrained(FLAGS.roberta_pretrained_model)
+        elif self.lm == "llama2":
+            self.tokenizer = LlamaTokenizer.from_pretrained(FLAGS.llama2_pretrained_model)
+            if "<pad>" not in self.tokenizer.get_vocab():
+                # Add the pad token
+                self.tokenizer.add_special_tokens({"pad_token": "<pad>"})
+            if "<mask>" not in self.tokenizer.get_vocab():
+                # Add the mask token
+                self.tokenizer.add_special_tokens({"mask_token": "<mask>"})
+            self.tokenizer.padding_side = "right"  # Fix weird overflow issue with fp16 training
 
         # construct the underlying model
         if FLAGS.exp_type == "soft_prompt_finetune":
-            self.model_pool["roberta_model"] = create_softprompt_roberta()
+            self.model_pool[f"{self.lm}_model"] = create_softprompt_roberta(self.lm)
 
         elif FLAGS.exp_type == "classifier_finetune":
-            self.model_pool["roberta_model"] = RobertaModel.from_pretrained(FLAGS.pretrained_model)
+            if self.lm == "roberta":
+                self.model_pool[f"{self.lm}_model"] = RobertaModel.from_pretrained(FLAGS.roberta_pretrained_model)
+            elif self.lm == "t5":
+                self.model_pool[f"{self.lm}_model"] = T5EncoderModel.from_pretrained(FLAGS.t5_pretrained_model)
+
             # use the d_model from the LM config defined internally from huggingface.
-            self.model_pool["classifier_model"] = FFClassifier(self.model_pool["roberta_model"].config.hidden_size)
+            self.model_pool["classifier_model"] = FFClassifier(self.model_pool[f"{self.lm}_model"].config.hidden_size)
         else:
-            # construct the underlying model.
-            self.model_pool["roberta_model"] = RobertaForMaskedLM.from_pretrained(FLAGS.pretrained_model)
+            if self.lm == "t5":
+                self.model_pool[f"{self.lm}_model"] = T5ForConditionalGeneration.from_pretrained(
+                    FLAGS.t5_pretrained_model
+                )
+            elif self.lm == "roberta":
+                self.model_pool[f"{self.lm}_model"] = RobertaForMaskedLM.from_pretrained(
+                    FLAGS.roberta_pretrained_model
+                )
+            elif self.lm == "llama2":
+                model = LlamaForCausalLM.from_pretrained(FLAGS.llama2_pretrained_model)
+
+                # Resize the embeddings
+                model.resize_token_embeddings(len(self.tokenizer))
+                # Configure the pad token in the model
+                model.config.pad_token_id = self.tokenizer.pad_token_id
+                # Configure the mask token in the model
+                model.config.mask_token_id = self.tokenizer.mask_token_id
+
+                self.model_pool[f"{self.lm}_model"] = model
+
             if FLAGS.exp_type == "lora_finetune":
                 inference_mode = False if FLAGS.mode == "train" else True
-                peft_config = LoraConfig(
-                    task_type=TaskType.SEQ_CLS, inference_mode=inference_mode, r=8, lora_alpha=32, lora_dropout=0.1
-                )
-                self.model_pool["roberta_model"] = get_peft_model(self.model_pool["roberta_model"], peft_config)
-                self.model_pool["roberta_model"].print_trainable_parameters()
+                if self.lm == "t5":
+                    peft_config = LoraConfig(
+                        task_type=TaskType.SEQ_2_SEQ_LM,
+                        inference_mode=inference_mode,
+                        r=8,
+                        lora_alpha=32,
+                        lora_dropout=0.1,
+                    )
+                elif self.lm in ["roberta", "llama2"]:
+                    peft_config = LoraConfig(
+                        task_type=TaskType.CAUSAL_LM,
+                        inference_mode=inference_mode,
+                        r=8,
+                        lora_alpha=32,
+                        lora_dropout=0.1,
+                    )
+                self.model_pool[f"{self.lm}_model"] = get_peft_model(self.model_pool[f"{self.lm}_model"], peft_config)
+                self.model_pool[f"{self.lm}_model"].print_trainable_parameters()
 
         self.enable_data_augmentation = enable_data_augmentation
         self.enable_paraphrase_training = enable_paraphrase_training
         if self.enable_data_augmentation == 1:
             if load_paraphraser == 1:
                 # this is to load the fine-tuned paraphraser.
-                self.para_model = Paraphraser(seed, device=0, mode="test", fixed=False)
+                if self.lm == "roberta":
+                    device = 0  # put on same device
+                elif self.lm in ["t5", "llama2"]:
+                    device = 0
+                self.para_model = Paraphraser(seed, device=device, mode="test", fixed=False)
                 self.para_tokenizer = self.para_model.tokenizer
             else:
                 # this is just to use the basic pre-trained paraphraser.
-                self.para_model = Paraphraser(seed, device=0, mode=FLAGS.mode, fixed=True)
+                if self.lm == "roberta":
+                    device = 0  # put on same device
+                elif self.lm in ["t5", "llama2"]:
+                    device = 0
+                self.para_model = Paraphraser(seed, device=device, mode=FLAGS.mode, fixed=True)
                 self.para_tokenizer = self.para_model.tokenizer
 
         elif self.enable_paraphrase_training == 1:
+            if self.lm == "roberta":
+                device = 0  # put on same device
+            elif self.lm in ["t5", "llama2"]:
+                device = 0
             if FLAGS.sampling_method in ["off_policy", "ppo"]:
                 # two t5 models, move to another gpu.
-                self.fixed_para_model = Paraphraser(seed, device=0, mode=FLAGS.mode, fixed=True)
-                self.para_model = Paraphraser(seed, device=0, mode=FLAGS.mode, fixed=False)
+                self.fixed_para_model = Paraphraser(seed, device=device, mode=FLAGS.mode, fixed=True)
+                self.para_model = Paraphraser(seed, device=device, mode=FLAGS.mode, fixed=False)
             elif FLAGS.sampling_method == "on_policy":
-                self.para_model = Paraphraser(seed, device=0, mode=FLAGS.mode, fixed=False)
+                self.para_model = Paraphraser(seed, device=device, mode=FLAGS.mode, fixed=False)
             self.para_tokenizer = self.para_model.tokenizer
 
         self.setup_models()
@@ -520,7 +686,7 @@ class RobertaPrompted(MyBaseLM):
         if FLAGS.mode == "train" and FLAGS.exp_type not in ["gradient_search", "grips"]:
             # create optimizer only for training.
             # based on the experiment type, setup the optimizer.
-            self.optimizer = optimizer_definer[FLAGS.exp_type](self.model_pool)
+            self.optimizer = define_optimizer(FLAGS.exp_type, self.model_pool, self.lm)
 
         elif FLAGS.mode in ["test", "inference", "eval"] and FLAGS.exp_type not in ["gradient_search", "grips"]:
             # load from the given checkpoint.
@@ -530,8 +696,6 @@ class RobertaPrompted(MyBaseLM):
             # for training with the paraphraser, we need average ensembling prediction
             # while evaluating the checkpoints on the dev data.
             FLAGS.ensemble_type = "paraphrase_predict"
-
-        self.grad_scalar = torch.cuda.amp.GradScaler()
 
     def draw_samples_for_augmentation(self, batch: torch.utils.data.Dataset, for_train: bool = True) -> List[str]:
         """Draw new samples if they are not in the sample memory.
@@ -653,11 +817,11 @@ class RobertaPrompted(MyBaseLM):
             )
             tokenize_samples(batch, samples, self.para_tokenizer)
 
-            para_log_ps = self.para_model.t5_forward_pass(batch, train=True)
+            para_log_ps = self.para_model.para_t5_forward_pass(batch, train=True)
 
             if FLAGS.sampling_method in ["off_policy", "ppo"]:
                 # we also need this for off-policy sampling.
-                fixed_para_log_ps = self.fixed_para_model.t5_forward_pass(batch, train=False)
+                fixed_para_log_ps = self.fixed_para_model.para_t5_forward_pass(batch, train=False)
 
             augment_batch(batch, samples, self.tokenizer, num_return_seq=FLAGS.train_sample_size)
             to_train_lm = False
@@ -665,7 +829,7 @@ class RobertaPrompted(MyBaseLM):
         self.predict_mode_on()
         if to_train_lm:
             self.train_mode_on()
-        class_log_ps = self.roberta_forward_pass(batch, train=to_train_lm, prompt_lists=None, para_training=True)
+        class_log_ps = self.lm_forward_pass(batch, train=to_train_lm, prompt_lists=None, para_training=True)
 
         if self.enable_paraphrase_training == 1:
             class_log_ps = class_log_ps.reshape(batch_size, FLAGS.train_sample_size + 1)
@@ -755,7 +919,7 @@ class RobertaPrompted(MyBaseLM):
 
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
         self.predict_mode_on()
-        class_log_ps = self.roberta_forward_pass(batch, train=False, prompt_lists=None)
+        class_log_ps = self.lm_forward_pass(batch, train=False, prompt_lists=None)
         class_log_ps = class_log_ps.cpu().detach().numpy()
         for index, input_str in enumerate(inputs_str):
             for class_idx in range(FLAGS.num_classes):
@@ -780,7 +944,7 @@ class RobertaPrompted(MyBaseLM):
         augment_batch(batch, paraphrases, self.tokenizer, num_return_seq=FLAGS.test_sample_size)
 
         self.predict_mode_on()
-        class_log_ps = self.roberta_forward_pass(batch, train=False, prompt_lists=None)
+        class_log_ps = self.lm_forward_pass(batch, train=False, prompt_lists=None)
         class_log_ps = class_log_ps.cpu().detach().numpy()
         for index, input_str in enumerate(inputs_str):
             scores = class_log_ps[index * (FLAGS.test_sample_size + 1) : (index + 1) * (FLAGS.test_sample_size + 1), :]

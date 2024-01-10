@@ -17,8 +17,9 @@ FEWSHOT_SIZE=${FEWSHOT_SIZE}
 CLUSTER_NAME=${CLUSTER_NAME}
 NUM_CLASSES=${NUM_CLASSES}
 PARA_MODEL_PATH=${PARA_MODEL_PATH}
+GPU_TYPE=${GPU_TYPE}
 
-seeds=(11 42 1993 2023 12321)
+seeds=(100 13 21 42 87)
 
 for s in ${!seeds[@]};
 do
@@ -43,6 +44,6 @@ do
         METRIC_TO_SAVE=original_accuracy \
         KL_COEFFICIENT=0.0 \
         CLUSTER_NAME=${CLUSTER_NAME} \
-        PARA_MODEL_PATH=${PARA_MODEL_PATH}/${seed}
-
+        PARA_MODEL_PATH=/checkpoint/snajafi/${TASK}-pretrained/${TASK}_${NUM_CLASSES}_16_all_finetune_${seed}_0.00001_0_1_0_mml_zscore_ppo_mixed_accuracy_0.1 \
+        GPU_TYPE=${GPU_TYPE}
 done

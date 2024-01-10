@@ -11,7 +11,7 @@ import torch
 from absl import flags
 
 from src.reference_implementations.prompt_zoo.data_utility import augment_batch, white_space_fix
-from src.reference_implementations.prompt_zoo.prompted_lm import RobertaPrompted
+from src.reference_implementations.prompt_zoo.prompted_lm import LMPrompted
 
 FLAGS = flags.FLAGS
 
@@ -121,7 +121,7 @@ class PromptSearchMemory:
         return beam_candidates + self.beam
 
 
-class SearchRoberta(RobertaPrompted):
+class SearchLM(LMPrompted):
     """Subclassing the RobertaPrompted class to introduce the roberta-large for
     gradient-search.
 
@@ -140,20 +140,39 @@ class SearchRoberta(RobertaPrompted):
         super().__init__(seed, enable_data_augmentation, enable_paraphrase_training, load_paraphraser)
 
         if task_name == "sst2":
-            initial_template = "In this task, you are given sentences from movie reviews. \
+            instruction = "In this task, you are given sentences from movie reviews. \
                 The task is to classify a sentence as 'great' if the sentiment of the \
-                    sentence is positive or as 'terrible' if the sentiment of the sentence is negative."
-        elif task_name == "SetFit_sst5":
-            initial_template = "In this task, you are given sentences from movie reviews. \
-            Based on the given review, classify it to one of the five classes: \
-                (1) terrible, (2) bad, (3) okay, (4) good, and (5) great."
-        elif task_name == "ag_news":
-            initial_template = "In this task, you are given a news article. Your task is to classify \
-            the article to one out of the four topics 'World', 'Sports', 'Business', 'Tech' \
-            if the article's main topic is relevant to the world, sports, business, \
-            and technology, correspondingly. If you are not sure about the topic, choose the closest option."
+                sentence is positive or as 'terrible' if the sentiment of the sentence is negative."
+        elif task_name == "cr":
+            instruction = "In this task, you are given sentences from customer \
+                    reviews. The task is to classify a sentence as 'great' if \
+                    the sentiment of the sentence is positive or as 'terrible' \
+                    if the sentiment of the sentence is negative."
+        elif task_name == "mr":
+            instruction = "In this task, you are given sentences from movie \
+                    reviews. The task is to classify a sentence as 'great' if \
+                    the sentiment of the sentence is positive or as 'terrible' \
+                    if the sentiment of the sentence is negative."
+        elif task_name == "sst5":
+            instruction = "In this task, you are given sentences from movie reviews. \
+                Based on the given review, classify it to one of the five classes: \
+                    (1) terrible, (2) bad, (3) okay, (4) good, and (5) great."
+        elif task_name == "subj":
+            instruction = "In this task, you are given sentences from reviews. \
+                The task is to classify a sentence as 'subjective' if the \
+                opinion of the sentence is subjective or as 'objective' \
+                if the opinion of the sentence is objective."
+        elif task_name == "trec":
+            instruction = "You are given a question. You need to detect which \
+                category better describes the question. Answer with \
+                'Description', 'Entity', 'Expression', 'Human', 'Location', and 'Number'."
+        elif task_name == "agnews":
+            instruction = "In this task, you are given a news article. Your task is to classify \
+                the article to one out of the four topics 'World', 'Sports', 'Business', 'Tech' \
+                if the article's main topic is relevant to the world, sports, business, \
+                and technology, correspondingly. If you are not sure about the topic, choose the closest option."
 
-        instruct_ids = self.tokenizer(white_space_fix(initial_template), add_special_tokens=False)["input_ids"]
+        instruct_ids = self.tokenizer(white_space_fix(instruction), add_special_tokens=False)["input_ids"]
         self.search_memory = PromptSearchMemory(instruct_ids)
 
         if FLAGS.mode in ["test", "inference", "eval"]:
@@ -199,10 +218,13 @@ class SearchRoberta(RobertaPrompted):
         batch_size, _ = batch["input_ids"].size()
         template_scores_arr = []
         for template in prompt_templates:
-            class_log_ps = self.roberta_forward_pass(batch, train, [template.tokens])
+            class_log_ps = self.lm_forward_pass(batch, train, [template.tokens])
 
             if train:
-                template_scores = class_log_ps.view(-1, 1, 1).reshape(batch_size, 1, 1)
+                if not for_augmentation:
+                    template_scores = class_log_ps.view(-1, 1).reshape(batch_size, 1)
+                else:
+                    template_scores = class_log_ps.view(-1, 1, 1).reshape(batch_size, 1, 1)
             else:
                 template_scores = class_log_ps.reshape(batch_size, 1, -1)
 
@@ -255,7 +277,8 @@ class SearchRoberta(RobertaPrompted):
         top_template = self.search_memory.beam[0]
         self.predict_mode_on()
         class_log_ps = self.score_templates(batch, [top_template], train=False, for_augmentation=False)
-        class_log_ps = class_log_ps.mean(dim=1)  # mean across the beam size.
+        class_log_ps = class_log_ps.squeeze()
+
         class_log_ps = class_log_ps.cpu().detach().numpy()
 
         # not efficient, but let's pair potential class along the prediction scores.
@@ -291,7 +314,7 @@ class SearchRoberta(RobertaPrompted):
         top_template = self.search_memory.beam[0]
         self.predict_mode_on()
         class_log_ps = self.score_templates(batch, [top_template], train=False, for_augmentation=False)
-        class_log_ps = class_log_ps.mean(dim=1)  # mean across the beam size.
+        class_log_ps = class_log_ps.squeeze()
         class_log_ps = class_log_ps.cpu().detach().numpy()
 
         prompt_str = self.tokenizer.batch_decode(top_template.tokens, skip_special_tokens=True)
@@ -299,7 +322,7 @@ class SearchRoberta(RobertaPrompted):
         for index, input_str in enumerate(inputs_str):
             for class_idx in range(FLAGS.num_classes):
                 scores = class_log_ps[
-                    index * (FLAGS.test_sample_size + 1) : (index + 1) * (FLAGS.test_sample_size + 1)
+                    index * (FLAGS.test_sample_size + 1) : (index + 1) * (FLAGS.test_sample_size + 1), class_idx
                 ]
                 avg_score = numpy.mean(scores[1:])
                 output_row = {
