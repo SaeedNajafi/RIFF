@@ -29,7 +29,7 @@ PARA_MODEL_PATH=${PARA_MODEL_PATH}
 TIME=${TIME}
 SCRIPT=${SCRIPT}
 LOG_DIR=${LOG_DIR}
-
+GPU_TYPE=${GPU_TYPE}
 
 if [ "${CLUSTER_NAME}" = "narval" ]; then
     sbatch \
@@ -61,8 +61,9 @@ if [ "${CLUSTER_NAME}" = "narval" ]; then
 elif [ "${CLUSTER_NAME}" = "vcluster" ]; then
     sbatch \
         --gres=gpu:1 \
-        --partition=a40 \
+        --partition=${GPU_TYPE} \
         --qos=normal \
+        --time=16:00:00 \
         src/reference_implementations/run_prompt.slrm \
             ${SCRIPT} \
             ${LOG_DIR} \
@@ -83,7 +84,6 @@ elif [ "${CLUSTER_NAME}" = "vcluster" ]; then
             ${KL_COEFFICIENT} \
             ${CLUSTER_NAME} \
             ${PARA_MODEL_PATH}
-
 
 elif [ "${CLUSTER_NAME}" = "linux" ]; then
     bash ${SCRIPT} \
