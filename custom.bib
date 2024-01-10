@@ -166,23 +166,6 @@ series = {ICML'20}
     abstract = "Prompting has shown impressive success in enabling large pre-trained language models (LMs) to perform diverse NLP tasks, especially with only few downstream data. Automatically finding the optimal prompt for each task, however, is challenging. Most existing work resorts to tuning *soft* prompts (e.g., embeddings) which fall short of interpretability, reusability across LMs, and applicability when gradients are not accessible. *Discrete* prompts, on the other hand, are difficult to optimize, and are often created by {``}enumeration (e.g., paraphrasing)-then-selection{''} heuristics that do not explore the prompt space systematically. This paper proposes RLPrompt, an efficient discrete prompt optimization approach with reinforcement learning (RL). RLPrompt formulates a parameter-efficient policy network that generates the optimized discrete prompt after training with reward. To harness the complex and stochastic reward signals from the large LM environment, we incorporate effective reward stabilization that substantially enhances training efficiency. RLPrompt is flexibly applicable to different types of LMs, such as masked (e.g., BERT) and left-to-right models (e.g., GPTs), for both classification and generation tasks. Experiments on few-shot classification and unsupervised text style transfer show superior performance over a wide range of existing fine-tuning or prompting methods. Interestingly, the resulting optimized prompts are often ungrammatical gibberish text; and surprisingly, those gibberish prompts are transferrable between different LMs to retain significant performance, indicating that LM prompting may not follow human language patterns.",
 }
 
-@inproceedings{shin-etal-2020-autoprompt,
-    title = "{A}uto{P}rompt: {E}liciting {K}nowledge from {L}anguage {M}odels with {A}utomatically {G}enerated {P}rompts",
-    author = "Shin, Taylor  and
-      Razeghi, Yasaman  and
-      Logan IV, Robert L.  and
-      Wallace, Eric  and
-      Singh, Sameer",
-    booktitle = "Proceedings of the 2020 Conference on Empirical Methods in Natural Language Processing (EMNLP)",
-    month = nov,
-    year = "2020",
-    address = "Online",
-    publisher = "Association for Computational Linguistics",
-    url = "https://aclanthology.org/2020.emnlp-main.346",
-    doi = "10.18653/v1/2020.emnlp-main.346",
-    pages = "4222--4235",
-    abstract = "The remarkable success of pretrained language models has motivated the study of what kinds of knowledge these models learn during pretraining. Reformulating tasks as fill-in-the-blanks problems (e.g., cloze tests) is a natural approach for gauging such knowledge, however, its usage is limited by the manual effort and guesswork required to write suitable prompts. To address this, we develop AutoPrompt, an automated method to create prompts for a diverse set of tasks, based on a gradient-guided search. Using AutoPrompt, we show that masked language models (MLMs) have an inherent capability to perform sentiment analysis and natural language inference without additional parameters or finetuning, sometimes achieving performance on par with recent state-of-the-art supervised models. We also show that our prompts elicit more accurate factual knowledge from MLMs than the manually created prompts on the LAMA benchmark, and that MLMs can be used as relation extractors more effectively than supervised relation extraction models. These results demonstrate that automatically generated prompts are a viable parameter-free alternative to existing probing methods, and as pretrained LMs become more sophisticated and capable, potentially a replacement for finetuning.",
-}
 
 @inproceedings{wieting-gimpel-2018-paranmt,
     title = "{P}ara{NMT}-50{M}: Pushing the Limits of Paraphrastic Sentence Embeddings with Millions of Machine Translations",
@@ -277,43 +260,6 @@ series = {ICML'20}
     abstract = "We present BART, a denoising autoencoder for pretraining sequence-to-sequence models. BART is trained by (1) corrupting text with an arbitrary noising function, and (2) learning a model to reconstruct the original text. It uses a standard Tranformer-based neural machine translation architecture which, despite its simplicity, can be seen as generalizing BERT (due to the bidirectional encoder), GPT (with the left-to-right decoder), and other recent pretraining schemes. We evaluate a number of noising approaches, finding the best performance by both randomly shuffling the order of sentences and using a novel in-filling scheme, where spans of text are replaced with a single mask token. BART is particularly effective when fine tuned for text generation but also works well for comprehension tasks. It matches the performance of RoBERTa on GLUE and SQuAD, and achieves new state-of-the-art results on a range of abstractive dialogue, question answering, and summarization tasks, with gains of up to 3.5 ROUGE. BART also provides a 1.1 BLEU increase over a back-translation system for machine translation, with only target language pretraining. We also replicate other pretraining schemes within the BART framework, to understand their effect on end-task performance.",
 }
 
-@inproceedings{zhou-bhat-2021-paraphrase,
-    title = "Paraphrase Generation: A Survey of the State of the Art",
-    author = "Zhou, Jianing  and
-      Bhat, Suma",
-    booktitle = "Proceedings of the 2021 Conference on Empirical Methods in Natural Language Processing",
-    month = nov,
-    year = "2021",
-    address = "Online and Punta Cana, Dominican Republic",
-    publisher = "Association for Computational Linguistics",
-    url = "https://aclanthology.org/2021.emnlp-main.414",
-    doi = "10.18653/v1/2021.emnlp-main.414",
-    pages = "5075--5086",
-    abstract = "This paper focuses on paraphrase generation,which is a widely studied natural language generation task in NLP. With the development of neural models, paraphrase generation research has exhibited a gradual shift to neural methods in the recent years. This has provided architectures for contextualized representation of an input text and generating fluent, diverseand human-like paraphrases. This paper surveys various approaches to paraphrase generation with a main focus on neural methods.",
-}
-
-@article{DBLP:journals/corr/abs-1910-10683,
-  author       = {Colin Raffel and
-                  Noam Shazeer and
-                  Adam Roberts and
-                  Katherine Lee and
-                  Sharan Narang and
-                  Michael Matena and
-                  Yanqi Zhou and
-                  Wei Li and
-                  Peter J. Liu},
-  title        = {Exploring the Limits of Transfer Learning with a Unified Text-to-Text
-                  Transformer},
-  journal      = {CoRR},
-  volume       = {abs/1910.10683},
-  year         = {2019},
-  url          = {http://arxiv.org/abs/1910.10683},
-  eprinttype    = {arXiv},
-  eprint       = {1910.10683},
-  timestamp    = {Fri, 05 Feb 2021 15:43:41 +0100},
-  biburl       = {https://dblp.org/rec/journals/corr/abs-1910-10683.bib},
-  bibsource    = {dblp computer science bibliography, https://dblp.org}
-}
 
 @article{DBLP:journals/corr/abs-1804-07461,
   author       = {Alex Wang and
@@ -366,22 +312,6 @@ series = {NIPS'99}
     abstract = "Maximum likelihood estimation (MLE) is the predominant algorithm for training text generation models. This paradigm relies on direct supervision examples, which is not applicable to many emerging applications, such as generating adversarial attacks or generating prompts to control language models. Reinforcement learning (RL) on the other hand offers a more flexible solution by allowing users to plug in arbitrary task metrics as reward. Yet previous RL algorithms for text generation, such as policy gradient (on-policy RL) and Q-learning (off-policy RL), are often notoriously inefficient or unstable to train due to the large sequence space and the sparse reward received only at the end of sequences. In this paper, we introduce a new RL formulation for text generation from the soft Q-learning (SQL) perspective. It enables us to draw from the latest RL advances, such as path consistency learning, to combine the best of on-/off-policy updates, and learn effectively from sparse reward. We apply the approach to a wide range of novel text generation tasks, including learning from noisy/negative examples, adversarial attacks, and prompt generation. Experiments show our approach consistently outperforms both task-specialized algorithms and the previous RL methods.",
 }
 
-@inproceedings{guu-etal-2017-language,
-    title = "From Language to Programs: Bridging Reinforcement Learning and Maximum Marginal Likelihood",
-    author = "Guu, Kelvin  and
-      Pasupat, Panupong  and
-      Liu, Evan  and
-      Liang, Percy",
-    booktitle = "Proceedings of the 55th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)",
-    month = jul,
-    year = "2017",
-    address = "Vancouver, Canada",
-    publisher = "Association for Computational Linguistics",
-    url = "https://aclanthology.org/P17-1097",
-    doi = "10.18653/v1/P17-1097",
-    pages = "1051--1062",
-    abstract = "Our goal is to learn a semantic parser that maps natural language utterances into executable programs when only indirect supervision is available: examples are labeled with the correct execution result, but not the program itself. Consequently, we must search the space of programs for those that output the correct result, while not being misled by \textit{spurious programs}: incorrect programs that coincidentally output the correct result. We connect two common learning paradigms, reinforcement learning (RL) and maximum marginal likelihood (MML), and then present a new learning algorithm that combines the strengths of both. The new algorithm guards against spurious programs by combining the systematic search traditionally employed in MML with the randomized exploration of RL, and by updating parameters such that probability is spread more evenly across consistent programs. We apply our learning algorithm to a new neural semantic parser and show significant gains over existing state-of-the-art results on a recent context-dependent semantic parsing task.",
-}
 
 @misc{holtzman2020curious,
       title={The Curious Case of Neural Text Degeneration},
@@ -489,48 +419,6 @@ series = {NIPS'99}
   bibsource    = {dblp computer science bibliography, https://dblp.org}
 }
 
-@inproceedings{petroni-etal-2019-language,
-    title = "Language Models as Knowledge Bases?",
-    author = {Petroni, Fabio  and
-      Rockt{\"a}schel, Tim  and
-      Riedel, Sebastian  and
-      Lewis, Patrick  and
-      Bakhtin, Anton  and
-      Wu, Yuxiang  and
-      Miller, Alexander},
-    booktitle = "Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing and the 9th International Joint Conference on Natural Language Processing (EMNLP-IJCNLP)",
-    month = nov,
-    year = "2019",
-    address = "Hong Kong, China",
-    publisher = "Association for Computational Linguistics",
-    url = "https://aclanthology.org/D19-1250",
-    doi = "10.18653/v1/D19-1250",
-    pages = "2463--2473",
-    abstract = "Recent progress in pretraining language models on large textual corpora led to a surge of improvements for downstream NLP tasks. Whilst learning linguistic knowledge, these models may also be storing relational knowledge present in the training data, and may be able to answer queries structured as {``}fill-in-the-blank{''} cloze statements. Language models have many advantages over structured knowledge bases: they require no schema engineering, allow practitioners to query about an open class of relations, are easy to extend to more data, and require no human supervision to train. We present an in-depth analysis of the relational knowledge already present (without fine-tuning) in a wide range of state-of-the-art pretrained language models. We find that (i) without fine-tuning, BERT contains relational knowledge competitive with traditional NLP methods that have some access to oracle knowledge, (ii) BERT also does remarkably well on open-domain question answering against a supervised baseline, and (iii) certain types of factual knowledge are learned much more readily than others by standard language model pretraining approaches. The surprisingly strong ability of these models to recall factual knowledge without any fine-tuning demonstrates their potential as unsupervised open-domain QA systems. The code to reproduce our analysis is available at https://github.com/facebookresearch/LAMA.",
-}
-
-@inproceedings{deng-etal-2022-rlprompt,
-    title = "{RLP}rompt: Optimizing Discrete Text Prompts with Reinforcement Learning",
-    author = "Deng, Mingkai  and
-      Wang, Jianyu  and
-      Hsieh, Cheng-Ping  and
-      Wang, Yihan  and
-      Guo, Han  and
-      Shu, Tianmin  and
-      Song, Meng  and
-      Xing, Eric  and
-      Hu, Zhiting",
-    booktitle = "Proceedings of the 2022 Conference on Empirical Methods in Natural Language Processing",
-    month = dec,
-    year = "2022",
-    address = "Abu Dhabi, United Arab Emirates",
-    publisher = "Association for Computational Linguistics",
-    url = "https://aclanthology.org/2022.emnlp-main.222",
-    pages = "3369--3391",
-    abstract = "Prompting has shown impressive success in enabling large pre-trained language models (LMs) to perform diverse NLP tasks, especially with only few downstream data. Automatically finding the optimal prompt for each task, however, is challenging. Most existing work resorts to tuning *soft* prompts (e.g., embeddings) which fall short of interpretability, reusability across LMs, and applicability when gradients are not accessible. *Discrete* prompts, on the other hand, are difficult to optimize, and are often created by {``}enumeration (e.g., paraphrasing)-then-selection{''} heuristics that do not explore the prompt space systematically. This paper proposes RLPrompt, an efficient discrete prompt optimization approach with reinforcement learning (RL). RLPrompt formulates a parameter-efficient policy network that generates the optimized discrete prompt after training with reward. To harness the complex and stochastic reward signals from the large LM environment, we incorporate effective reward stabilization that substantially enhances training efficiency. RLPrompt is flexibly applicable to different types of LMs, such as masked (e.g., BERT) and left-to-right models (e.g., GPTs), for both classification and generation tasks. Experiments on few-shot classification and unsupervised text style transfer show superior performance over a wide range of existing fine-tuning or prompting methods. Interestingly, the resulting optimized prompts are often ungrammatical gibberish text; and surprisingly, those gibberish prompts are transferrable between different LMs to retain significant performance, indicating that LM prompting may not follow human language patterns.",
-}
-
-
 @InProceedings{pmlr-v97-houlsby19a,
   title = 	 {Parameter-Efficient Transfer Learning for {NLP}},
   author =       {Houlsby, Neil and Giurgiu, Andrei and Jastrzebski, Stanislaw and Morrone, Bruna and De Laroussilhe, Quentin and Gesmundo, Andrea and Attariyan, Mona and Gelly, Sylvain},
@@ -554,24 +442,6 @@ series = {NIPS'99}
       eprint={2107.13586},
       archivePrefix={arXiv},
       primaryClass={cs.CL}
-}
-
-@inproceedings{shin-etal-2020-autoprompt,
-    title = "{A}uto{P}rompt: {E}liciting {K}nowledge from {L}anguage {M}odels with {A}utomatically {G}enerated {P}rompts",
-    author = "Shin, Taylor  and
-      Razeghi, Yasaman  and
-      Logan IV, Robert L.  and
-      Wallace, Eric  and
-      Singh, Sameer",
-    booktitle = "Proceedings of the 2020 Conference on Empirical Methods in Natural Language Processing (EMNLP)",
-    month = nov,
-    year = "2020",
-    address = "Online",
-    publisher = "Association for Computational Linguistics",
-    url = "https://aclanthology.org/2020.emnlp-main.346",
-    doi = "10.18653/v1/2020.emnlp-main.346",
-    pages = "4222--4235",
-    abstract = "The remarkable success of pretrained language models has motivated the study of what kinds of knowledge these models learn during pretraining. Reformulating tasks as fill-in-the-blanks problems (e.g., cloze tests) is a natural approach for gauging such knowledge, however, its usage is limited by the manual effort and guesswork required to write suitable prompts. To address this, we develop AutoPrompt, an automated method to create prompts for a diverse set of tasks, based on a gradient-guided search. Using AutoPrompt, we show that masked language models (MLMs) have an inherent capability to perform sentiment analysis and natural language inference without additional parameters or finetuning, sometimes achieving performance on par with recent state-of-the-art supervised models. We also show that our prompts elicit more accurate factual knowledge from MLMs than the manually created prompts on the LAMA benchmark, and that MLMs can be used as relation extractors more effectively than supervised relation extraction models. These results demonstrate that automatically generated prompts are a viable parameter-free alternative to existing probing methods, and as pretrained LMs become more sophisticated and capable, potentially a replacement for finetuning.",
 }
 
 @inproceedings{prasad-etal-2023-grips,
@@ -644,21 +514,6 @@ series = {NIPS'99}
   abstract = 	 {Recent work pre-training Transformers with self-supervised objectives on large text corpora has shown great success when fine-tuned on downstream NLP tasks including text summarization. However, pre-training objectives tailored for abstractive text summarization have not been explored. Furthermore there is a lack of systematic evaluation across diverse domains. In this work, we propose pre-training large Transformer-based encoder-decoder models on massive text corpora with a new self-supervised objective. In PEGASUS, important sentences are removed/masked from an input document and are generated together as one output sequence from the remaining sentences, similar to an extractive summary. We evaluated our best PEGASUS model on 12 downstream summarization tasks spanning news, science, stories, instructions, emails, patents, and legislative bills. Experiments demonstrate it achieves state-of-the-art performance on all 12 downstream datasets measured by ROUGE scores. Our model also shows surprising performance on low-resource summarization, surpassing previous state-of-the-art results on 6 datasets with only 1000 examples. Finally we validated our results using human evaluation and show that our model summaries achieve human performance on multiple datasets.}
 }
 
-@inproceedings{lester-etal-2021-power,
-    title = "The Power of Scale for Parameter-Efficient Prompt Tuning",
-    author = "Lester, Brian  and
-      Al-Rfou, Rami  and
-      Constant, Noah",
-    booktitle = "Proceedings of the 2021 Conference on Empirical Methods in Natural Language Processing",
-    month = nov,
-    year = "2021",
-    address = "Online and Punta Cana, Dominican Republic",
-    publisher = "Association for Computational Linguistics",
-    url = "https://aclanthology.org/2021.emnlp-main.243",
-    doi = "10.18653/v1/2021.emnlp-main.243",
-    pages = "3045--3059",
-    abstract = "In this work, we explore {``}prompt tuning,{''} a simple yet effective mechanism for learning {``}soft prompts{''} to condition frozen language models to perform specific downstream tasks. Unlike the discrete text prompts used by GPT-3, soft prompts are learned through backpropagation and can be tuned to incorporate signals from any number of labeled examples. Our end-to-end learned approach outperforms GPT-3{'}s few-shot learning by a large margin. More remarkably, through ablations on model size using T5, we show that prompt tuning becomes more competitive with scale: as models exceed billions of parameters, our method {``}closes the gap{''} and matches the strong performance of model tuning (where all model weights are tuned). This finding is especially relevant because large models are costly to share and serve and the ability to reuse one frozen model for multiple downstream tasks can ease this burden. Our method can be seen as a simplification of the recently proposed {``}prefix tuning{''} of Li and Liang (2021) and we provide a comparison to this and other similar approaches. Finally, we show that conditioning a frozen model with soft prompts confers benefits in robustness to domain transfer and enables efficient {``}prompt ensembling.{''} We release code and model checkpoints to reproduce our experiments.",
-}
 @article{DBLP:journals/corr/abs-2106-09685,
   author       = {Edward J. Hu and
                   Yelong Shen and
@@ -677,20 +532,6 @@ series = {NIPS'99}
   timestamp    = {Tue, 29 Jun 2021 16:55:04 +0200},
   biburl       = {https://dblp.org/rec/journals/corr/abs-2106-09685.bib},
   bibsource    = {dblp computer science bibliography, https://dblp.org}
-}
-
-@inproceedings
-
-@inproceedings{NIPS2015_250cf8b5,
- author = {Zhang, Xiang and Zhao, Junbo and LeCun, Yann},
- booktitle = {Advances in Neural Information Processing Systems},
- editor = {C. Cortes and N. Lawrence and D. Lee and M. Sugiyama and R. Garnett},
- pages = {},
- publisher = {Curran Associates, Inc.},
- title = {Character-level Convolutional Networks for Text Classification},
- url = {https://proceedings.neurips.cc/paper_files/paper/2015/file/250cf8b51c773f3f8dc8b4be867a9a02-Paper.pdf},
- volume = {28},
- year = {2015}
 }
 
 @article{DBLP:journals/corr/abs-1711-05101,
@@ -723,51 +564,56 @@ series = {NIPS'99}
   biburl       = {https://dblp.org/rec/journals/corr/abs-1904-09237.bib},
   bibsource    = {dblp computer science bibliography, https://dblp.org}
 }
-@inproceedings{NIPS2015_250cf8b5,
- author = {Zhang, Xiang and Zhao, Junbo and LeCun, Yann},
- booktitle = {Advances in Neural Information Processing Systems},
- editor = {C. Cortes and N. Lawrence and D. Lee and M. Sugiyama and R. Garnett},
- pages = {},
- publisher = {Curran Associates, Inc.},
- title = {Character-level Convolutional Networks for Text Classification},
- url = {https://proceedings.neurips.cc/paper_files/paper/2015/file/250cf8b51c773f3f8dc8b4be867a9a02-Paper.pdf},
- volume = {28},
- year = {2015}
+
+
+@article{DBLP:journals/corr/abs-2107-13586,
+  author       = {Pengfei Liu and
+                  Weizhe Yuan and
+                  Jinlan Fu and
+                  Zhengbao Jiang and
+                  Hiroaki Hayashi and
+                  Graham Neubig},
+  title        = {Pre-train, Prompt, and Predict: {A} Systematic Survey of Prompting
+                  Methods in Natural Language Processing},
+  journal      = {CoRR},
+  volume       = {abs/2107.13586},
+  year         = {2021},
+  url          = {https://arxiv.org/abs/2107.13586},
+  eprinttype    = {arXiv},
+  eprint       = {2107.13586},
+  timestamp    = {Tue, 03 Aug 2021 14:53:34 +0200},
+  biburl       = {https://dblp.org/rec/journals/corr/abs-2107-13586.bib},
+  bibsource    = {dblp computer science bibliography, https://dblp.org}
 }
 
-@inproceedings{liu-etal-2022-p,
-    title = "{P}-Tuning: Prompt Tuning Can Be Comparable to Fine-tuning Across Scales and Tasks",
-    author = "Liu, Xiao  and
-      Ji, Kaixuan  and
-      Fu, Yicheng  and
-      Tam, Weng  and
-      Du, Zhengxiao  and
-      Yang, Zhilin  and
-      Tang, Jie",
-    booktitle = "Proceedings of the 60th Annual Meeting of the Association for Computational Linguistics (Volume 2: Short Papers)",
-    month = may,
-    year = "2022",
-    address = "Dublin, Ireland",
-    publisher = "Association for Computational Linguistics",
-    url = "https://aclanthology.org/2022.acl-short.8",
-    doi = "10.18653/v1/2022.acl-short.8",
-    pages = "61--68",
-    abstract = "Prompt tuning, which only tunes continuous prompts with a frozen language model, substantially reduces per-task storage and memory usage at training. However, in the context of NLU, prior work reveals that prompt tuning does not perform well for normal-sized pretrained models. We also find that existing methods of prompt tuning cannot handle hard sequence labeling tasks, indicating a lack of universality. We present a novel empirical finding that properly optimized prompt tuning can be universally effective across a wide range of model scales and NLU tasks. It matches the performance of finetuning while having only 0.1{\%}-3{\%} tuned parameters. Our method P-Tuning v2 is an implementation of Deep Prompt Tuning (CITATION) optimized and adapted for NLU. Given the universality and simplicity of P-Tuning v2, we believe it can serve as an alternative to finetuning and a strong baseline for future research.",
+@Book{childbook,
+        title={ Children's Minds },
+        author={ Margaret C. Donaldson },
+        year={ 1978 },
 }
 
-@inproceedings{li-liang-2021-prefix,
-    title = "Prefix-Tuning: Optimizing Continuous Prompts for Generation",
-    author = "Li, Xiang Lisa  and
-      Liang, Percy",
-    booktitle = "Proceedings of the 59th Annual Meeting of the Association for Computational Linguistics and the 11th International Joint Conference on Natural Language Processing (Volume 1: Long Papers)",
-    month = aug,
-    year = "2021",
-    address = "Online",
-    publisher = "Association for Computational Linguistics",
-    url = "https://aclanthology.org/2021.acl-long.353",
-    doi = "10.18653/v1/2021.acl-long.353",
-    pages = "4582--4597",
-    abstract = "Fine-tuning is the de facto way of leveraging large pretrained language models for downstream tasks. However, fine-tuning modifies all the language model parameters and therefore necessitates storing a full copy for each task. In this paper, we propose prefix-tuning, a lightweight alternative to fine-tuning for natural language generation tasks, which keeps language model parameters frozen and instead optimizes a sequence of continuous task-specific vectors, which we call the prefix. Prefix-tuning draws inspiration from prompting for language models, allowing subsequent tokens to attend to this prefix as if it were {``}virtual tokens{''}. We apply prefix-tuning to GPT-2 for table-to-text generation and to BART for summarization. We show that by learning only 0.1{\%} of the parameters, prefix-tuning obtains comparable performance in the full data setting, outperforms fine-tuning in low-data settings, and extrapolates better to examples with topics that are unseen during training.",
+@Inbook{Broughton1995,
+author="Broughton, David",
+title="The assumptions and theory of public opinion polling",
+bookTitle="Public Opinion Polling and Politics in Britain",
+year="1995",
+publisher="Macmillan Education UK",
+address="London",
+pages="15--33",
+abstract="Whenever polling results are deemed to be `wrong' or to have `failed' to predict election outcomes accurately, doubts about the fundamental nature of the polling process are always raised. These doubts cover not only the specific practice of polling but also altogether broader questions about whether public opinion can truly be measured through polls and whether the impact of public opinion on politics can be adequately assessed by the same means.",
+isbn="978-1-349-14907-0",
+doi="10.1007/978-1-349-14907-0_2",
+url="https://doi.org/10.1007/978-1-349-14907-0_2"
+}
+
+
+@inproceedings{liang2021towards,
+  title={{Towards Understanding and Mitigating Social Biases in Language Models}},
+  author={Liang, Paul Pu and Wu, Chiyu and Morency, Louis-Philippe and Salakhutdinov, Ruslan},
+  booktitle={International Conference on Machine Learning},
+  pages={6565--6576},
+  year={2021},
+  organization={PMLR}
 }
 
 @article{DBLP:journals/corr/abs-1902-00751,
@@ -791,21 +637,6 @@ series = {NIPS'99}
   bibsource    = {dblp computer science bibliography, https://dblp.org}
 }
 
-@inproceedings{lin-etal-2020-exploring,
-    title = "Exploring Versatile Generative Language Model Via Parameter-Efficient Transfer Learning",
-    author = "Lin, Zhaojiang  and
-      Madotto, Andrea  and
-      Fung, Pascale",
-    booktitle = "Findings of the Association for Computational Linguistics: EMNLP 2020",
-    month = nov,
-    year = "2020",
-    address = "Online",
-    publisher = "Association for Computational Linguistics",
-    url = "https://aclanthology.org/2020.findings-emnlp.41",
-    doi = "10.18653/v1/2020.findings-emnlp.41",
-    pages = "441--459",
-    abstract = "Fine-tuning pre-trained generative language models to down-stream language generation tasks has shown promising results. However, this comes with the cost of having a single, large model for each task, which is not ideal in low-memory/power scenarios (e.g., mobile). In this paper, we propose an effective way to fine-tune multiple down-stream generation tasks simultaneously using a single, large pretrained model. The experiments on five diverse language generation tasks show that by just using an additional 2-3{\%} parameters for each task, our model can maintain or even improve the performance of fine-tuning the whole model.",
-}
 
 @inproceedings{valipour-etal-2023-dylora,
     title = "{D}y{L}o{RA}: Parameter-Efficient Tuning of Pre-trained Models using Dynamic Search-Free Low-Rank Adaptation",
@@ -917,40 +748,6 @@ series = {NIPS'99}
  year = {2022}
 }
 
-@inproceedings{li-etal-2018-paraphrase,
-    title = "Paraphrase Generation with Deep Reinforcement Learning",
-    author = "Li, Zichao  and
-      Jiang, Xin  and
-      Shang, Lifeng  and
-      Li, Hang",
-    booktitle = "Proceedings of the 2018 Conference on Empirical Methods in Natural Language Processing",
-    month = oct # "-" # nov,
-    year = "2018",
-    address = "Brussels, Belgium",
-    publisher = "Association for Computational Linguistics",
-    url = "https://aclanthology.org/D18-1421",
-    doi = "10.18653/v1/D18-1421",
-    pages = "3865--3878",
-    abstract = "Automatic generation of paraphrases from a given sentence is an important yet challenging task in natural language processing (NLP). In this paper, we present a deep reinforcement learning approach to paraphrase generation. Specifically, we propose a new framework for the task, which consists of a generator and an evaluator, both of which are learned from data. The generator, built as a sequence-to-sequence learning model, can produce paraphrases given a sentence. The evaluator, constructed as a deep matching model, can judge whether two sentences are paraphrases of each other. The generator is first trained by deep learning and then further fine-tuned by reinforcement learning in which the reward is given by the evaluator. For the learning of the evaluator, we propose two methods based on supervised learning and inverse reinforcement learning respectively, depending on the type of available training data. Experimental results on two datasets demonstrate the proposed models (the generators) can produce more accurate paraphrases and outperform the state-of-the-art methods in paraphrase generation in both automatic evaluation and human evaluation.",
-}
-
-@inproceedings{qian-etal-2019-exploring,
-    title = "Exploring Diverse Expressions for Paraphrase Generation",
-    author = "Qian, Lihua  and
-      Qiu, Lin  and
-      Zhang, Weinan  and
-      Jiang, Xin  and
-      Yu, Yong",
-    booktitle = "Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing and the 9th International Joint Conference on Natural Language Processing (EMNLP-IJCNLP)",
-    month = nov,
-    year = "2019",
-    address = "Hong Kong, China",
-    publisher = "Association for Computational Linguistics",
-    url = "https://aclanthology.org/D19-1313",
-    doi = "10.18653/v1/D19-1313",
-    pages = "3173--3182",
-    abstract = "Paraphrasing plays an important role in various natural language processing (NLP) tasks, such as question answering, information retrieval and sentence simplification. Recently, neural generative models have shown promising results in paraphrase generation. However, prior work mainly focused on single paraphrase generation, while ignoring the fact that diversity is essential for enhancing generalization capability and robustness of downstream applications. Few works have been done to solve diverse paraphrase generation. In this paper, we propose a novel approach with two discriminators and multiple generators to generate a variety of different paraphrases. A reinforcement learning algorithm is applied to train our model. Our experiments on two real-world datasets demonstrate that our model not only gains a significant increase in diversity but also improves generation quality over several state-of-the-art baselines.",
-}
 
 @article{DBLP:journals/corr/RennieMMRG16,
   author       = {Steven J. Rennie and
@@ -970,52 +767,6 @@ series = {NIPS'99}
   bibsource    = {dblp computer science bibliography, https://dblp.org}
 }
 
-@inproceedings{liu-etal-2020-learning,
-    title = "A Learning-Exploring Method to Generate Diverse Paraphrases with Multi-Objective Deep Reinforcement Learning",
-    author = "Liu, Mingtong  and
-      Yang, Erguang  and
-      Xiong, Deyi  and
-      Zhang, Yujie  and
-      Meng, Yao  and
-      Hu, Changjian  and
-      Xu, Jinan  and
-      Chen, Yufeng",
-    booktitle = "Proceedings of the 28th International Conference on Computational Linguistics",
-    month = dec,
-    year = "2020",
-    address = "Barcelona, Spain (Online)",
-    publisher = "International Committee on Computational Linguistics",
-    url = "https://aclanthology.org/2020.coling-main.209",
-    doi = "10.18653/v1/2020.coling-main.209",
-    pages = "2310--2321",
-    abstract = "Paraphrase generation (PG) is of great importance to many downstream tasks in natural language processing. Diversity is an essential nature to PG for enhancing generalization capability and robustness of downstream applications. Recently, neural sequence-to-sequence (Seq2Seq) models have shown promising results in PG. However, traditional model training for PG focuses on optimizing model prediction against single reference and employs cross-entropy loss, which objective is unable to encourage model to generate diverse paraphrases. In this work, we present a novel approach with multi-objective learning to PG. We propose a learning-exploring method to generate sentences as learning objectives from the learned data distribution, and employ reinforcement learning to combine these new learning objectives for model training. We first design a sample-based algorithm to explore diverse sentences. Then we introduce several reward functions to evaluate the sampled sentences as learning signals in terms of expressive diversity and semantic fidelity, aiming to generate diverse and high-quality paraphrases. To effectively optimize model performance satisfying different evaluating aspects, we use a GradNorm-based algorithm that automatically balances these training objectives. Experiments and analyses on Quora and Twitter datasets demonstrate that our proposed method not only gains a significant increase in diversity but also improves generation quality over several state-of-the-art baselines.",
-}
-@inproceedings{du-ji-2019-empirical,
-    title = "An Empirical Comparison on Imitation Learning and Reinforcement Learning for Paraphrase Generation",
-    author = "Du, Wanyu  and
-      Ji, Yangfeng",
-    booktitle = "Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing and the 9th International Joint Conference on Natural Language Processing (EMNLP-IJCNLP)",
-    month = nov,
-    year = "2019",
-    address = "Hong Kong, China",
-    publisher = "Association for Computational Linguistics",
-    url = "https://aclanthology.org/D19-1619",
-    doi = "10.18653/v1/D19-1619",
-    pages = "6012--6018",
-    abstract = "Generating paraphrases from given sentences involves decoding words step by step from a large vocabulary. To learn a decoder, supervised learning which maximizes the likelihood of tokens always suffers from the exposure bias. Although both reinforcement learning (RL) and imitation learning (IL) have been widely used to alleviate the bias, the lack of direct comparison leads to only a partial image on their benefits. In this work, we present an empirical study on how RL and IL can help boost the performance of generating paraphrases, with the pointer-generator as a base model. Experiments on the benchmark datasets show that (1) imitation learning is constantly better than reinforcement learning; and (2) the pointer-generator models with imitation learning outperform the state-of-the-art methods with a large margin.",
-}
-
-@inproceedings{NEURIPS2022_8bb0d291,
- author = {Kojima, Takeshi and Gu, Shixiang (Shane) and Reid, Machel and Matsuo, Yutaka and Iwasawa, Yusuke},
- booktitle = {Advances in Neural Information Processing Systems},
- editor = {S. Koyejo and S. Mohamed and A. Agarwal and D. Belgrave and K. Cho and A. Oh},
- pages = {22199--22213},
- publisher = {Curran Associates, Inc.},
- title = {Large Language Models are Zero-Shot Reasoners},
- url = {https://proceedings.neurips.cc/paper_files/paper/2022/file/8bb0d291acd4acf06ef112099c16f326-Paper-Conference.pdf},
- volume = {35},
- year = {2022}
-}
 
 @article{Sancheti_Srinivasan_Rudinger_2022, title={Entailment Relation Aware Paraphrase Generation}, volume={36}, url={https://ojs.aaai.org/index.php/AAAI/article/view/21376}, DOI={10.1609/aaai.v36i10.21376}, abstractNote={We introduce a new task of entailment relation aware paraphrase generation which aims at generating a paraphrase conforming to a given entailment relation (e.g. equivalent, forward entailing, or reverse entailing) with respect to a given
 input. We propose a reinforcement learning-based weakly-supervised paraphrasing system, ERAP, that can be trained using existing paraphrase and natural language inference (NLI) corpora without an explicit task-specific corpus. A combination of automated and human evaluations show that ERAP generates paraphrases conforming to the specified entailment relation and are of good quality as compared to the baselines and uncontrolled paraphrasing systems. Using ERAP for augmenting training data for downstream textual entailment task improves performance over an uncontrolled paraphrasing system, and introduces fewer training artifacts, indicating the benefit of explicit control during paraphrasing.}, number={10}, journal={Proceedings of the AAAI Conference on Artificial Intelligence}, author={Sancheti, Abhilasha and Srinivasan, Balaji Vasan and Rudinger, Rachel}, year={2022}, month={Jun.}, pages={11258-11266} }
@@ -1056,6 +807,92 @@ location = {Virtual Event, CA, USA},
 series = {KDD '20}
 }
 
+
+@inproceedings{li-etal-2023-making,
+    title = "Making Language Models Better Reasoners with Step-Aware Verifier",
+    author = "Li, Yifei  and
+      Lin, Zeqi  and
+      Zhang, Shizhuo  and
+      Fu, Qiang  and
+      Chen, Bei  and
+      Lou, Jian-Guang  and
+      Chen, Weizhu",
+    editor = "Rogers, Anna  and
+      Boyd-Graber, Jordan  and
+      Okazaki, Naoaki",
+    booktitle = "Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)",
+    month = jul,
+    year = "2023",
+    address = "Toronto, Canada",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2023.acl-long.291",
+    doi = "10.18653/v1/2023.acl-long.291",
+    pages = "5315--5333",
+    abstract = "Few-shot learning is a challenging task that requires language models to generalize from limited examples. Large language models like GPT-3 and PaLM have made impressive progress in this area, but they still face difficulties in reasoning tasks such as GSM8K, a benchmark for arithmetic problems. To improve their reasoning skills, previous work has proposed to guide the language model with prompts that elicit a series of reasoning steps before giving the final answer, achieving a significant improvement on GSM8K from 17.9{\%} to 58.1{\%} in problem-solving rate. In this paper, we present DiVeRSe (Diverse Verifier on Reasoning Step), a novel approach that further enhances the reasoning capability of language models. DiVeRSe has three main components: first, it generates diverse prompts to explore different reasoning paths for the same question; second, it uses a verifier to filter out incorrect answers based on a weighted voting scheme; and third, it verifies each reasoning step individually instead of the whole chain. We evaluate DiVeRSe on the latest language model code-davinci-002 and show that it achieves new state-of-the-art results on six of eight reasoning benchmarks (e.g., GSM8K 74.4{\%} to 83.2{\%}).",
+}
+
+@misc{izmailov2019averaging,
+      title={Averaging Weights Leads to Wider Optima and Better Generalization}, 
+      author={Pavel Izmailov and Dmitrii Podoprikhin and Timur Garipov and Dmitry Vetrov and Andrew Gordon Wilson},
+      year={2019},
+      eprint={1803.05407},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG}
+}
+
+@misc{allingham2023simple,
+      title={A Simple Zero-shot Prompt Weighting Technique to Improve Prompt Ensembling in Text-Image Models}, 
+      author={James Urquhart Allingham and Jie Ren and Michael W Dusenberry and Xiuye Gu and Yin Cui and Dustin Tran and Jeremiah Zhe Liu and Balaji Lakshminarayanan},
+      year={2023},
+      eprint={2302.06235},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG}
+}
+
+@misc{muennighoff2023scaling,
+      title={Scaling Data-Constrained Language Models}, 
+      author={Niklas Muennighoff and Alexander M. Rush and Boaz Barak and Teven Le Scao and Aleksandra Piktus and Nouamane Tazi and Sampo Pyysalo and Thomas Wolf and Colin Raffel},
+      year={2023},
+      eprint={2305.16264},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL}
+}
+
+@inproceedings{10.1145/345508.345577,
+author = {Voorhees, Ellen M. and Tice, Dawn M.},
+title = {Building a Question Answering Test Collection},
+year = {2000},
+isbn = {1581132263},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/345508.345577},
+doi = {10.1145/345508.345577},
+abstract = {The TREC-8 Question Answering (QA) Track was the first large-scale evaluation of domain-independent question answering systems. In addition to fostering research on the QA task, the track was used to investigate whether the evaluation methodology used for document retrieval is appropriate for a different natural language processing task. As with document relevance judging, assessors had legitimate differences of opinions as to whether a response actually answers a question, but comparative evaluation of QA systems was stable despite these differences. Creating a reusable QA test collection is fundamentally more difficult than creating a document retrieval test collection since the QA task has no equivalent to document identifiers.},
+booktitle = {Proceedings of the 23rd Annual International ACM SIGIR Conference on Research and Development in Information Retrieval},
+pages = {200–207},
+numpages = {8},
+location = {Athens, Greece},
+series = {SIGIR '00}
+}
+
+@inproceedings{10.1145/1014052.1014073,
+author = {Hu, Minqing and Liu, Bing},
+title = {Mining and Summarizing Customer Reviews},
+year = {2004},
+isbn = {1581138881},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/1014052.1014073},
+doi = {10.1145/1014052.1014073},
+abstract = {Merchants selling products on the Web often ask their customers to review the products that they have purchased and the associated services. As e-commerce is becoming more and more popular, the number of customer reviews that a product receives grows rapidly. For a popular product, the number of reviews can be in hundreds or even thousands. This makes it difficult for a potential customer to read them to make an informed decision on whether to purchase the product. It also makes it difficult for the manufacturer of the product to keep track and to manage customer opinions. For the manufacturer, there are additional difficulties because many merchant sites may sell the same product and the manufacturer normally produces many kinds of products. In this research, we aim to mine and to summarize all the customer reviews of a product. This summarization task is different from traditional text summarization because we only mine the features of the product on which the customers have expressed their opinions and whether the opinions are positive or negative. We do not summarize the reviews by selecting a subset or rewrite some of the original sentences from the reviews to capture the main points as in the classic text summarization. Our task is performed in three steps: (1) mining product features that have been commented on by customers; (2) identifying opinion sentences in each review and deciding whether each opinion sentence is positive or negative; (3) summarizing the results. This paper proposes several novel techniques to perform these tasks. Our experimental results using reviews of a number of products sold online demonstrate the effectiveness of the techniques.},
+booktitle = {Proceedings of the Tenth ACM SIGKDD International Conference on Knowledge Discovery and Data Mining},
+pages = {168–177},
+numpages = {10},
+keywords = {sentiment classification, reviews, text mining, summarization},
+location = {Seattle, WA, USA},
+series = {KDD '04}
+}
+
 @misc{zhang2022tempera,
       title={TEMPERA: Test-Time Prompting via Reinforcement Learning},
       author={Tianjun Zhang and Xuezhi Wang and Denny Zhou and Dale Schuurmans and Joseph E. Gonzalez},
@@ -1090,5 +927,75 @@ series = {KDD '20}
   eprint       = {2106.07499},
   timestamp    = {Wed, 16 Jun 2021 10:42:19 +0200},
   biburl       = {https://dblp.org/rec/journals/corr/abs-2106-07499.bib},
+  bibsource    = {dblp computer science bibliography, https://dblp.org}
+}
+
+@article{Vijayakumar_Cogswell_Selvaraju_Sun_Lee_Crandall_Batra_2018, title={Diverse Beam Search for Improved Description of Complex Scenes}, volume={32}, url={https://ojs.aaai.org/index.php/AAAI/article/view/12340}, DOI={10.1609/aaai.v32i1.12340}, abstractNote={ &lt;p&gt; A single image captures the appearance and position of multiple entities in a scene as well as their complex interactions. As a consequence, natural language grounded in visual contexts tends to be diverse---with utterances differing as focus shifts to specific objects, interactions, or levels of detail. Recently, neural sequence models such as RNNs and LSTMs have been employed to produce visually-grounded language. Beam Search, the standard work-horse for decoding sequences from these models, is an approximate inference algorithm that decodes the top-B sequences in a greedy left-to-right fashion. In practice, the resulting sequences are often minor rewordings of a common utterance, failing to capture the multimodal nature of source images. To address this shortcoming, we propose Diverse Beam Search (DBS), a diversity promoting alternative to BS for approximate inference. DBS produces sequences that are significantly different from each other by incorporating diversity constraints within groups of candidate sequences during decoding; moreover, it achieves this with minimal computational or memory overhead. We demonstrate that our method improves both diversity and quality of decoded sequences over existing techniques on two visually-grounded language generation tasks---image captioning and visual question generation---particularly on complex scenes containing diverse visual content. We also show similar improvements at language-only machine translation tasks, highlighting the generality of our approach. &lt;/p&gt; }, number={1}, journal={Proceedings of the AAAI Conference on Artificial Intelligence}, author={Vijayakumar, Ashwin and Cogswell, Michael and Selvaraju, Ramprasaath and Sun, Qing and Lee, Stefan and Crandall, David and Batra, Dhruv}, year={2018}, month={Apr.} }
+''
+@inproceedings{chatgpt_paraphraser,
+  author={Vladimir Vorobev, Maxim Kuznetsov},
+  title={A paraphrasing model based on ChatGPT paraphrases},
+  year={2023}
+}
+
+
+@article{radford2019language,
+  title={Language models are unsupervised multitask learners},
+  author={Radford, Alec and Wu, Jeffrey and Child, Rewon and Luan, David and Amodei, Dario and Sutskever, Ilya and others},
+  journal={OpenAI blog},
+  volume={1},
+  number={8},
+  pages={9},
+  year={2019}
+}
+
+@misc{anil2023palm,
+      title={PaLM 2 Technical Report}, 
+      author={Rohan Anil and Andrew M. Dai and Orhan Firat and Melvin Johnson and Dmitry Lepikhin and Alexandre Passos and Siamak Shakeri and Emanuel Taropa and Paige Bailey and Zhifeng Chen and Eric Chu and Jonathan H. Clark and Laurent El Shafey and Yanping Huang and Kathy Meier-Hellstern and Gaurav Mishra and Erica Moreira and Mark Omernick and Kevin Robinson and Sebastian Ruder and Yi Tay and Kefan Xiao and Yuanzhong Xu and Yujing Zhang and Gustavo Hernandez Abrego and Junwhan Ahn and Jacob Austin and Paul Barham and Jan Botha and James Bradbury and Siddhartha Brahma and Kevin Brooks and Michele Catasta and Yong Cheng and Colin Cherry and Christopher A. Choquette-Choo and Aakanksha Chowdhery and Clément Crepy and Shachi Dave and Mostafa Dehghani and Sunipa Dev and Jacob Devlin and Mark Díaz and Nan Du and Ethan Dyer and Vlad Feinberg and Fangxiaoyu Feng and Vlad Fienber and Markus Freitag and Xavier Garcia and Sebastian Gehrmann and Lucas Gonzalez and Guy Gur-Ari and Steven Hand and Hadi Hashemi and Le Hou and Joshua Howland and Andrea Hu and Jeffrey Hui and Jeremy Hurwitz and Michael Isard and Abe Ittycheriah and Matthew Jagielski and Wenhao Jia and Kathleen Kenealy and Maxim Krikun and Sneha Kudugunta and Chang Lan and Katherine Lee and Benjamin Lee and Eric Li and Music Li and Wei Li and YaGuang Li and Jian Li and Hyeontaek Lim and Hanzhao Lin and Zhongtao Liu and Frederick Liu and Marcello Maggioni and Aroma Mahendru and Joshua Maynez and Vedant Misra and Maysam Moussalem and Zachary Nado and John Nham and Eric Ni and Andrew Nystrom and Alicia Parrish and Marie Pellat and Martin Polacek and Alex Polozov and Reiner Pope and Siyuan Qiao and Emily Reif and Bryan Richter and Parker Riley and Alex Castro Ros and Aurko Roy and Brennan Saeta and Rajkumar Samuel and Renee Shelby and Ambrose Slone and Daniel Smilkov and David R. So and Daniel Sohn and Simon Tokumine and Dasha Valter and Vijay Vasudevan and Kiran Vodrahalli and Xuezhi Wang and Pidong Wang and Zirui Wang and Tao Wang and John Wieting and Yuhuai Wu and Kelvin Xu and Yunhan Xu and Linting Xue and Pengcheng Yin and Jiahui Yu and Qiao Zhang and Steven Zheng and Ce Zheng and Weikang Zhou and Denny Zhou and Slav Petrov and Yonghui Wu},
+      year={2023},
+      eprint={2305.10403},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL}
+}
+
+@misc{brown2020language,
+      title={Language Models are Few-Shot Learners}, 
+      author={Tom B. Brown and Benjamin Mann and Nick Ryder and Melanie Subbiah and Jared Kaplan and Prafulla Dhariwal and Arvind Neelakantan and Pranav Shyam and Girish Sastry and Amanda Askell and Sandhini Agarwal and Ariel Herbert-Voss and Gretchen Krueger and Tom Henighan and Rewon Child and Aditya Ramesh and Daniel M. Ziegler and Jeffrey Wu and Clemens Winter and Christopher Hesse and Mark Chen and Eric Sigler and Mateusz Litwin and Scott Gray and Benjamin Chess and Jack Clark and Christopher Berner and Sam McCandlish and Alec Radford and Ilya Sutskever and Dario Amodei},
+      year={2020},
+      eprint={2005.14165},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL}
+}
+
+@misc{touvron2023llama,
+      title={Llama 2: Open Foundation and Fine-Tuned Chat Models}, 
+      author={Hugo Touvron and Louis Martin and Kevin Stone and Peter Albert and Amjad Almahairi and Yasmine Babaei and Nikolay Bashlykov and Soumya Batra and Prajjwal Bhargava and Shruti Bhosale and Dan Bikel and Lukas Blecher and Cristian Canton Ferrer and Moya Chen and Guillem Cucurull and David Esiobu and Jude Fernandes and Jeremy Fu and Wenyin Fu and Brian Fuller and Cynthia Gao and Vedanuj Goswami and Naman Goyal and Anthony Hartshorn and Saghar Hosseini and Rui Hou and Hakan Inan and Marcin Kardas and Viktor Kerkez and Madian Khabsa and Isabel Kloumann and Artem Korenev and Punit Singh Koura and Marie-Anne Lachaux and Thibaut Lavril and Jenya Lee and Diana Liskovich and Yinghai Lu and Yuning Mao and Xavier Martinet and Todor Mihaylov and Pushkar Mishra and Igor Molybog and Yixin Nie and Andrew Poulton and Jeremy Reizenstein and Rashi Rungta and Kalyan Saladi and Alan Schelten and Ruan Silva and Eric Michael Smith and Ranjan Subramanian and Xiaoqing Ellen Tan and Binh Tang and Ross Taylor and Adina Williams and Jian Xiang Kuan and Puxin Xu and Zheng Yan and Iliyan Zarov and Yuchen Zhang and Angela Fan and Melanie Kambadur and Sharan Narang and Aurelien Rodriguez and Robert Stojnic and Sergey Edunov and Thomas Scialom},
+      year={2023},
+      eprint={2307.09288},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL}
+}
+@misc{zhang2022opt,
+      title={OPT: Open Pre-trained Transformer Language Models}, 
+      author={Susan Zhang and Stephen Roller and Naman Goyal and Mikel Artetxe and Moya Chen and Shuohui Chen and Christopher Dewan and Mona Diab and Xian Li and Xi Victoria Lin and Todor Mihaylov and Myle Ott and Sam Shleifer and Kurt Shuster and Daniel Simig and Punit Singh Koura and Anjali Sridhar and Tianlu Wang and Luke Zettlemoyer},
+      year={2022},
+      eprint={2205.01068},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL}
+}
+
+@article{DBLP:journals/corr/ZhangZL15,
+  author       = {Xiang Zhang and
+                  Junbo Jake Zhao and
+                  Yann LeCun},
+  title        = {Character-level Convolutional Networks for Text Classification},
+  journal      = {CoRR},
+  volume       = {abs/1509.01626},
+  year         = {2015},
+  url          = {http://arxiv.org/abs/1509.01626},
+  eprinttype    = {arXiv},
+  eprint       = {1509.01626},
+  timestamp    = {Fri, 13 Mar 2020 16:29:43 +0100},
+  biburl       = {https://dblp.org/rec/journals/corr/ZhangZL15.bib},
   bibsource    = {dblp computer science bibliography, https://dblp.org}
 }
