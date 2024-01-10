@@ -18,17 +18,18 @@ from torch.utils.tensorboard import SummaryWriter
 
 from src.reference_implementations.prompt_zoo.classifier import ClassifierLM
 from src.reference_implementations.prompt_zoo.data_utility import create_sentiment_dataset
-from src.reference_implementations.prompt_zoo.gradient_search import SearchRoberta
-from src.reference_implementations.prompt_zoo.grips import GRIPSSearch
+from src.reference_implementations.prompt_zoo.gradient_search import SearchLM
 from src.reference_implementations.prompt_zoo.metrics import sentiment_metric
 from src.reference_implementations.prompt_zoo.model_utility import set_random_seed
-from src.reference_implementations.prompt_zoo.prompted_lm import MyBaseLM, RobertaPrompted
+from src.reference_implementations.prompt_zoo.prompted_lm import LMPrompted, MyBaseLM
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("max_epochs", 20, "The maximum number of epochs for training.")
 flags.DEFINE_integer("training_steps", 100, "The number of training steps for each epoch.")
 flags.DEFINE_integer("steps_per_checkpoint", 50, "keep checkpoint of the model every this number of steps")
 flags.DEFINE_string("prediction_file", "/tmp/predictions.csv", "the path/name for saving the predictions.")
+flags.DEFINE_string("paraphrase_save_path", "/tmp/paraphrases.json", "path to save the generated paraphrases.")
+
 flags.DEFINE_string("dev_file", "/tmp/dev.csv", "the path/name of the dev file.")
 flags.DEFINE_string("test_file", "/tmp/test.csv", "the path/name of the test file.")
 flags.DEFINE_string("task_name", "semeval_3_class_sentiment", "the name of the downstream nlp task.")
@@ -71,11 +72,12 @@ def start_training(model: MyBaseLM, dataloader: torch.utils.data.DataLoader) -> 
 
 def train_model(
     model: MyBaseLM,
-    metric: Callable[[str], Dict[str, float]],
+    metric: Callable[[str, int], Dict[str, float]],
     train_dataloader: torch.utils.data.DataLoader,
     eval_dataloader: torch.utils.data.DataLoader,
 ) -> None:
     """Run the model on input data; for training or inference."""
+    num_labels = len(list(model.tokenizer.class_to_id.keys()))
     if FLAGS.mode == "train":
         start_time = time.time()
         writer = SummaryWriter(FLAGS.model_path)
@@ -84,12 +86,13 @@ def train_model(
         total_loss = []
         eval_file = os.path.join(FLAGS.model_path, "temp_eval.csv")
         start_predicting(model, eval_dataloader, eval_file)
-        scores = metric(eval_file)  # type: ignore
+        scores = metric(eval_file, num_labels)  # type: ignore
         for score_name, score_val in scores.items():
             writer.add_scalar(f"{score_name}/dev", score_val, 0)
             if score_name == FLAGS.metric_to_save:
                 best_score = score_val
                 model.save("best_step")
+
         while epoch < FLAGS.max_epochs and global_step < FLAGS.training_steps:
             print("\nEpoch:{0}\n".format(epoch))
             epoch_loss = []
@@ -106,14 +109,14 @@ def train_model(
 
                 if global_step % FLAGS.steps_per_checkpoint == 0:
                     start_predicting(model, eval_dataloader, eval_file)
-                    scores = metric(eval_file)  # type: ignore
+                    scores = metric(eval_file, num_labels)  # type: ignore
                     for score_name, score_val in scores.items():
                         writer.add_scalar(f"{score_name}/dev", score_val, global_step)
                         if score_name == FLAGS.metric_to_save:
                             if score_val > best_score:
                                 best_score = score_val
                                 model.save("best_step")
-                            elif score_val < best_score and FLAGS.exp_type in ["gradient_search", "grips"]:
+                            elif score_val < best_score and FLAGS.exp_type in ["gradient_search"]:
                                 # re-load the best previous template searched so far!
                                 # the previous templates was not good!
                                 FLAGS.checkpoint = "best_step"
@@ -128,14 +131,14 @@ def train_model(
 
             # do final evaluation on the dev data at the end of epoch.
             start_predicting(model, eval_dataloader, eval_file)
-            scores = metric(eval_file)  # type: ignore
+            scores = metric(eval_file, num_labels)  # type: ignore
             for score_name, score_val in scores.items():
                 writer.add_scalar(f"{score_name}/dev", score_val, global_step)
                 if score_name == FLAGS.metric_to_save:
                     if score_val > best_score:
                         best_score = score_val
                         model.save("best_step")
-                    elif score_val < best_score and FLAGS.exp_type in ["gradient_search", "grips"]:
+                    elif score_val < best_score and FLAGS.exp_type in ["gradient_search"]:
                         # re-load the best previous template searched so far!
                         # the previous templates was not good!
                         FLAGS.checkpoint = "best_step"
@@ -148,6 +151,7 @@ def train_model(
         os.remove(eval_file)
         end_time = time.time()
         print(f"Training finished in {end_time - start_time} seconds!")
+
     else:
         raise Exception(f"the mode {FLAGS.mode} is not for training.")
 
@@ -155,16 +159,17 @@ def train_model(
 def test_model(
     model: MyBaseLM,
     test_dataloader: torch.utils.data.DataLoader,
-    metric: Optional[Callable[[str], Dict[str, float]]] = None,
+    metric: Optional[Callable[[str, int], Dict[str, float]]] = None,
 ) -> None:
     writer = SummaryWriter(FLAGS.model_path)
+    num_labels = len(list(model.tokenizer.class_to_id.keys()))
     if FLAGS.mode in ["test", "inference", "eval", "no_finetune_test"]:
         print("Predicting...")
         start_predicting(model, test_dataloader, FLAGS.prediction_file)
         if metric is not None:
-            scores = metric(FLAGS.prediction_file)  # type: ignore
+            scores = metric(FLAGS.prediction_file, num_labels)  # type: ignore
             for score_name, score_val in scores.items():
-                writer.add_scalar(score_name, score_val, 0)
+                writer.add_scalar(f"{score_name}/test", score_val, 0)
     else:
         raise Exception(f"the mode {FLAGS.mode} is not for testing.")
 
@@ -173,50 +178,28 @@ def launch_test_or_train() -> None:
     """Launch the testing or training phase for the prompting experiments."""
 
     if FLAGS.exp_type == "gradient_search":
-        model = SearchRoberta(
+        model = SearchLM(
             FLAGS.seed,
             FLAGS.task_name,
             FLAGS.enable_data_augmentation,
             FLAGS.enable_paraphrase_training,
             FLAGS.load_paraphraser,
         )
-        eval_repeat_input = True
-        train_repeat_input = False
 
-    elif FLAGS.exp_type == "grips":
-        model = GRIPSSearch(
-            FLAGS.seed,
-            FLAGS.task_name,
-            FLAGS.enable_data_augmentation,
-            FLAGS.enable_paraphrase_training,
-            FLAGS.load_paraphraser,
-        )
-        eval_repeat_input = True
-        train_repeat_input = True
-        # For grips, we use train dataset as the search set and compute the balanced accuracy on it.
-        # we should repeat the input for prediction and with set shuffle false to
-        # keep the repeated inputs next to each other.
     elif FLAGS.exp_type == "classifier_finetune":
         model = ClassifierLM(
             FLAGS.seed, FLAGS.enable_data_augmentation, FLAGS.enable_paraphrase_training, FLAGS.load_paraphraser
         )
-        eval_repeat_input = False
-        train_repeat_input = False
 
     elif FLAGS.exp_type == "no_finetune":
         FLAGS.mode = "no_finetune_test"
-        model = RobertaPrompted(
+        model = LMPrompted(
             FLAGS.seed, FLAGS.enable_data_augmentation, FLAGS.enable_paraphrase_training, FLAGS.load_paraphraser
         )
-        eval_repeat_input = True
-        train_repeat_input = False
-        # change the flag to use the pre-trained weights only.
     else:
-        model = RobertaPrompted(
+        model = LMPrompted(
             FLAGS.seed, FLAGS.enable_data_augmentation, FLAGS.enable_paraphrase_training, FLAGS.load_paraphraser
         )
-        eval_repeat_input = True
-        train_repeat_input = False
 
     para_tokenizer = None
     if FLAGS.enable_data_augmentation == 1 or FLAGS.enable_paraphrase_training == 1:
@@ -224,29 +207,21 @@ def launch_test_or_train() -> None:
 
     if FLAGS.mode == "train":
         if FLAGS.classification_type == "fewshot":
-            train_dataloader, eval_dataloader = create_sentiment_dataset(
+            train_dataloader = create_sentiment_dataset(
                 tokenizer=model.tokenizer,
-                file_name=FLAGS.train_file,
+                train_file_name=FLAGS.train_file,
                 task_name=FLAGS.task_name,
-                eval_repeat_input=eval_repeat_input,
-                train_repeat_input=train_repeat_input,
+                para_tokenizer=para_tokenizer,
+            )
+            eval_dataloader = create_sentiment_dataset(
+                tokenizer=model.tokenizer,
+                dev_file_name=FLAGS.dev_file,
+                task_name=FLAGS.task_name,
                 para_tokenizer=para_tokenizer,
             )
         else:
-            train_dataloader, _ = create_sentiment_dataset(
-                tokenizer=model.tokenizer,
-                file_name=FLAGS.train_file,
-                task_name=FLAGS.task_name,
-                train_repeat_input=train_repeat_input,
-                para_tokenizer=para_tokenizer,
-            )
-            _, eval_dataloader = create_sentiment_dataset(
-                tokenizer=model.tokenizer,
-                file_name=FLAGS.dev_file,
-                task_name=FLAGS.task_name,
-                eval_repeat_input=eval_repeat_input,
-                para_tokenizer=para_tokenizer,
-            )
+            raise ValueError("Is this fewshot learning?")
+
         train_model(
             model=model,
             metric=sentiment_metric,
@@ -255,11 +230,10 @@ def launch_test_or_train() -> None:
         )
 
     elif FLAGS.mode in ["test", "inference", "eval", "no_finetune_test"]:
-        _, test_dataloader = create_sentiment_dataset(
+        test_dataloader = create_sentiment_dataset(
             tokenizer=model.tokenizer,
-            file_name=FLAGS.test_file,
+            test_file_name=FLAGS.test_file,
             task_name=FLAGS.task_name,
-            eval_repeat_input=eval_repeat_input,
             para_tokenizer=para_tokenizer,
         )
         test_model(model=model, metric=sentiment_metric, test_dataloader=test_dataloader)
@@ -280,7 +254,6 @@ def main(argv: Any) -> None:
         "gradient_search",
         "classifier_finetune",
         "no_finetune",
-        "grips",
         "lora_finetune",
     ]:
         launch_test_or_train()

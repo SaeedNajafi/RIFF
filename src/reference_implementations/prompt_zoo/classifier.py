@@ -6,12 +6,12 @@ import torch
 from absl import flags
 
 from src.reference_implementations.prompt_zoo.data_utility import augment_batch
-from src.reference_implementations.prompt_zoo.prompted_lm import RobertaPrompted
+from src.reference_implementations.prompt_zoo.prompted_lm import LMPrompted
 
 FLAGS = flags.FLAGS
 
 
-class ClassifierLM(RobertaPrompted):
+class ClassifierLM(LMPrompted):
     """Wrapper class around the LM Model with a classifier on top of the LM."""
 
     def __init__(
@@ -25,7 +25,7 @@ class ClassifierLM(RobertaPrompted):
         self.predict_mode_on()
         loaded_batch = self.move_to_gpu(batch, keys=["input_ids", "attention_mask"])
 
-        encoder = self.model_pool["roberta_model"]
+        encoder = self.model_pool[f"{self.lm}_model"]
         classifier_model = self.model_pool["classifier_model"]
 
         output = encoder(
@@ -43,10 +43,10 @@ class ClassifierLM(RobertaPrompted):
         for index, input_str in enumerate(inputs_str):
             for class_idx in range(FLAGS.num_classes):
                 output_row = {
-                    "potential_class": str(class_idx),
+                    "potential_class": self.tokenizer.id_to_class[str(class_idx)],
                     "original_prediction_score": prediction_logits[index][class_idx],
-                    "original_inputs": input_str.strip(),
-                    "gold_class": str(batch["class_indices"][index].item()),
+                    "original_inputs": input_str,
+                    "gold_class": batch["gold_outputs"][index],
                 }
                 yield output_row
 
@@ -57,39 +57,19 @@ class ClassifierLM(RobertaPrompted):
         For each example, the first score belongs to the original input.
         """
         self.predict_mode_on()
-        # for classifier_finetuning, the dummy labels doesn't have any effect.
-        dummy_labels = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
+        # for classifier_fine-tuning, the dummy labels doesn't have any effect.
         inputs_str = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=False)
-
-        if FLAGS.test_sampling_algorithm == "beam_search":
-            paraphrases = self.para_model.generate_beam_paraphrases(
-                batch, num_return_seq=FLAGS.test_sample_size, train_mode=False
-            )
-        elif FLAGS.test_sampling_algorithm == "top_p":
-            paraphrases = self.para_model.generate_top_p_paraphrases(
-                batch, num_return_seq=FLAGS.test_sample_size, temperature=FLAGS.test_temperature, train_mode=False
-            )
+        paraphrases = self.draw_samples_for_augmentation(batch, for_train=False)
         augment_batch(
             batch,
             paraphrases,
             self.tokenizer,
-            dummy_labels,
             num_return_seq=FLAGS.test_sample_size,
-        )
-
-        batch_size = batch["class_indices"].size()[0]
-        batch["class_indices"] = (
-            batch.pop("class_indices")
-            .reshape(batch_size, 1)
-            .expand(batch_size, 1 + FLAGS.test_sample_size)
-            .reshape(
-                -1,
-            )
         )
 
         loaded_batch = self.move_to_gpu(batch, keys=["input_ids", "attention_mask"])
 
-        encoder = self.model_pool["roberta_model"]
+        encoder = self.model_pool[f"{self.lm}_model"]
         classifier_model = self.model_pool["classifier_model"]
 
         output = encoder(
@@ -110,58 +90,57 @@ class ClassifierLM(RobertaPrompted):
             for class_idx in range(FLAGS.num_classes):
                 avg_score = numpy.mean(scores[1:, class_idx])
                 output_row = {
-                    "potential_class": str(class_idx),
+                    "potential_class": self.tokenizer.id_to_class[str(class_idx)],
                     "prediction_score": avg_score,
                     "all_prediction_score": 0.5 * avg_score + 0.5 * scores[0, class_idx],
                     "original_prediction_score": scores[0, class_idx],
-                    "gold_class": str(batch["class_indices"][index * (FLAGS.test_sample_size + 1)].item()),
+                    "gold_class": batch["gold_outputs"][index],
                     "paraphrases": paraphrases[index * FLAGS.test_sample_size : (index + 1) * FLAGS.test_sample_size],
-                    "original_inputs": input_str.strip(),
+                    "original_inputs": input_str,
                 }
                 yield output_row
 
     def train(self, batch: torch.utils.data.Dataset) -> Dict[str, float]:
         """The classifier training step."""
-        with torch.autocast(device_type="cuda"):
-            self.train_mode_on()
-            if self.enable_data_augmentation == 1:
-                # dummy_labels doesn't have any effect for classifier_finetuning.
-                dummy_labels = self.tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
-                paraphrases = self.draw_samples_for_augmentation(batch)
-                augment_batch(batch, paraphrases, self.tokenizer, dummy_labels, num_return_seq=FLAGS.test_sample_size)
+        self.train_mode_on()
+        batch["class_indices"] = torch.tensor(
+            [int(self.tokenizer.class_to_id[label]) for label in batch["gold_outputs"]]
+        )
+        if self.enable_data_augmentation == 1:
+            paraphrases = self.draw_samples_for_augmentation(batch)
+            augment_batch(batch, paraphrases, self.tokenizer, num_return_seq=FLAGS.test_sample_size)
 
-                batch_size = batch["class_indices"].size()[0]
-                batch["class_indices"] = (
-                    batch.pop("class_indices")
-                    .reshape(batch_size, 1)
-                    .expand(batch_size, 1 + FLAGS.test_sample_size)
-                    .reshape(
-                        -1,
-                    )
+            batch_size = batch["class_indices"].size()[0]
+            batch["class_indices"] = (
+                batch.pop("class_indices")
+                .reshape(batch_size, 1)
+                .expand(batch_size, 1 + FLAGS.test_sample_size)
+                .reshape(
+                    -1,
                 )
-
-            loaded_batch = self.move_to_gpu(batch, keys=["input_ids", "attention_mask", "class_indices"])
-
-            encoder = self.model_pool["roberta_model"]
-            classifier_model = self.model_pool["classifier_model"]
-
-            output = encoder(
-                input_ids=loaded_batch["input_ids"],
-                attention_mask=loaded_batch["attention_mask"],
-            )
-            encoder_hidden_states = output.last_hidden_state
-            loss = classifier_model.compute_loss(
-                encoder_hidden_states,
-                loaded_batch["attention_mask"],
-                loaded_batch["class_indices"],
-                enable_data_augmentation=self.enable_data_augmentation == 1,
             )
 
-        self.grad_scalar.scale(loss).backward()
+        loaded_batch = self.move_to_gpu(batch, keys=["input_ids", "attention_mask", "class_indices"])
+
+        encoder = self.model_pool[f"{self.lm}_model"]
+        classifier_model = self.model_pool["classifier_model"]
+
+        output = encoder(
+            input_ids=loaded_batch["input_ids"],
+            attention_mask=loaded_batch["attention_mask"],
+        )
+        encoder_hidden_states = output.last_hidden_state
+        loss = classifier_model.compute_loss(
+            encoder_hidden_states,
+            loaded_batch["attention_mask"],
+            loaded_batch["class_indices"],
+            enable_data_augmentation=self.enable_data_augmentation == 1,
+        )
+
+        loss.backward()
 
         # updates the main language model.
-        self.grad_scalar.step(self.optimizer)
-        self.grad_scalar.update()
+        self.optimizer.step()
         loss_value = loss.item()
 
         return {"loss_value": loss_value}
