@@ -84,7 +84,7 @@ Pre-trained Language Models (PLMs) have shown remarkable performance when fine-t
 \section{Introduction}
 Multiple Pre-trained Language Models (PLMs), such as BERT~\cite{devlin-etal-2019-bert}, RoBERTa~\cite{DBLP:journals/corr/abs-1907-11692}, T5~\cite{DBLP:journals/corr/abs-1910-10683}, and GPT2~\cite{radford2019language}, have demonstrated remarkable performance when fine-tuned for downstream text processing tasks. PLM variants with less than 1 billion parameters are easier to train end-to-end with commodity hardware. However, very recent PLMs have been trained with a few hundred billion parameters, including PaLM-2 (540B)\cite{anil2023palm}, GPT3 (175B)\cite{brown2020language}, OPT (175B)\cite{zhang2022opt}, or Llama-2 (70B)\cite{touvron2023llama}. Training all parameters of these models end-to-end is not straightforward unless done with a dedicated cluster of specialized hardware.
 
-In response, NLP research have developed effective techniques to control or alter the behavior of PLMs by updating the input context through prompt optimization~\cite{DBLP:journals/corr/abs-2107-13586} or adapting a few additional parameters within the network itself~\cite{DBLP:journals/corr/abs-2106-09685}. 
+In response, NLP research have developed effective techniques to control or alter the behavior of PLMs by updating the input context through prompt optimization~\cite{DBLP:journals/corr/abs-2107-13586} or adapting a few additional parameters within the network itself~\cite{DBLP:journals/corr/abs-2106-09685}.
 However, current PLM control techniques have not considered altering the \textit{original input text} to improve the performance of the model.  Here, we investigate this idea by training a secondary smaller PLM to paraphrase the original input at train and test time, thus augmenting the existing data and improving model performance.
 
 Our inspiration comes from interactions with young children.
@@ -104,9 +104,9 @@ Our experiments on seven text classification datasets demonstrate that incorpora
 \end{itemize}
 
 \section{Problem Formulation}
-We focus on classification problems in Natural Language Understanding (NLU) tasks where we have access to a mini-batch of supervised training examples $B_{\text{supp}} = \{(x_i, y_i)\}_{i=1}^{N}$. Our goal is to update the parameter set $\theta_{\text{lm}}$ for a language model by maximizing the probability of the class label $y_i$ given the input $x_i$: $P_{\theta_{\text{lm}}} (y_i | x_i)$. 
+We focus on classification problems in Natural Language Understanding (NLU) tasks where we have access to a mini-batch of supervised training examples $B_{\text{supp}} = \{(x_i, y_i)\}_{i=1}^{N}$. Our goal is to update the parameter set $\theta_{\text{lm}}$ for a language model by maximizing the probability of the class label $y_i$ given the input $x_i$: $P_{\theta_{\text{lm}}} (y_i | x_i)$.
 
-Here, we augment $B_{\text{supp}}$ with semi-supervised examples. In particular, we generate $M$ paraphrases for each $x_i$ using the paraphrase generator $P_{\theta_{\text{par}}} (z_{i,j} | x_i)$, where $z_{i,j}$ represents the $j$-th paraphrase for the input $x_i$.  In the optimal case, this paraphrase will preserve semantic meaning but vary syntactic/lexical form. 
+Here, we augment $B_{\text{supp}}$ with semi-supervised examples. In particular, we generate $M$ paraphrases for each $x_i$ using the paraphrase generator $P_{\theta_{\text{par}}} (z_{i,j} | x_i)$, where $z_{i,j}$ represents the $j$-th paraphrase for the input $x_i$.  In the optimal case, this paraphrase will preserve semantic meaning but vary syntactic/lexical form.
 
 We then incorporate the generated paraphrases to create a new mini-batch of examples $B_{\text{s+p}} = B_{\text{supp}} \cup B_{\text{para}}$.  Using this augmented mini-batch, we then optimize the following objective function:
 \begin{multline}
@@ -120,12 +120,12 @@ To train the language model using Equation \ref{lmfp-augmentation-objective}, we
 
 We assume that each input $x$ or its paraphrase $z$ is preceded by the task instruction $p$, which is often specified in previous works. The task instruction, which we represent using the symbol $p$ to be consist with prompt optimization literature, serves as a parameter-free, gradient-free technique for enhancing the performance of the PLM across various downstream tasks~\cite{DBLP:journals/corr/abs-2005-14165, petroni-etal-2019-language, deng-etal-2022-rlprompt}. When using only the task instructions, no parameters for the language model are updated ($\theta_{\text{lm}}=\emptyset$), and zero-shot predictions are made solely on the evaluation data. We further investigate the following language model tuning techniques while incorporating these task instructions into the input or its paraphrases.
 
-\textbf{Gradient-Search (GS):} 
+\textbf{Gradient-Search (GS):}
 The GS technique is based on the recent AUTOPROMPT~\cite{shin-etal-2020-autoprompt} method, which optimizes task instructions without updating any parameters in the model. The search process begins in the vocabulary space, optimizing the change in label log-likelihood when replacing token $p_{i}$ in the task instruction with another token $v$ from the vocabulary set. In our implementation, each search iteration randomly selects one mini-batch of training examples and then randomly selects a token from the task instruction to update. The top $k$ candidate tokens are determined based on the approximate change in label log-likelihood: $Top_v \; \{w^{T}_{v} . \nabla_{w_{p_i}} \log P_{\text{lm}}(y|p,x)\}$, where $w_v$ is the embedding vector of a candidate token $v$. The resulting $k$ new task instructions are evaluated again using label log-likelihood on the same training examples\footnote{The original AUTOPROMPT evaluates the new candidate instructions on another training mini-batch. For fewshot classification, we re-use the drawn training mini-batch to evaluate the complete new candidate instructions.}, and the top-performing instruction is retained for the next search iteration. Prompt optimization always uses the original input $x$ when searching new task prompts~\cite{shin-etal-2020-autoprompt, deng-etal-2022-rlprompt}. In our work, we investigate the impact of incorporating paraphrases of $x$ during search.
 
 \begin{comment}
 NOT NEEDED to SAVE SPACE.
-This process continues with the next iteration using another training mini-batch. We also monitor the task performance on the validation set and revert to the best saved task instruction if the current search instruction does not enhance validation performance. It is worth noting that this technique finds an optimized task instruction in the discrete space, which often yields ungrammatical strings~\cite{shin-etal-2020-autoprompt}. 
+This process continues with the next iteration using another training mini-batch. We also monitor the task performance on the validation set and revert to the best saved task instruction if the current search instruction does not enhance validation performance. It is worth noting that this technique finds an optimized task instruction in the discrete space, which often yields ungrammatical strings~\cite{shin-etal-2020-autoprompt}.
 \end{comment}
 
 \begin{comment}
@@ -133,19 +133,19 @@ This process continues with the next iteration using another training mini-batch
 \textbf{GrIPS:} The Gradient-free Edit-based Instruction Search (GrIPS)~\cite{prasad-etal-2023-grips} serves as our second parameter-free method for discrete prompt optimization. Similar to the previous GS technique, GrIPS conducts a search iteration over a training mini-batch. Within each iteration, a sequence of four edit operations is performed: randomly deleting one token from the instruction, randomly adding one of the previously deleted tokens back to the instruction, randomly swapping the position of two tokens in the instruction, and finally paraphrasing one of the tokens in the instruction using a pre-trained Pegasus paraphrase model~\cite{pmlr-v119-zhang20ae}. In evaluating candidate instructions, GrIPS uses a score function based on balanced accuracy, augmented with the entropy of predictions over the training mini-batch, instead of measuring the change in label log-likelihood~\cite{prasad-etal-2023-grips}. Similar to the GS method, we monitor the task performance on the development set to retain the best instruction if the new instructions are not enhancing the performance. Optimized instructions generated by GrIPS also tend to be ungrammatical strings. It is worth noting that the paraphrase model used in GrIPS has only been applied to the instructions, not the original text $x$. Therefore, we explore whether further paraphrasing of $x$ would enhance the performance of GrIPS in discovering instructions that offer better generalization.
 \end{comment}
 
-\textbf{Input-Finetuning (InTune):} As a straightforward and efficient tuning technique, we compare to updating only the input embedding table in the transformer architecture. This method requires gradient computation similar to All-Finetuning (AllTune) as well as the GS method. 
+\textbf{Input-Finetuning (InTune):} As a straightforward and efficient tuning technique, we compare to updating only the input embedding table in the transformer architecture. This method requires gradient computation similar to All-Finetuning (AllTune) as well as the GS method.
 
 \begin{comment}
 During training with InTune, $\Theta(V \times D)$ parameters are updated, where $D$ represents the dimension of the embedding vectors and $V$ denotes the vocabulary size~\footnote{Additionally, the bias and weight of the normalization layer associated with the input embedding table are also updated, but they are a function of the input embeddings.}.
 \end{comment}
 
-\textbf{LM-Head-Finetuning (HTune):} The transformer-based pre-trained language models consist of a language modeling head, which maps the hidden vectors to the token logit for each token in the vocabulary. For the HTune technique, we solely update the parameters of the language modeling head. 
+\textbf{LM-Head-Finetuning (HTune):} The transformer-based pre-trained language models consist of a language modeling head, which maps the hidden vectors to the token logit for each token in the vocabulary. For the HTune technique, we solely update the parameters of the language modeling head.
 
 \begin{comment}
 This process involves updating $\Theta(D \times V)$ parameters, where $D$ represents the dimension of the hidden vectors in the final layer of the transformer architecture, and $V$ denotes the vocabulary size.
 \end{comment}
 
-\textbf{Classifier-Finetuning (ClsTune):} In ClsTune, we first create a feature representation $h(x)$ for the input text $x$ using average pooling of the final hidden vectors in the last layer of the language model. Here, we assume that the language model (feature extractor) remains fixed, and we then construct a two-layer feedforward network with the $gelu$ activation function~\cite{DBLP:journals/corr/HendrycksG16} as a classification module on top of the language model. 
+\textbf{Classifier-Finetuning (ClsTune):} In ClsTune, we first create a feature representation $h(x)$ for the input text $x$ using average pooling of the final hidden vectors in the last layer of the language model. Here, we assume that the language model (feature extractor) remains fixed, and we then construct a two-layer feedforward network with the $gelu$ activation function~\cite{DBLP:journals/corr/HendrycksG16} as a classification module on top of the language model.
 
 \begin{comment}
 The classification module is defined as follows: $y = softmax(W \times gelu(U \times h(x) + f) + b)$. In ClsTune, we only update the weight matrices $W$ and $U$, along with the bias vectors $f$ and $b$. The total number of parameters to update in ClsTune is $\Theta(D' \times D + D' + C \times D' + C)$, where $D$ represents the dimension of the hidden vectors in the language model, $D'$ corresponds to the dimension of the bias vector $f$, and $C$ indicates the number of labels.
@@ -173,13 +173,13 @@ J_{\theta_{\text{par}}} := \log P(y | x) = \log E_{z \, \sim \, \theta_{\text{pa
 \label{lmfp-main-objective}
 \end{multline}
 
-To train the paraphrase generator and optimize the objective stated in Equation~\ref{lmfp-main-objective}, we explore four distinct learning aspects: 
+To train the paraphrase generator and optimize the objective stated in Equation~\ref{lmfp-main-objective}, we explore four distinct learning aspects:
 \begin{inparaenum}[(a)]
-\item two methods for gradient approximation, 
-\item a reward normalization technique, 
-\item three decoding techniques for sampling paraphrases, and 
-\item two approaches to ensure grammatical integrity during paraphrase generation. 
-\end{inparaenum} 
+\item two methods for gradient approximation,
+\item a reward normalization technique,
+\item three decoding techniques for sampling paraphrases, and
+\item two approaches to ensure grammatical integrity during paraphrase generation.
+\end{inparaenum}
 By combining these elements, we examine various learning approaches to refine the paraphrase generator with the aid of the downstream language model. In the subsequent paragraphs, we will describe our suggested options for each aspect.
 
 \textbf{Gradient Approximation}:
@@ -192,7 +192,7 @@ J_{\theta_{\text{par}}} := \log E_{z \, \sim \, P_{\theta_{\text{par}}}(.|x)} [e
 
 Given each input $x$, if we extract paraphrase samples from $P_{\theta_{\text{par}}}(.|x)$ and approximate the expectation in $J_{\theta_{\text{par}}}$ via numerical summation, we optimize the objective using MML estimation. This process results in the following gradient update:
 \begin{multline}
-\nabla J^{\text{MML}}_{\theta_{\text{par}}} := \nabla_{\theta_{\text{par}}} \log E_{z} [e^{R(z)}] \\ = 
+\nabla J^{\text{MML}}_{\theta_{\text{par}}} := \nabla_{\theta_{\text{par}}} \log E_{z} [e^{R(z)}] \\ =
 \sum^{M}_{j=1} \phi^{\text{MML}}(z_{j}) \times \nabla_{\theta_{\text{par}}} \log P_{\theta_{\text{par}}}(z_{j}|x) \\
 \phi^{\text{MML}}(z_{j}) = \frac{P_{\theta_{\text{par}}}(z_{j}|x) \times e^{R(z_{j})}}{\sum^{M}_{j^{'}=1} P_{\theta_{\text{par}}}(z_{j^{'}}|x) \times e^{R(z_{j^{'}})}}
 \label{mml-objective}
@@ -277,7 +277,7 @@ Given that some of our classification experiments were conducted on the GLUE ben
 \end{comment}
 
 For our main language model, we use the RoBERTa-large model pre-trained with the Masked Language Modeling (MLM) objective~\cite{DBLP:journals/corr/abs-1907-11692}, which has demonstrated strong performance on NLU tasks. Our proposed learning framework can be readily extended to other paraphrase generators or backbone language models.
-%To further test our hypotheses, we also experiment with the T5 model~\cite{DBLP:journals/corr/abs-1910-10683} with 3B parameters which has roughly 10x more parameters than the RoBERTa-large. T5-3B\footnote{Public model: \url{https://huggingface.co/t5-3b}} model has been trained for conditional sequence-to-sequence text generation and we use it for classifying text by scoring/comparing the probability of the generated class labels. 
+%To further test our hypotheses, we also experiment with the T5 model~\cite{DBLP:journals/corr/abs-1910-10683} with 3B parameters which has roughly 10x more parameters than the RoBERTa-large. T5-3B\footnote{Public model: \url{https://huggingface.co/t5-3b}} model has been trained for conditional sequence-to-sequence text generation and we use it for classifying text by scoring/comparing the probability of the generated class labels.
 
 
 
@@ -307,7 +307,7 @@ MML \small +zscoring & \small70.3 & \small\textbf{70.2} & \small70.2 & \small68.
 \label{maximum-curves-on-ppo}
 \end{table*}
 
-As discussed in Section~\ref{paraphrase-objectives}, there are four learning aspects to be considered when fine-tuning our paraphrase generator for the downstream language model. We conduct an extensive set of experiments in the 128-shot setting for the SST2 binary sentiment classification task. 
+As discussed in Section~\ref{paraphrase-objectives}, there are four learning aspects to be considered when fine-tuning our paraphrase generator for the downstream language model. We conduct an extensive set of experiments in the 128-shot setting for the SST2 binary sentiment classification task.
 
 \begin{figure}[h]
 \begin{center}
@@ -390,7 +390,7 @@ All of the recent techniques for prompt optimization and efficient tuning of the
 Our objective is not to present a state-of-the-art paraphrase generator, but rather to examine the impact of incorporating input paraphrases on the efficient tuning of LMs. Recent advancements in generating diverse paraphrases~\cite{zhou-bhat-2021-paraphrase} could provide better pre-trained models, thereby these techniques can enhance performance in all our experiments as our proposed RIFF technique can be seen as an extra fine-tuning step for the paraphrase model. These recent techniques encompass various approaches, including the use of copy mechanisms, Variational Autoencoders, Generative Adversarial Networks, and Reinforcement Learning techniques. For a comprehensive overview of neural paraphrase generation, please refer to a recent survey by Zhou and Bhat~\cite{zhou-bhat-2021-paraphrase}. While previous studies have applied RL techniques for paraphrase generation, we propose the use of MML gradients instead of policy gradients to fine-tune our paraphrase model.
 
 \section{Conclusion}
-We investigated the impact of incorporating input paraphrases while fine-tuning PLMs with recent prompt optimization and efficient tuning techniques. We also provided extensive experiments for reducing noise in a distantly supervised paraphrase generator. 
+We investigated the impact of incorporating input paraphrases while fine-tuning PLMs with recent prompt optimization and efficient tuning techniques. We also provided extensive experiments for reducing noise in a distantly supervised paraphrase generator.
 
 Recent study suggests that large PLMs face constraints related to the quantity of unique data points~\cite{muennighoff2023scaling}. A potential avenue for future research could explore whether the introduction of paraphrased inputs can mitigate these challenges for large PLMs during the pre-training stage.
 
@@ -438,7 +438,7 @@ Additional elements were taken from the formatting instructions of the \emph{Int
 \label{training-paraphrase-extra:appendix}
 
 
-This section provides additional results that compare our training objectives for fine-tuning the paraphrase generator using the feedback from the downstream language model. 
+This section provides additional results that compare our training objectives for fine-tuning the paraphrase generator using the feedback from the downstream language model.
 
 \begin{table}
 \centering
@@ -549,7 +549,7 @@ Method &  &  & \\
 \section{Further Training Details}
 \label{training-details-extra:appendix}
 
-The learning rate for each LM tuning technique was separately fine-tuned from the set \{0.5, 0.3, 0.1, 0.01, 0.001, 0.0001, 0.00001\} using the train/validation split created for the seed 11 on the SST2 dataset. The tuned learning rates were then applied globally across other datasets and experiments. For paraphrase fine-tuning, we train all the parameters in T5-base with the learning rate of 0.00001. In Tables~\ref{hyper-parameters} and~\ref{learning-rates}, we list the hyper-parameters and learning rates used across all datasets.  For optimization, we utilized the AdamW~\cite{DBLP:journals/corr/abs-1711-05101}\footnote{\url{https://pytorch.org/docs/stable/generated/torch.optim.AdamW.html}} optimizer with the AMSGrad variant set to True~\cite{DBLP:journals/corr/abs-1904-09237}. We implemented the methods using the HuggingFace\footnote{\url{https://huggingface.co/}} library and the PyTorch\footnote{\url{https://pytorch.org/}} machine learning framework. We report the accuracy metric on these classification datasets. The experiments were conducted using multiple NVIDIA's A40 GPU cards. 
+The learning rate for each LM tuning technique was separately fine-tuned from the set \{0.5, 0.3, 0.1, 0.01, 0.001, 0.0001, 0.00001\} using the train/validation split created for the seed 11 on the SST2 dataset. The tuned learning rates were then applied globally across other datasets and experiments. For paraphrase fine-tuning, we train all the parameters in T5-base with the learning rate of 0.00001. In Tables~\ref{hyper-parameters} and~\ref{learning-rates}, we list the hyper-parameters and learning rates used across all datasets.  For optimization, we utilized the AdamW~\cite{DBLP:journals/corr/abs-1711-05101}\footnote{\url{https://pytorch.org/docs/stable/generated/torch.optim.AdamW.html}} optimizer with the AMSGrad variant set to True~\cite{DBLP:journals/corr/abs-1904-09237}. We implemented the methods using the HuggingFace\footnote{\url{https://huggingface.co/}} library and the PyTorch\footnote{\url{https://pytorch.org/}} machine learning framework. We report the accuracy metric on these classification datasets. The experiments were conducted using multiple NVIDIA's A40 GPU cards.
 % This was facilitated by the GPU cluster provided by the Vector Institute\footnote{\url{https://vectorinstitute.ai/}}.
 
 \begin{table}[t]
@@ -597,7 +597,7 @@ InTune &  0.001 \\
 HTune & 0.001 \\
 ClsTune & 0.001 \\
 SpTune & 0.001 \\
-LoRA & 0.0001 
+LoRA & 0.0001
 \end{tabular}
 \label{learning-rates}
 \end{table}
@@ -659,7 +659,7 @@ FluentPrompt~\cite{shi2022human} is a recent discrete prompting technique based 
 
 Building upon SpTune~\cite{lester-etal-2021-power} and P-tuning~\cite{li-liang-2021-prefix}, P-tuning V2~\cite{liu-etal-2022-p} introduced the concept of deep prompt tuning. This method involves injecting prompt vectors into the deeper layers of the transformer model to close the performance gap with AllTuning in medium-sized language models. We have experimented with LoRA~\cite{DBLP:journals/corr/abs-2106-09685}, a recent low-rank adaptation technique for tuning language models. Other potential methods include training bottleneck adapter modules~\cite{DBLP:journals/corr/abs-1902-00751, lin-etal-2020-exploring} added per sub-layer of the transformer model. LoRA outperforms adapter tuning and P-Tuning V2 techniques ~\cite{DBLP:journals/corr/abs-2106-09685}. The successors of LoRA include DyLoRA~\cite{valipour-etal-2023-dylora}  which dynamically learns a range of adaptation ranks, thus eliminating the need to search the rank of the adaptation matrices as a hyper-parameter. Similarly, AdaLoRA dynamically allocates the parameter budget among the weight matrices during adaptation, with matrices of higher priority (i.e., those with greater importance to the downstream task) receiving higher adaptation ranks than less important matrices~\cite{zhang2023adaptive}.
 
-In scenarios where gradients are absent, Black-Box Tuning~\cite{DBLP:journals/corr/abs-2201-03514} applies derivative-free algorithms for optimizing continuous prompts. For discrete prompt optimization, RLPrompt~\cite{deng-etal-2022-rlprompt} employs the on-policy version of soft Q-learning~\cite{https://doi.org/10.48550/arxiv.2106.07704} to find the optimal prompt tokens in a gradient-free setting. Decoder Tuning~\cite{cui-etal-2023-decoder} learns a decoder network over the language model, thus circumventing the need for gradient computation and input-side prompt tuning in few-shot classification. In a recent study, TEMPERA~\cite{zhang2022tempera} introduced a novel approach that involves test-time discrete prompt editing using a trained RL agent. This agent is capable of modifying the instruction, in-context examples, or the verbalizers based on the given task input. 
+In scenarios where gradients are absent, Black-Box Tuning~\cite{DBLP:journals/corr/abs-2201-03514} applies derivative-free algorithms for optimizing continuous prompts. For discrete prompt optimization, RLPrompt~\cite{deng-etal-2022-rlprompt} employs the on-policy version of soft Q-learning~\cite{https://doi.org/10.48550/arxiv.2106.07704} to find the optimal prompt tokens in a gradient-free setting. Decoder Tuning~\cite{cui-etal-2023-decoder} learns a decoder network over the language model, thus circumventing the need for gradient computation and input-side prompt tuning in few-shot classification. In a recent study, TEMPERA~\cite{zhang2022tempera} introduced a novel approach that involves test-time discrete prompt editing using a trained RL agent. This agent is capable of modifying the instruction, in-context examples, or the verbalizers based on the given task input.
 
 The use of Language Models (LLMs) in generating instructions for downstream tasks has involved a two-step process. Initially, LLMs generate a set of candidate instructions, and subsequently, the highest-scoring instruction is utilized to prompt another LLM to perform the downstream task. This approach, known as prompt-based generation-then-filtering, has been investigated in the recent APE method~\cite{zhou2023large}. APE demonstrates the ability to generate prompts that achieve performance comparable to human-designed prompts~\cite{zhou2023large}.
 
