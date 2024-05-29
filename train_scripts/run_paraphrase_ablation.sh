@@ -4,7 +4,7 @@ rates=(0.00001)
 exps=(all_finetune)
 seeds=(100 13 21 42 87)
 num_classes=(2)
-tasks=(subj)
+tasks=(sst2)
 losses=(mml_zscore)
 sampling_methods=(ppo)
 sampling_algs=(mixed)
@@ -32,8 +32,8 @@ do
                         do
                             sampling_method=${sampling_methods[$s_m]}
                             TOKENIZERS_PARALLELISM=false bash src/reference_implementations/run_prompt.sh \
-                                SCRIPT=src/reference_implementations/prompt_zoo/fewshot_lmfps.sh \
-                                LOG_DIR=./roberta-exps-logs-lmfps \
+                                SCRIPT=src/reference_implementations/prompt_zoo/fewshot_para_finetune.sh \
+                                LOG_DIR=./roberta-exps-logs-para_finetune \
                                 EXP_TYPE=${exp} \
                                 TASK=${task} \
                                 SEED=${seed} \
@@ -49,7 +49,7 @@ do
                                 SAMPLING_ALG=${sampling_alg} \
                                 METRIC_TO_SAVE=accuracy \
                                 KL_COEFFICIENT=0.1 \
-                                CLUSTER_NAME=vcluster \
+                                CLUSTER_NAME=linux \
                                 GPU_TYPE=a40
                         done
                     done

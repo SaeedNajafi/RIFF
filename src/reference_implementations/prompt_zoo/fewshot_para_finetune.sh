@@ -53,7 +53,7 @@ mkdir -p ${model_path}
 # delay purge in the checkpoint and job_id
 touch ${checkpoint_path}/DELAYPURGE
 
-data_path=/h/snajafi/codes/paraphrase_inputs_for_prompts/16-shot
+data_path=./16-shot
 train_file=${data_path}/${TASK_NAME}/16-${RANDOM_SEED}/train.tsv
 dev_file=${data_path}/${TASK_NAME}/16-${RANDOM_SEED}/dev.tsv
 test_file=${data_path}/${TASK_NAME}/16-${RANDOM_SEED}/test.tsv
@@ -139,5 +139,5 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --use_cache 1 \
     --lm_type "roberta"
 
-
-rm -r -f ${model_path}/roberta_model_best_step
+# remove if we do not need the model weights.
+# rm -r -f ${model_path}/roberta_model_best_step

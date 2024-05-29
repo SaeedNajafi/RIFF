@@ -35,7 +35,7 @@ elif [ "${CLUSTER_NAME}" = "vcluster" ]; then
     checkpoint_path=/checkpoint/$USER/${SLURM_JOB_ID}
 
 elif [ "${CLUSTER_NAME}" = "linux" ]; then
-    checkpoint_path=./checkpoint
+    checkpoint_path=~/checkpoint
 fi
 
 # create checkpoint path if it doesn't exist.
