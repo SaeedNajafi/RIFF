@@ -5,7 +5,7 @@ from setuptools import find_packages, setup
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(HERE, "README.md")).read()
-VERSION = "0.3"
+VERSION = "1.0"
 
 # Publicly Available Packages (PyPi)
 INSTALL_REQUIRES = ["ipython", "jupyterlab", "matplotlib"]

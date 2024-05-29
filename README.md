@@ -1,14 +1,14 @@
 # Paraphrasing the Inputs
-This repository holds all of the code associated with the research side of my projects considering prompt engineering and paraphrasing the inputs for large language models.
+This repository holds all of the code associated with the research side of my projects considering prompt engineering and paraphrasing the inputs for language models.
 
 The static code checker runs on python3.9
 
 # Installing dependencies
 
-## Virtualenv installing on Cirrus VM
-You can call `setup.sh` with the `OS=cirrus` flag. This installs python in the linux VM and installs the ML libraries for the GPU cards.
+## Virtualenv installing on linux VM
+You can call `setup.sh` with the `OS=linux` flag. This installs python in the linux VM and installs the ML libraries for the GPU cards.
 ```
-bash setup.sh OS=cirrus ENV_NAME=prompt_torch DEV=true
+bash setup.sh OS=linux ENV_NAME=prompt_torch DEV=true
 ```
 
 ## Virtualenv installing on Vector's GPU Cluster
@@ -28,9 +28,15 @@ You can also get pre-commit to fix your code
 pre-commit run
 ```
 
-# Running the Experiment on the Narval Cluster.
+## Reference
+Please cite the following article published in *ACL 2024 (findings)*.
 ```
-bash train_scripts/run_augmentation_experiments.sh \
-    TIME=0-3:00 AUG=0 LR=0.001 EXP_TYPE=soft_prompt_finetune \
-    TASK=sst2 FEWSHOT_SIZE=32 CLUSTER_NAME=narval NUM_CLASSES=2
+@misc{najafi2024riff,
+      title={RIFF: Learning to Rephrase Inputs for Few-shot Fine-tuning of Language Models},
+      author={Saeed Najafi and Alona Fyshe},
+      year={2024},
+      eprint={2403.02271},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL}
+}
 ```

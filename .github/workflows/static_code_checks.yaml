@@ -1,4 +1,3 @@
-# only has to pass for python 3.8
 name: Static code checks
 
 on:

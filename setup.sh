@@ -35,7 +35,7 @@ function install_env () {
 		source $ENV_NAME-env/bin/activate
 		pip install --upgrade pip
 
-	elif [ "$OS" = "cirrus" ]; then
+	elif [ "$OS" = "linux" ]; then
 		python3.9 -m venv $ENV_NAME-env
 		source $ENV_NAME-env/bin/activate
 		mkdir -p $HOME/tmp
@@ -50,10 +50,8 @@ function install_ml_libraries () {
 		# Installs torch for the mac.
 		pip install torch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 --no-cache-dir
 
-		# Installs tensorflow cpu on mac.
-		# Tensorflow 2.10 cannot recognize the cublas library.
-		# https://github.com/google-research/multinerf/issues/47#issuecomment-1258045656
-		pip install https://storage.googleapis.com/tensorflow/mac/cpu/tensorflow-2.9.2-cp39-cp39-macosx_10_14_x86_64.whl
+		python -m pip install tensorflow
+
 
 		# Installs jax for cpu on mac.
 		pip install --upgrade "jax[cpu]"
@@ -62,7 +60,7 @@ function install_ml_libraries () {
 		python -m pip install tensorflow
 		python -m pip install torch torchvision torchaudio
 
-	elif [ "$OS" = "cirrus" ]; then
+	elif [ "$OS" = "linux" ]; then
 		python3.9 -m pip install tensorflow
 
 		python3.9 -m pip install torch torchvision torchtext torchaudio
