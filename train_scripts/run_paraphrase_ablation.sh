@@ -3,8 +3,14 @@
 rates=(0.00001)
 exps=(all_finetune)
 seeds=(100 13 21 42 87)
+
+# for all tasks, uncomment.
+# num_classes=(2 2 2 4 5 6)
+# tasks=(sst2 cr mr agnews sst5 trec)
+
 num_classes=(2)
 tasks=(sst2)
+
 losses=(mml_zscore)
 sampling_methods=(ppo)
 sampling_algs=(mixed)
