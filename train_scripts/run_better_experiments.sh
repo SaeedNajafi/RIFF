@@ -12,14 +12,12 @@ done
 GPU_TYPE=${GPU_TYPE}
 
 # run for all these tasks.
-num_classes=(2 2 2 2 4 5 6)
-tasks=(sst2 cr mr subj agnews sst5 trec)
+num_classes=(2 2 2 4 5 6)
+tasks=(sst2 cr mr agnews sst5 trec)
 
-#rates=(0.0001 0.00001 0.001 0.001 0.001 0.001 0.5)
-#exps=(lora_finetune all_finetune input_finetune output_finetune soft_prompt_finetune classifier_finetune gradient_search)
+rates=(0.0001 0.00001 0.001 0.001 0.001 0.001 0.5)
+exps=(lora_finetune all_finetune input_finetune output_finetune soft_prompt_finetune classifier_finetune gradient_search)
 
-rates=(0.0001)
-exps=(lora_finetune)
 
 for t in ${!tasks[@]};
 do
@@ -32,7 +30,7 @@ do
         TOKENIZERS_PARALLELISM=false bash train_scripts/run_better_augmentation_experiments.sh \
             LR=${rate} \
             EXP_TYPE=${exp} TASK=${task} \
-            FEWSHOT_SIZE=16 CLUSTER_NAME=vcluster NUM_CLASSES=${num_class} \
+            FEWSHOT_SIZE=16 CLUSTER_NAME=linux NUM_CLASSES=${num_class} \
             GPU_TYPE=${GPU_TYPE}
     done
 

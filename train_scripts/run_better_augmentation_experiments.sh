@@ -26,7 +26,7 @@ do
     seed=${seeds[$s]}
     bash src/reference_implementations/run_prompt.sh \
         TIME=${TIME} \
-        SCRIPT=src/reference_implementations/prompt_zoo/fewshot_data_augmentation.sh \
+        SCRIPT=src/reference_implementations/prompt_zoo/fewshot_data.sh \
         LOG_DIR=./roberta-exps-logs \
         EXP_TYPE=${EXP_TYPE} \
         TASK=${TASK} \
@@ -44,6 +44,6 @@ do
         METRIC_TO_SAVE=original_accuracy \
         KL_COEFFICIENT=0.0 \
         CLUSTER_NAME=${CLUSTER_NAME} \
-        PARA_MODEL_PATH=/checkpoint/snajafi/${TASK}-pretrained/${TASK}_${NUM_CLASSES}_16_all_finetune_${seed}_0.00001_0_1_0_mml_zscore_ppo_mixed_accuracy_0.1 \
+        PARA_MODEL_PATH=~/checkpoint/${TASK}-paraphraser-pretrained/${TASK}_${NUM_CLASSES}_16_all_finetune_${seed}_0.00001_0_1_0_mml_zscore_ppo_mixed_accuracy_0.1 \
         GPU_TYPE=${GPU_TYPE}
 done
