@@ -1,5 +1,5 @@
 """This module implements the functions for preprocessing the data files into
-pytorch datasets."""
+pytorch dataloaders."""
 
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple, Union

@@ -100,14 +100,7 @@ def create_softprompt_roberta(lm_type: str) -> torch.nn.Module:
     if lm_type == "roberta":
         # let the RobertaForMaskedLM load the initial checkpoint of the roberta
         # with the normal embedding table.
-        try:
-            roberta_model = RobertaForMaskedLM.from_pretrained(FLAGS.roberta_pretrained_model)
-        except Exception:
-            # load the local pre-trained model on narval.
-            # path to the local pre-trained models on the narval cluster.
-            NARVAL_PATH = "/home/saeednjf/scratch/paraphrase_inputs_for_prompts/models"
-            path = f"{NARVAL_PATH}/roberta-large-masked-lm"
-            roberta_model = RobertaForMaskedLM.from_pretrained(path)
+        roberta_model = RobertaForMaskedLM.from_pretrained(FLAGS.roberta_pretrained_model)
 
         d_model = roberta_model.config.hidden_size
         vocab_size = roberta_model.config.vocab_size
