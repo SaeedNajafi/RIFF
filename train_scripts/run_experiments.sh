@@ -19,9 +19,6 @@ CLUSTER_NAME=${CLUSTER_NAME}
 NUM_CLASSES=${NUM_CLASSES}
 GPU_TYPE=${GPU_TYPE}
 
-# seeds=(12321 42 2023 11 1993)
-# seeds used internally.
-
 seeds=(100 13 21 42 87)
 
 for s in ${!seeds[@]};
@@ -29,7 +26,7 @@ do
     seed=${seeds[$s]}
     bash src/reference_implementations/run_prompt.sh \
         TIME=${TIME} \
-        SCRIPT=src/reference_implementations/prompt_zoo/fewshot_data_augmentation.sh \
+        SCRIPT=src/reference_implementations/prompt_zoo/fewshot_data.sh \
         LOG_DIR=./roberta-exps-logs \
         EXP_TYPE=${EXP_TYPE} \
         TASK=${TASK} \

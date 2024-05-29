@@ -35,7 +35,7 @@ elif [ "${CLUSTER_NAME}" = "vcluster" ]; then
     checkpoint_path=/checkpoint/$USER/${SLURM_JOB_ID}
 
 elif [ "${CLUSTER_NAME}" = "linux" ]; then
-    checkpoint_path=/scratch/ssd004/scratch/snajafi/checkpoint
+    checkpoint_path=./checkpoint
 fi
 
 # create checkpoint path if it doesn't exist.
@@ -51,12 +51,15 @@ mkdir -p ${model_path}
 # delay purge in the checkpoint and job_id, required for vcluster.
 touch ${checkpoint_path}/DELAYPURGE
 
+# if to augment with paraphrases, copy the fine-tuned paraphraser to this model path.
 if [ "${LOAD_PARAPHRASER}" = "1" ]; then
     [[ -e ${PARA_MODEL_PATH}/para_t5_model_best_step ]] && cp -r ${PARA_MODEL_PATH}/para_t5_model_best_step ${model_path}/
     [[ -e ${PARA_MODEL_PATH}/t5_model_best_step ]] && cp -r ${PARA_MODEL_PATH}/t5_model_best_step ${model_path}/para_t5_model_best_step
 fi
 
-data_path=/h/snajafi/codes/paraphrase_inputs_for_prompts/16-shot
+# make sure to get data.
+
+data_path=./16-shot
 train_file=${data_path}/${TASK_NAME}/16-${RANDOM_SEED}/train.tsv
 dev_file=${data_path}/${TASK_NAME}/16-${RANDOM_SEED}/dev.tsv
 test_file=${data_path}/${TASK_NAME}/16-${RANDOM_SEED}/test.tsv
@@ -67,6 +70,7 @@ eval_batch_size=2
 max_seq_len=128
 test_sample_size=8
 max_epochs=100
+
 if [ "${EXPERIMENT_TYPE}" = "gradient_search" ]; then
     instruction_type=manual_template_research_${TASK_NAME}_no_instruction
     train_batch_size=2
@@ -116,7 +120,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --top_k 4 \
     --test_sampling_algorithm "beam_search" \
     --use_cache 1 \
-    --lm_type "t5"
+    --lm_type "roberta"
 
 # test phase
 python -m src.reference_implementations.prompt_zoo.trainer \
@@ -145,6 +149,7 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --top_k 4 \
     --test_sampling_algorithm "beam_search" \
     --use_cache 1 \
-    --lm_type "t5"
+    --lm_type "roberta"
 
-rm -r -f ${model_path}/t5_model_best_step
+# don't keep the model if you want.
+# rm -r -f ${model_path}/roberta_model_best_step
