@@ -28,6 +28,11 @@ You can also get pre-commit to fix your code
 pre-commit run
 ```
 
+## Download data.
+To download data, use the following link to get 16-shot splits for the classification tasks.
+
+https://github.com/mingkaid/rl-prompt/tree/main/examples/few-shot-classification/data/16-shot
+
 ## Reference
 Please cite the following article published in *ACL 2024 (findings)*.
 ```

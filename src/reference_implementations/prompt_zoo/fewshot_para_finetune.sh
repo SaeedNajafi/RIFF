@@ -53,6 +53,10 @@ mkdir -p ${model_path}
 # delay purge in the checkpoint and job_id
 touch ${checkpoint_path}/DELAYPURGE
 
+# Make sure to get data.
+# Download data from here:
+# https://github.com/mingkaid/rl-prompt/tree/main/examples/few-shot-classification/data/16-shot
+
 data_path=./16-shot
 train_file=${data_path}/${TASK_NAME}/16-${RANDOM_SEED}/train.tsv
 dev_file=${data_path}/${TASK_NAME}/16-${RANDOM_SEED}/dev.tsv

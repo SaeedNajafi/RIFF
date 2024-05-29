@@ -57,7 +57,9 @@ if [ "${LOAD_PARAPHRASER}" = "1" ]; then
     [[ -e ${PARA_MODEL_PATH}/t5_model_best_step ]] && cp -r ${PARA_MODEL_PATH}/t5_model_best_step ${model_path}/para_t5_model_best_step
 fi
 
-# make sure to get data.
+# Make sure to get data.
+# Download data from here:
+# https://github.com/mingkaid/rl-prompt/tree/main/examples/few-shot-classification/data/16-shot
 
 data_path=./16-shot
 train_file=${data_path}/${TASK_NAME}/16-${RANDOM_SEED}/train.tsv
