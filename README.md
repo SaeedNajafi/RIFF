@@ -1,7 +1,10 @@
-# Paraphrasing the Inputs
+# RIFF
 This repository holds all of the code associated with the research side of my projects considering prompt engineering and paraphrasing the inputs for language models.
+This repo implements the experiments in our paper:
 
-The static code checker runs on python3.9
+**RIFF: Learning to Rephrase Inputs for Few-shot Fine-tuning of Language Models**
+
+https://arxiv.org/pdf/2403.02271
 
 # Installing dependencies
 
@@ -18,6 +21,8 @@ bash setup.sh OS=vcluster ENV_NAME=prompt_torch DEV=true
 ```
 
 ## Using Pre-commit Hooks
+The static code checker runs on python3.9.
+
 To check your code at commit time
 ```
 pre-commit install
