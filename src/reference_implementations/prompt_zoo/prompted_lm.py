@@ -92,7 +92,7 @@ flags.DEFINE_string(
 flags.DEFINE_float(
     "kl_penalty_coefficient",
     0.1,
-    "What is the coefficient for the KL penalty used in the ppo algorithm?",
+    "What is the coefficient for the KL penalty used in the kl_on algorithm?",
 )
 flags.DEFINE_integer("classifier_hidden_d", 128, "The number of hidden units used in the classifier.")
 flags.DEFINE_integer("num_classes", 2, "Number of classes for classification. Only used in linear classifier.")
@@ -671,7 +671,7 @@ class LMPrompted(MyBaseLM):
                 device = 0  # put on same device
             elif self.lm in ["t5", "llama2"]:
                 device = 0
-            if FLAGS.sampling_method in ["off_policy", "ppo"]:
+            if FLAGS.sampling_method in ["off_policy", "kl_on"]:
                 # two t5 models, move to another gpu.
                 self.fixed_para_model = Paraphraser(seed, device=device, mode=FLAGS.mode, fixed=True)
                 self.para_model = Paraphraser(seed, device=device, mode=FLAGS.mode, fixed=False)
@@ -761,7 +761,7 @@ class LMPrompted(MyBaseLM):
             to_train_lm = True
 
         elif self.enable_paraphrase_training == 1:
-            if FLAGS.sampling_method in ["on_policy", "ppo"]:
+            if FLAGS.sampling_method in ["on_policy", "kl_on"]:
                 sampling_model = self.para_model
 
             elif FLAGS.sampling_method == "off_policy":
@@ -819,7 +819,7 @@ class LMPrompted(MyBaseLM):
 
             para_log_ps = self.para_model.para_t5_forward_pass(batch, train=True)
 
-            if FLAGS.sampling_method in ["off_policy", "ppo"]:
+            if FLAGS.sampling_method in ["off_policy", "kl_on"]:
                 # we also need this for off-policy sampling.
                 fixed_para_log_ps = self.fixed_para_model.para_t5_forward_pass(batch, train=False)
 
@@ -839,7 +839,7 @@ class LMPrompted(MyBaseLM):
             final_rewards = paraphrase_class_log_ps  # basic rewards.
             final_rewards_z = z_scoring(paraphrase_class_log_ps - normal_class_log_ps)
 
-            if FLAGS.sampling_method in ["off_policy", "ppo"]:
+            if FLAGS.sampling_method in ["off_policy", "kl_on"]:
                 para_log_ps = para_log_ps.to(self.device)
                 para_log_ps_copy = para_log_ps.detach().clone()
                 fixed_para_log_ps = fixed_para_log_ps.to(self.device)
@@ -867,7 +867,7 @@ class LMPrompted(MyBaseLM):
             elif FLAGS.paraphrase_loss == "mml_zscore":
                 if FLAGS.sampling_method == "off_policy":
                     ratio_log = para_log_ps - fixed_para_log_ps + final_rewards_z
-                elif FLAGS.sampling_method in ["on_policy", "ppo"]:
+                elif FLAGS.sampling_method in ["on_policy", "kl_on"]:
                     ratio_log = para_log_ps + final_rewards_z
                 mml_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
                 loss = mml_loss
@@ -875,12 +875,12 @@ class LMPrompted(MyBaseLM):
             elif FLAGS.paraphrase_loss == "mml_basic":
                 if FLAGS.sampling_method == "off_policy":
                     ratio_log = para_log_ps - fixed_para_log_ps + final_rewards
-                elif FLAGS.sampling_method in ["on_policy", "ppo"]:
+                elif FLAGS.sampling_method in ["on_policy", "kl_on"]:
                     ratio_log = para_log_ps + final_rewards
                 mml_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
                 loss = mml_loss
 
-            if FLAGS.sampling_method == "ppo":
+            if FLAGS.sampling_method == "kl_on":
                 # now we need to add the kl penalty.
                 kl_penalty = torch.mean(torch.mean((importance_ratio_log + 1) * para_log_ps, dim=1), dim=0)
                 loss = loss + FLAGS.kl_penalty_coefficient * kl_penalty

@@ -12,7 +12,7 @@ num_classes=(2)
 tasks=(sst2)
 
 losses=(mml_zscore)
-sampling_methods=(ppo)
+sampling_methods=(kl_on)
 sampling_algs=(mixed)
 
 for i in ${!rates[@]};
