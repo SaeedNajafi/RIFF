@@ -154,4 +154,4 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --lm_type "roberta"
 
 # don't keep the model if you want.
-# rm -r -f ${model_path}/roberta_model_best_step
+rm -r -f ${model_path}/roberta_model_best_step

@@ -33,12 +33,19 @@ You can also get pre-commit to fix your code
 pre-commit run
 ```
 
-## Download data.
+# Download data.
 To download data, use the following link to get 16-shot splits for the classification tasks.
 
 https://github.com/mingkaid/rl-prompt/tree/main/examples/few-shot-classification/data/16-shot
 
-## Reference
+# Training Scripts
+To train normal models without paraphrase augmentation, use the following train script.
+Currently, it will be run on a linux machine on a single GPU iteratively for different seeds, prompt optimization techniques and tasks. For a cluster of GPUs managed by **slurm**, it will submit different jobs in parallel (e.g. for the **vcluster**)
+```
+bash train_scripts/run_basic_experiments.sh
+```
+
+# Reference
 Please cite the following article published in *ACL 2024 (findings)*.
 ```
 @misc{najafi2024riff,
