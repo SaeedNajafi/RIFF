@@ -33,7 +33,7 @@ You can also get pre-commit to fix your code
 pre-commit run
 ```
 
-# Download data.
+# Download data
 To download data, use the following link to get 16-shot splits for the classification tasks.
 
 https://github.com/mingkaid/rl-prompt/tree/main/examples/few-shot-classification/data/16-shot
@@ -44,9 +44,14 @@ Currently, it will be run on a linux machine on a single GPU iteratively for dif
 ```
 bash train_scripts/run_basic_experiments.sh
 ```
+# Training Loop
+The losses for the downstream language model or the paraphraser model under different optimization techniques have been implemented in the following function:
+```
+https://github.com/SaeedNajafi/RIFF/blob/main/src/reference_implementations/prompt_zoo/prompted_lm.py#L754
+```
 
 # Reference
-Please cite the following article published in *ACL 2024 (findings)*.
+If you find the paper or the code helpful, please cite the following article published in *ACL 2024 (findings)*.
 ```
 @misc{najafi2024riff,
       title={RIFF: Learning to Rephrase Inputs for Few-shot Fine-tuning of Language Models},
