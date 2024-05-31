@@ -44,6 +44,17 @@ Currently, it will be run on a linux machine on a single GPU iteratively for dif
 ```
 bash train_scripts/run_basic_experiments.sh
 ```
+
+Then you can finetune the paraphraser with the RIFF objective. 
+```
+bash train_scripts/run_paraphrase_finetuning.sh
+```
+
+Finally, fix the path for the fine-tuned paraphraser, and train the downstream LM with paraphrase augmentation.
+```
+bash train_scripts/run_better_experiments.sh
+```
+
 # Training Loop
 The losses for the downstream language model or the paraphraser model under different optimization techniques have been implemented in the following function:
 ```
