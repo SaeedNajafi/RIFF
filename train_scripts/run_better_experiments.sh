@@ -18,7 +18,6 @@ tasks=(sst2 cr mr agnews sst5 trec)
 rates=(0.0001 0.00001 0.001 0.001 0.001 0.001 0.5)
 exps=(lora_finetune all_finetune input_finetune output_finetune soft_prompt_finetune classifier_finetune gradient_search)
 
-
 for t in ${!tasks[@]};
 do
     task=${tasks[$t]}

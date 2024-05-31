@@ -15,11 +15,13 @@ GPU_TYPE=${GPU_TYPE}
 num_classes=(2 2 2 4 5 6)
 tasks=(sst2 cr mr agnews sst5 trec)
 
+
 # learning rates.
 rates=(0.0001 0.00001 0.001 0.001 0.001 0.001 0.5)
 
 # experiment names.
 exps=(lora_finetune all_finetune input_finetune output_finetune soft_prompt_finetune classifier_finetune gradient_search)
+
 
 # zero means no paraphrase augmentation.
 augs=(0)

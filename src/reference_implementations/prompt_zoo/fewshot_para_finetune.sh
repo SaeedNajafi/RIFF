@@ -143,5 +143,6 @@ python -m src.reference_implementations.prompt_zoo.trainer \
     --use_cache 1 \
     --lm_type "roberta"
 
-# remove if we do not need the model weights.
-# rm -r -f ${model_path}/roberta_model_best_step
+# remove roberta, we do not need the LM model weights.
+# we only need the paraphraser.
+rm -r -f ${model_path}/roberta_model_best_step

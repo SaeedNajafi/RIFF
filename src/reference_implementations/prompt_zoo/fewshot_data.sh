@@ -67,8 +67,8 @@ dev_file=${data_path}/${TASK_NAME}/16-${RANDOM_SEED}/dev.tsv
 test_file=${data_path}/${TASK_NAME}/16-${RANDOM_SEED}/test.tsv
 
 instruction_type=manual_template_research_${TASK_NAME}_with_instruction
-train_batch_size=2
-eval_batch_size=2
+train_batch_size=8
+eval_batch_size=8
 max_seq_len=128
 test_sample_size=8
 max_epochs=100

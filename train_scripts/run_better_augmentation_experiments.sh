@@ -44,6 +44,6 @@ do
         METRIC_TO_SAVE=original_accuracy \
         KL_COEFFICIENT=0.0 \
         CLUSTER_NAME=${CLUSTER_NAME} \
-        PARA_MODEL_PATH=~/checkpoint/${TASK}-paraphraser-pretrained/${TASK}_${NUM_CLASSES}_16_all_finetune_${seed}_0.00001_0_1_0_mml_zscore_ppo_mixed_accuracy_0.1 \
+        PARA_MODEL_PATH=~/checkpoint/${TASK}_${NUM_CLASSES}_16_all_finetune_${seed}_0.00001_0_1_0_mml_zscore_kl_on_mixed_accuracy_0.1 \
         GPU_TYPE=${GPU_TYPE}
 done
