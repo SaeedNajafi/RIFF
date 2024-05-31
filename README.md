@@ -45,7 +45,7 @@ Currently, it will be run on a linux machine on a single GPU iteratively for dif
 bash train_scripts/run_basic_experiments.sh
 ```
 
-Then you can finetune the paraphraser with the RIFF objective. 
+Then you can finetune the paraphraser with the RIFF objective.
 ```
 bash train_scripts/run_paraphrase_finetuning.sh
 ```
