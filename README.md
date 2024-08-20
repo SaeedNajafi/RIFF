@@ -64,12 +64,20 @@ https://github.com/SaeedNajafi/RIFF/blob/main/src/reference_implementations/prom
 # Reference
 If you find the paper or the code helpful, please cite the following article published in *ACL 2024 (findings)*.
 ```
-@misc{najafi2024riff,
-      title={RIFF: Learning to Rephrase Inputs for Few-shot Fine-tuning of Language Models},
-      author={Saeed Najafi and Alona Fyshe},
-      year={2024},
-      eprint={2403.02271},
-      archivePrefix={arXiv},
-      primaryClass={cs.CL}
+@inproceedings{najafi-fyshe-2024-riff,
+    title = "{RIFF}: Learning to Rephrase Inputs for Few-shot Fine-tuning of Language Models",
+    author = "Najafi, Saeed  and
+      Fyshe, Alona",
+    editor = "Ku, Lun-Wei  and
+      Martins, Andre  and
+      Srikumar, Vivek",
+    booktitle = "Findings of the Association for Computational Linguistics ACL 2024",
+    month = aug,
+    year = "2024",
+    address = "Bangkok, Thailand and virtual meeting",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2024.findings-acl.85",
+    pages = "1447--1466",
+    abstract = "Pre-trained Language Models (PLMs) can be accurately fine-tuned for downstream text processing tasks. Recently, researchers have introduced several parameter-efficient fine-tuning methods that optimize input prompts or adjust a small number of model parameters (e.g LoRA). In this study, we explore the impact of altering the input text of the original task in conjunction with parameter-efficient fine-tuning methods. To most effectively rewrite the input text, we train a few-shot paraphrase model with a Maximum-Marginal Likelihood objective. Using six few-shot text classification datasets, we show that enriching data with paraphrases at train and test time enhances the performance beyond what can be achieved with parameter-efficient fine-tuning alone. The code used for our experiments can be found at https://github.com/SaeedNajafi/RIFF.",
 }
 ```
